@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from shared.image_downloader import download_image
 from shared.utils import sanitize_filename  
-from shared.html_loader import load_html_as_dom_tree, get_self_link
+from shared.html_loader import load_html_as_dom_tree
 from tqdm import tqdm
 
 class Product:
@@ -14,8 +14,6 @@ class Product:
         self.short_description = ""
         self.description = ""
         self.variants = []
-        self.price = 0
-        self.discount = 0
         self.main_photo_link = ""
         self.photogallery_links = set()
         self.main_photo_filepath = ""
@@ -30,6 +28,13 @@ class Variant:
         self.basic_price = basic_price
         self.stock_status = stock_status
 
+def get_self_link(page_dom):
+    meta_tag = page_dom.find('meta', property='og:url')
+    if meta_tag:
+        return meta_tag['content']
+    else:
+        return ""
+        
 def extract_product_name(dom_tree):
     try:
         name_tag = dom_tree.find('div', class_='p-detail-inner-header').find('h1')
@@ -63,58 +68,86 @@ def extract_product_variants(dom_tree):
     variants = []
     try:
         variant_tags = dom_tree.find_all('div', {'class':'table-row', 'data-testid': 'productVariant'})
-        for variant_tag in variant_tags:
-            key_value_pairs = {}
-            name_tag = variant_tag.find('div', {'class':'variant-name', 'data-testid': 'productVariantName'})
-            if name_tag:
-                pairs = name_tag.text.split(',')
-                for pair in pairs:
-                    if ':' in pair:
-                        key, value = pair.split(':', 1)
-                        key_value_pairs[key.strip()] = value.strip()
-
-            current_price = 0
-            current_price_tag = variant_tag.find('div', {'class':'price-final', 'data-testid': 'productVariantPrice'})
-            if current_price_tag:
-                current_price = int(current_price_tag.text.replace(' ', '').replace('Kč', ''))
-
-            basic_price = current_price
-            basic_price_tag = variant_tag.find('span', class_='price-standard')
-            if basic_price_tag:
-                basic_price = int(basic_price_tag.find('span').text.replace(' ', '').replace('Kč', ''))
-
-            stock_status = ""
-            stock_status_tag = name_tag.find_next_sibling('span')
-            if stock_status_tag:
-                stock_status = stock_status_tag.text.strip()
-
+        if variant_tags:
+            for variant_tag in variant_tags:
+                key_value_pairs = {}
+                name_tag = variant_tag.find('div', {'class':'variant-name', 'data-testid': 'productVariantName'})
+                if name_tag:
+                    # Rozdělíme text podle čárky, ale necháme spojená desetinná čísla
+                    raw_pairs = name_tag.text.split(',')
+                    pairs = []
+                    current_pair = ""
+    
+                    for part in raw_pairs:
+                        if ':' in part:
+                            # Pokud aktuální část obsahuje dvojtečku, začíná nový klíč-hodnota pár
+                            if current_pair:
+                                pairs.append(current_pair.strip())
+                            current_pair = part
+                        else:
+                            # Přidáváme část k předchozímu klíč-hodnota páru (pro případ desetinné čárky)
+                            current_pair += ',' + part
+    
+                    if current_pair:
+                        pairs.append(current_pair.strip())
+    
+                    for pair in pairs:
+                        if ':' in pair:
+                            key, value = pair.split(':', 1)
+                            key_value_pairs[key.strip()] = value.strip()
+    
+                current_price = 0
+                current_price_tag = variant_tag.find('div', {'class':'price-final', 'data-testid': 'productVariantPrice'})
+                if current_price_tag:
+                    current_price = int(current_price_tag.text.replace(' ', '').replace('Kč', ''))
+    
+                basic_price = current_price
+                basic_price_tag = variant_tag.find('span', class_='price-standard')
+                if basic_price_tag:
+                    basic_price = int(basic_price_tag.find('span').text.replace(' ', '').replace('Kč', ''))
+    
+                stock_status = ""
+                stock_status_tag = name_tag.find_next_sibling('span')
+                if stock_status_tag:
+                    stock_status = stock_status_tag.text.strip()
+    
+                variant = Variant(key_value_pairs, current_price, basic_price, stock_status)
+                variants.append(variant)
+        else:
+            basic_price,current_price = extract_product_prices(dom_tree)
+            stock_status = extract_availability_tag(dom_tree)
+            key_value_pairs={}
             variant = Variant(key_value_pairs, current_price, basic_price, stock_status)
             variants.append(variant)
     except Exception as e:
         logging.error(f"Error extracting product variants: {e}", exc_info=True)
     return variants
 
-def extract_product_price(variants):
+def extract_product_prices(dom_tree):
     try:
-        if variants:
-            return max(variant.current_price for variant in variants)
-        return 0
-    except Exception as e:
-        logging.error(f"Error extracting product price: {e}", exc_info=True)
-    return 0
-
-def extract_product_discount(dom_tree, variants):
-    try:
-        if variants:
-            if all(variant.current_price == variants[0].current_price for variant in variants):
-                return variants[0].basic_price - variants[0].current_price
-            return 0
-        discount_tag = dom_tree.find('span', class_='price-save')
-        if discount_tag:
-            return int(discount_tag.text.strip().replace(' ', '').replace('–', '').replace('%', ''))
+        price_tag = dom_tree.find('div',class_='p-final-price-wrapper')
+        if price_tag:
+            current_price_tag = price_tag.find('span',class_='price-final-holder')
+            if current_price_tag:
+                current_price = int(current_price_tag.text.replace(' ', '').replace('Kč', ''))
+            basic_price = current_price
+            basic_price_tag = price_tag.find('span', class_='price-standard')
+            if basic_price_tag:
+                basic_price = int(basic_price_tag.find('span').text.replace(' ', '').replace('Kč', ''))
     except Exception as e:
         logging.error(f"Error extracting product discount: {e}", exc_info=True)
-    return 0
+    return basic_price,current_price
+
+def extract_availability_tag(dom_tree):
+    avaolability_label=""
+    try:
+        availability_tag = dom_tree.find('span',class_='availability-label')
+        if availability_tag:
+            availability_label = availability_tag.text
+    except Exception as e:
+        logging.error(f"Error extracting product discount: {e}", exc_info=True)
+    return availability_label
+
 
 def extract_product_main_photo_link(dom_tree):
     try:
@@ -150,8 +183,6 @@ def extract_product(filepath):
         product.short_description = extract_product_short_description(dom_tree)
         product.description = extract_product_description(dom_tree)
         product.variants = extract_product_variants(dom_tree)
-        product.price = extract_product_price(product.variants)
-        product.discount = extract_product_discount(dom_tree, product.variants)
         product.main_photo_link = extract_product_main_photo_link(dom_tree)
         product.photogallery_links = extract_product_photogallery_links(dom_tree)
         product.url = extract_product_link(dom_tree)

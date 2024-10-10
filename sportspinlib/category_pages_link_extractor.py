@@ -3,7 +3,8 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from sportspinlib.constants import MAIN_URL
 from tqdm import tqdm
-from shared.html_loader import load_html_as_dom_tree, get_self_link
+from shared.html_loader import load_html_as_dom_tree 
+from sportspinlib.product_attribute_extractor import get_self_link
 
 
 def extract_all_category_pages_links(category_firstpage_paths):

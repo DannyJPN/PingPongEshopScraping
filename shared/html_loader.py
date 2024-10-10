@@ -25,9 +25,3 @@ def load_html_as_dom_tree(filepath):
         logging.error(f"Error loading HTML file {filepath}: {e}", exc_info=True)
         return None
 
-def get_self_link(page_dom):
-    meta_tag = page_dom.find('meta', property='og:url')
-    if meta_tag:
-        return meta_tag['content']
-    else:
-        return ""
