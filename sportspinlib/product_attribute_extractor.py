@@ -143,7 +143,7 @@ def extract_availability_tag(dom_tree):
     try:
         availability_tag = dom_tree.find('span',class_='availability-label')
         if availability_tag:
-            availability_label = availability_tag.text
+            availability_label = availability_tag.text.strip()
     except Exception as e:
         logging.error(f"Error extracting product discount: {e}", exc_info=True)
     return availability_label

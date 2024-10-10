@@ -9,7 +9,7 @@ from sportspinlib.product_attribute_extractor import get_self_link
 
 def extract_all_category_pages_links(category_firstpage_paths):
     category_page_links = set()
-    with tqdm(total=len(category_firstpage_paths), desc="Downloading main images") as pbar:
+    with tqdm(total=len(category_firstpage_paths), desc="Extracting all category page links") as pbar:
         for firstpage_path in category_firstpage_paths:
             firstpage_dom = load_html_as_dom_tree(firstpage_path)
             category_page_links.update(extract_category_pages_links(firstpage_dom))
