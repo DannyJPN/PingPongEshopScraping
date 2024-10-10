@@ -2,6 +2,7 @@ import logging
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from tqdm import tqdm
+from sportspinlib.constants import MAIN_URL
 def extract_category_links(main_page_html):
     """
     Extracts category links from the main page HTML.
@@ -18,7 +19,7 @@ def extract_category_links(main_page_html):
                 href = link.get('href')
                 if href:
                     # Convert to absolute URL
-                    absolute_url = urljoin("https://sportspin.cz", href)
+                    absolute_url = urljoin(MAIN_URL, href)
                     category_links.add(absolute_url)
                 pbar.update(1)
 
