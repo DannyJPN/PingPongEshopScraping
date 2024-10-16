@@ -14,10 +14,13 @@ def load_html_as_dom_tree(filepath):
         if not os.path.exists(filepath):
             logging.error(f"File does not exist: {filepath}")
             return None
+
         with open(filepath, 'r', encoding='utf-8') as file:
             content = file.read()
+
         dom_tree = BeautifulSoup(content, 'lxml')
         return dom_tree
+
     except Exception as e:
         logging.error(f"Error loading HTML file {filepath}: {e}", exc_info=True)
         return None

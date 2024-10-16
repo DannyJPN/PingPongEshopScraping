@@ -139,7 +139,7 @@ def extract_product_prices(dom_tree):
     return basic_price,current_price
 
 def extract_availability_tag(dom_tree):
-    avaolability_label=""
+    availability_label=""
     try:
         availability_tag = dom_tree.find('span',class_='availability-label')
         if availability_tag:

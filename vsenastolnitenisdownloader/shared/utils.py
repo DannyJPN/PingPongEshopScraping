@@ -1,6 +1,6 @@
 import re
 from urllib.parse import quote
-from stotenlib.constants import CURRENT_DATE ,CSV_OUTPUT_NAME 
+from vsenastolnitenislib.constants import CURRENT_DATE ,CSV_OUTPUT_NAME 
 import html
 
 def sanitize_filename(filename):

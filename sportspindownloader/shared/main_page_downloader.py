@@ -1,8 +1,8 @@
 import os
 import logging
 from datetime import datetime
-from stotenlib.constants import MAIN_URL
-from stotenlib.constants import MAIN_PAGE_FILENAME
+from sportspinlib.constants import MAIN_URL
+from sportspinlib.constants import MAIN_PAGE_FILENAME
 from shared.webpage_downloader import download_webpage
 
 
