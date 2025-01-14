@@ -25,7 +25,7 @@ def download_image(url, filepath, overwrite=False, debug=False):
         # Download the image
         logging.debug(f"Downloading image from URL: {url} to filepath: {sanitized_filepath}")
         response = requests.get(url)
-        response.raise_for_status()  # Raise an HTTPError for bad responses
+        #response.raise_for_status()  # Raise an HTTPError for bad responses
 
         # Write the content to a file
         with open(sanitized_filepath, 'wb') as file:

@@ -13,7 +13,7 @@ def extract_all_product_detail_links(category_pages_downloaded_paths):
             pbar.update(1)
     logging.debug(product_detail_links)
     return product_detail_links
-    
+
 def extract_product_detail_links(category_page_filepath):
     """
     Extracts product detail URLs from the category page HTML.
@@ -36,6 +36,10 @@ def extract_product_detail_links(category_page_filepath):
         product_links = set()
 
         product_items = category_page_dom.find_all('div', {'data-testid': 'productItem'})
+        if not product_items:
+            logging.debug("No product items found.")
+            return set()
+
         for item in product_items:
             link = item.find('a', {'class': 'image'})
             if link:

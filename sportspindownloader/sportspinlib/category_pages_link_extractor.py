@@ -3,7 +3,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from sportspinlib.constants import MAIN_URL
 from tqdm import tqdm
-from shared.html_loader import load_html_as_dom_tree 
+from shared.html_loader import load_html_as_dom_tree
 from sportspinlib.product_attribute_extractor import get_self_link
 
 
@@ -53,7 +53,6 @@ def extract_category_pages_links(category_page_dom):
             logging.debug(f"Only one page URL: {first_page_url}")
             page_links.add(first_page_url)
 
-        
         unique_sorted_page_links = sorted(page_links)
         logging.debug(f"Unique sorted page links: {unique_sorted_page_links}")
         return unique_sorted_page_links

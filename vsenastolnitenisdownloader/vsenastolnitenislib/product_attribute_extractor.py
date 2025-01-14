@@ -60,7 +60,7 @@ def extract_product_short_description(dom_tree):
     try:
         span_tag = dom_tree.find('span', class_='sdesc')
         if span_tag:
-            return str(span_tag)
+            return " ".join(line.strip() for line in span_tag.decode_contents().splitlines())
         return ""
     except Exception as e:
         logging.error(f"Error extracting product short description: {e}", exc_info=True)
@@ -70,7 +70,7 @@ def extract_product_description(dom_tree):
     try:
         div_tag = dom_tree.find('div', id='collapseOne', class_='collapse show')
         if div_tag:
-            return str(div_tag)
+            return " ".join(line.strip() for line in div_tag.decode_contents().splitlines())
         return ""
     except Exception as e:
         logging.error(f"Error extracting product description: {e}", exc_info=True)
@@ -102,36 +102,48 @@ def extract_product_variants(dom_tree):
         key_value_pairs = []
         div_tags = dom_tree.find_all('div', class_='mb-2 pp-detail-options')
         logging.debug(f"Found {len(div_tags)} div tags with class 'mb-2 pp-detail-options'")
-        variant_values={}
-        all_input_tags=[]
+        variant_values = {}
+        all_input_tags = []
         for div_tag in div_tags:
-            input_tags = div_tag.find_all('input',type='radio')
+            input_tags = div_tag.find_all('input', type='radio')
             all_input_tags.extend(input_tags)
-            variant_single_vals=[{"name":input_tag['name'],"value_id":input_tag['value'],"value":input_tag.find_parent().text.strip()} for input_tag in input_tags]
+            variant_single_vals = []
+            for input_tag in input_tags:
+                parent = input_tag.find_parent()
+                if parent:
+                    variant_single_vals.append({"name": input_tag['name'], "value_id": input_tag['value'], "value": parent.text.strip()})
             for single_val in variant_single_vals:
                 if single_val['name'] not in variant_values:
-                    variant_values[single_val['name']]=[]
+                    variant_values[single_val['name']] = []
                 variant_values[single_val['name']].append(single_val['value'])
         keys = variant_values.keys()
-        values=variant_values.values()
+        values = variant_values.values()
         combinations = itertools.product(*values)
         for combo in combinations:
             result_dict = dict(zip(keys, combo))
             key_value_pairs.append(result_dict)
             logging.debug(f"Extracted key-value pair: {result_dict}")
-                    
+
         # Extract JS variants data
         js_variants = extract_product_js_variants(dom_tree)
         logging.debug(f"Extracted {len(js_variants)} JS variants")
 
         for key_value_pair in key_value_pairs:
-            keylist=list(key_value_pair.keys())
-            search_vals=[[{input['name']:input['value']} for input in all_input_tags if input['name'] == keylist[i]  and input.find_parent().text.strip() == key_value_pair[keylist[i]]    ] for i in range(len(keylist))]
-            search_terms=list(itertools.chain.from_iterable(search_vals))
-            search_list={}
+            keylist = list(key_value_pair.keys())
+            search_vals = []
+            for i in range(len(keylist)):
+                matches = []
+                for input in all_input_tags:
+                    if input['name'] == keylist[i]:
+                        parent = input.find_parent()
+                        if parent and parent.text.strip() == key_value_pair[keylist[i]]:
+                            matches.append({input['name']: input['value']})
+                search_vals.append(matches)
+            search_terms = list(itertools.chain.from_iterable(search_vals))
+            search_list = {}
             for d in search_terms:
                 search_list.update(d)
-            
+
             logging.debug(f"Processing combination: {key_value_pair}")
             pairkeys = search_list.keys()
             # Find matching JS variant

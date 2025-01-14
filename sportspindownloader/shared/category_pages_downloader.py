@@ -22,25 +22,23 @@ def download_category_pages(category_page_links, root_folder, overwrite=False, d
     downloaded_files = []
     pages_folder = get_pages_folder(root_folder)
 
-
     # Progress bar setup
     with tqdm(total=len(category_page_links), desc="Downloading all category pages") as pbar:
         for url in category_page_links:
             try:
                 # Parse URL to create a valid filename
                 parsed_url = urlparse(url)
-                filename = (parsed_url.path+parsed_url.query).strip("/").replace('/', '_') + '.html'
+                filename = (parsed_url.path + parsed_url.query).strip("/").replace('/', '_') + '.html'
                 logging.debug(f"Original filename: {filename}")
                 sanitized_filename = sanitize_filename(filename)
                 logging.debug(f"Sanitized filename: {sanitized_filename}")
                 file_path = os.path.join(pages_folder, sanitized_filename)
-                
+
                 logging.debug(f"Downloading webpage from URL: {url} to filepath: {file_path}")
                 # Download the webpage
-                download_webpage(url, file_path, overwrite=overwrite)
-
-                # Add the absolute path to the list of downloaded files
-                downloaded_files.append(os.path.abspath(file_path))
+                if download_webpage(url, file_path, overwrite=overwrite):
+                    # Add the absolute path to the list of downloaded files only if successful
+                    downloaded_files.append(os.path.abspath(file_path))
 
                 # Update progress bar
                 pbar.update(1)

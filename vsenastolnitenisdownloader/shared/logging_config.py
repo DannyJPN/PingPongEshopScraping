@@ -3,10 +3,15 @@ import colorlog
 import json
 import os
 import sys
-def setup_logging(debug=False):
+
+def setup_logging(debug=False, log_file="logs/logfile.log"):
     # Load color configuration from the JSON file
-    with open(os.path.join(os.path.dirname(sys.argv[0]),'shared/log_colors.json'), 'r') as f:
-        color_config = json.load(f)
+    try:
+        with open(os.path.join(os.path.dirname(sys.argv[0]), 'shared/log_colors.json'), 'r') as f:
+            color_config = json.load(f)
+    except Exception as e:
+        logging.error(f"Failed to load color configuration: {e}", exc_info=True)
+        raise
 
     # Set logging level based on the debug flag
     level = logging.DEBUG if debug else logging.INFO
@@ -25,8 +30,23 @@ def setup_logging(debug=False):
     )
 
     # Set up the console handler with the formatter
-    handler = logging.StreamHandler()
-    handler.setFormatter(formatter)
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
 
-    # Configure the root logger
-    logging.basicConfig(level=level, handlers=[handler])
+    # Set up the file handler with the formatter
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setFormatter(formatter)
+
+    # Get the root logger
+    root_logger = logging.getLogger()
+
+    # Remove any existing handlers from the root logger
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+
+    # Add both handlers to the root logger
+    root_logger.setLevel(level)
+    root_logger.addHandler(console_handler)
+    root_logger.addHandler(file_handler)
+
+    logging.debug(f"Logging setup complete. Log file: {log_file}")

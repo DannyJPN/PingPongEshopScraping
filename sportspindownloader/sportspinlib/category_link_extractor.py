@@ -3,6 +3,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 from sportspinlib.constants import MAIN_URL
+
 def extract_category_links(main_page_html):
     """
     Extracts category links from the main page HTML.
@@ -14,6 +15,10 @@ def extract_category_links(main_page_html):
         # Find all category links
         category_links = set()
         category_link_elements = main_page_html.find_all('a', {'data-testid': 'headerMenuItem'})
+        if not category_link_elements:
+            logging.warning("No category links found.")
+            return set()
+
         with tqdm(total=len(category_link_elements), desc="Extracting category links") as pbar:
             for link in category_link_elements:
                 href = link.get('href')

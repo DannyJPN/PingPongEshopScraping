@@ -51,8 +51,10 @@ def extract_product_link(dom_tree):
 def extract_product_short_description(dom_tree):
     try:
         short_description_tag = dom_tree.find('div', class_='description-inner', attrs={'data-testid': 'productCardDescr'})
-        if short_description_tag and short_description_tag.p:
-            return str(short_description_tag.p)
+        if short_description_tag:
+            p_tag = short_description_tag.find('p')
+            if p_tag:
+                return " ".join(line.strip() for line in p_tag.decode_contents().splitlines())
         return ""
     except Exception as e:
         logging.error(f"Error extracting product short description: {e}", exc_info=True)
@@ -62,7 +64,7 @@ def extract_product_description(dom_tree):
     try:
         description_tag = dom_tree.find('div', class_='description-inner', attrs={'data-testid': 'productCardDescr'})
         if description_tag:
-            return str(description_tag)
+            return " ".join(line.strip() for line in description_tag.decode_contents().splitlines())
         return ""
     except Exception as e:
         logging.error(f"Error extracting product description: {e}", exc_info=True)
@@ -79,7 +81,6 @@ def extract_product_variants(dom_tree):
                 key_value_pairs = {}
                 name_tag = variant_tag.find('td', {'class': 'variant', 'data-testid': 'productVariantName'})
                 if name_tag:
-                    # Replace both <br /> and <br/> with a newline character
                     raw_content = name_tag.decode_contents().replace('<br />', '\n').replace('<br/>', '\n')
                     raw_pairs = raw_content.split('\n')
                     for pair in raw_pairs:
@@ -99,10 +100,11 @@ def extract_product_variants(dom_tree):
                 basic_price = current_price
 
                 stock_status = ""
-                stock_status_tag = variant_tag.find('td', {'class': 'variant-availability'}).find('span', {'class': 'show-tooltip acronym'})
+                stock_status_tag = variant_tag.find('td', {'class': 'variant-availability'})
                 if stock_status_tag:
-                    # Correctly handle nested elements
-                    stock_status = stock_status_tag.text.strip()
+                    stock_status_span = stock_status_tag.find('span', {'class': 'show-tooltip acronym'})
+                    if stock_status_span:
+                        stock_status = stock_status_span.text.strip()
 
                 variant = Variant(key_value_pairs, current_price, basic_price, stock_status)
                 variants.append(variant)
@@ -125,23 +127,26 @@ def extract_product_variants(dom_tree):
 
 def extract_product_prices(dom_tree):
     try:
-        # Extract current price
+        current_price = 0.0
+        basic_price = 0.0
+
         current_price_tag = dom_tree.find('strong', class_='price sub-left-position', attrs={'data-testid': 'productCardPrice'})
         if current_price_tag:
             current_price = float(current_price_tag.text.replace(' ', '').replace('Kč', '').replace(',', '.'))
             logging.debug(f"Found current price: {current_price}")
-        else:
-            logging.warning("No current price found.")
-            return 0.0, 0.0
 
-        # Extract basic price
         basic_price_tag = dom_tree.find('td', class_='td-normal-price')
-        if basic_price_tag and basic_price_tag.find('span', class_='line'):
-            basic_price = float(basic_price_tag.find('span', class_='line').text.replace(' ', '').replace('Kč', '').replace(',', '.'))
-            logging.debug(f"Found basic price: {basic_price}")
+        if basic_price_tag:
+            line_span = basic_price_tag.find('span', class_='line')
+            if line_span:
+                basic_price = float(line_span.text.replace(' ', '').replace('Kč', '').replace(',', '.'))
+                logging.debug(f"Found basic price: {basic_price}")
+            else:
+                basic_price = current_price
+                logging.debug(f"No basic price found, setting basic price to current price: {basic_price}")
         else:
             basic_price = current_price
-            logging.debug(f"No basic price found, setting basic price to current price: {basic_price}")
+            logging.debug(f"No basic price tag found, setting basic price to current price: {basic_price}")
 
         return basic_price, current_price
     except Exception as e:
@@ -151,7 +156,6 @@ def extract_product_prices(dom_tree):
 def extract_product_main_photo_link(dom_tree):
     try:
         main_photo_link_tag = dom_tree.find('a', id='gallery-image')
-        logging.debug(f"Found mainphotolink {main_photo_link_tag}")
         if main_photo_link_tag:
             return main_photo_link_tag['href']
         return ""

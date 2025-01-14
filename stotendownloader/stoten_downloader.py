@@ -17,9 +17,14 @@ from shared.product_image_downloader import download_product_main_image
 from shared.product_image_downloader import download_product_gallery_images
 from stotenlib.constants import DEFAULT_RESULT_FOLDER  
 from shared.logging_config import setup_logging
-from shared.utils import get_csv_outfile
+from stotenlib.constants import CSV_OUTPUT_NAME 
 from shared.product_to_eshop_csv_saver import export_to_csv
 from tqdm import tqdm
+from stotenlib.constants import MAIN_URL
+from stotenlib.constants import MAIN_PAGE_FILENAME,CSV_OUTPUT_NAME, LOG_DIR
+from shared.utils import get_full_day_folder
+from shared.utils import get_log_filename
+
 # Constants
 
 
@@ -32,17 +37,24 @@ def parse_arguments():
 
 def main():
     args = parse_arguments()
-    setup_logging(args.debug)
+    if not os.path.exists(LOG_DIR):
+        os.makedirs(LOG_DIR)
+
+    # Generate the log filename
+    LOG_FILE = get_log_filename(LOG_DIR)
+
+    # Setup logging with the log file path
+    setup_logging(args.debug, LOG_FILE)
 
     root_folder = args.result_folder
     overwrite = args.overwrite
-    debug = args.debug
+    
 
     # Ensure directories
     ensure_directories(root_folder)
 
     # Step 1: Download main webpage
-    main_page_path = download_main_page(root_folder, overwrite)
+    main_page_path = download_main_page(root_folder,MAIN_URL,MAIN_PAGE_FILENAME,overwrite)
     if not main_page_path:
         logging.error("Failed to download main page.")
         return
@@ -78,7 +90,7 @@ def main():
     download_product_gallery_images(products,root_folder, overwrite)
     
     # Step 10: Generate the final CSV output
-    csv_output_path = get_csv_outfile(root_folder)
+    csv_output_path = f"{get_full_day_folder(root_folder)}/{CSV_OUTPUT_NAME}"
     export_to_csv(csv_output_path,products)
     
 if __name__ == "__main__":

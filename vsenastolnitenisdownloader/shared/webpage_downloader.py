@@ -21,17 +21,26 @@ def download_webpage(url, filepath, overwrite=False, debug=False):
         # Check if file already exists
         if not overwrite and os.path.exists(sanitized_filepath):
             logging.debug(f"File already exists and overwrite is not set: {sanitized_filepath}")
-            return
+            return True
 
         # Download the webpage
         logging.debug(f"Making HTTP request to URL: {url}")
         response = requests.get(url)
-        response.raise_for_status()  # Raise an HTTPError for bad responses
+
+        if response.status_code == 404:
+            logging.debug(f"404 Not Found for URL: {url}")
+            return False
+        else:
+            response.raise_for_status()  # Raise an HTTPError for other bad responses
+
         logging.debug(f"Downloading webpage from URL: {url} to filepath: {sanitized_filepath}")
 
         # Write the content to a file
         with open(sanitized_filepath, 'w', encoding='utf-8') as file:
             file.write(response.text)
 
+        return True
+
     except Exception as e:
         logging.error(f"Error downloading {url} to {sanitized_filepath}: {e}", exc_info=True)
+        return False
