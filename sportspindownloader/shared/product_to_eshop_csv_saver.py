@@ -5,10 +5,8 @@ import json
 
 def export_to_csv(csv_output_path,products):
     with open(csv_output_path, 'w', newline='', encoding='utf-8') as csvfile:
-        csvwriter = csv.writer(csvfile)
-        # Write the header
-        csvwriter.writerow(['Name', 'Short Description', 'Description',  'Main Photo Filepath', 'Gallery Filepaths', 'Variants','URL'])
-        # Write product data
+        writer = csv.writer(csvfile)
+        writer.writerow(['Name', 'Short Description', 'Description',  'Main Photo Filepath', 'Gallery Filepaths', 'Variants','URL'])
         with tqdm(total=len(products), desc="Exporting to csv") as pbar:
             for product in products:
                 csvwriter.writerow([

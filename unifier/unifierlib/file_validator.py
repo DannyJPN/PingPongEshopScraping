@@ -1,7 +1,23 @@
 import os
 import logging
+import sys
+from shared.file_loader import load_csv_file
 from pathlib import Path
-from unifierlib.constants import SUPPORTED_LANGUAGES_LIST
+from unifierlib.constants import SUPPORTED_LANGUAGES_FILE
+from unifierlib.constants import (
+    BRAND_CODE_LIST,
+    CATEGORY_CODE_LIST,
+    CATEGORY_SUB_CODE_LIST,
+    CATEGORY_LIST,
+    CATEGORY_ID_LIST,
+    DEFAULT_UNIFIED_PRODUCT_VALUES,
+    CATEGORY_MAPPING_HEUREKA_PREFIX,
+    CATEGORY_MAPPING_ZBOZI_PREFIX,
+    CATEGORY_MAPPING_GLAMI_PREFIX,
+    CATEGORY_MAPPING_GOOGLE_PREFIX
+)
+
+
 
 def ensure_directory_exists(directory_path: str) -> None:
     """
@@ -12,56 +28,34 @@ def ensure_directory_exists(directory_path: str) -> None:
     """
     try:
         path = Path(directory_path)
-        logging.debug(f"Absolute path being created: {path.absolute()}")
-        logging.debug(f"Is path absolute? {path.is_absolute()}")
-
-        # If the path is not absolute and it's the Memory directory
-        if not path.is_absolute() and "Memory" in str(path):
-            script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            logging.debug(f"Script directory: {script_dir}")
-            logging.debug("Converting relative path to absolute using script directory")
-            path = Path(script_dir) / path
-            logging.debug(f"New absolute path: {path.absolute()}")
-
         if not path.exists():
             path.mkdir(parents=True)
-            logging.info(f"Created directory: {path}")
+            logging.info(f"Created directory: {directory_path}")
         else:
-            logging.debug(f"Directory already exists: {path}")
+            logging.debug(f"Directory already exists: {directory_path}")
     except Exception as e:
         logging.error(f"Failed to create directory {directory_path}: {str(e)}", exc_info=True)
         raise
 
 def create_supported_languages_list(memory_dir: str) -> None:
     """
-    Create SupportedLanguagesList.txt with default 'CS' content if it doesn't exist.
+    Create SupportedLanguagesList.txt with default 'CS' content if it doesn't exist or is empty.
 
     Args:
         memory_dir: Path to the memory directory
     """
     try:
-        # Convert memory_dir to absolute path if it's relative
-        if not Path(memory_dir).is_absolute() and "Memory" in memory_dir:
-            script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            memory_dir = str(Path(script_dir) / memory_dir)
-            logging.debug(f"Converted memory directory to absolute path: {memory_dir}")
-
-        languages_file = Path(memory_dir) / SUPPORTED_LANGUAGES_LIST
-        
-        # Add debug logging for file existence and content
-        logging.debug(f"SupportedLanguagesList.txt content before creation: {'exists' if os.path.exists(languages_file) else 'does not exist'}")
-        if os.path.exists(languages_file):
-            with open(languages_file, 'r') as f:
-                logging.debug(f"Current content: {f.read()}")
-            # File exists, don't modify it
-            logging.debug(f"{SUPPORTED_LANGUAGES_LIST} already exists at {languages_file}")
-            return
-
-        # Only create and write to the file if it doesn't exist
-        languages_file.write_text("CS")
-        logging.info(f"Created {SUPPORTED_LANGUAGES_LIST} with default content 'CS'")
+        languages_file = Path(memory_dir) / SUPPORTED_LANGUAGES_FILE
+        if not languages_file.exists() or languages_file.stat().st_size == 0:
+            languages_file.write_text("CS")
+            if not languages_file.exists():
+                logging.info(f"Created {SUPPORTED_LANGUAGES_FILE} with default content 'CS'")
+            else:
+                logging.info(f"Updated {SUPPORTED_LANGUAGES_FILE} with default content 'CS' as it was empty")
+        else:
+            logging.debug(f"{SUPPORTED_LANGUAGES_FILE} already exists and is not empty at {languages_file}")
     except Exception as e:
-        logging.error(f"Failed to create {SUPPORTED_LANGUAGES_LIST}: {str(e)}", exc_info=True)
+        logging.error(f"Failed to create or update {SUPPORTED_LANGUAGES_FILE}: {str(e)}", exc_info=True)
         raise
 
 def validate_file_system(result_dir: str, memory_dir: str, export_dir: str) -> None:
@@ -87,10 +81,55 @@ def validate_file_system(result_dir: str, memory_dir: str, export_dir: str) -> N
             logging.debug(f"Validating {dir_name} directory: {directory}")
             ensure_directory_exists(directory)
 
-        # Create SupportedLanguagesList.txt if it doesn't exist
+        # Create SupportedLanguagesList.txt if it doesn't exist or is empty
         create_supported_languages_list(memory_dir)
 
         logging.info("File system validation completed successfully")
     except Exception as e:
         logging.error(f"File system validation failed: {str(e)}", exc_info=True)
         raise
+
+def validate_required_files(memory_dir):
+    required_files = [
+        BRAND_CODE_LIST,
+        CATEGORY_CODE_LIST,
+        CATEGORY_SUB_CODE_LIST,
+        CATEGORY_LIST,
+        CATEGORY_ID_LIST,
+        DEFAULT_UNIFIED_PRODUCT_VALUES
+    ]
+
+    # Add category mapping files
+    category_mapping_files = [
+        f"{CATEGORY_MAPPING_HEUREKA_PREFIX}.csv",
+        f"{CATEGORY_MAPPING_ZBOZI_PREFIX}.csv",
+        f"{CATEGORY_MAPPING_GLAMI_PREFIX}.csv",
+        f"{CATEGORY_MAPPING_GOOGLE_PREFIX}.csv"
+    ]
+
+    required_files.extend(category_mapping_files)
+
+    missing_files = []
+
+    for file_name in required_files:
+        file_path = os.path.join(memory_dir, file_name)
+        if not os.path.exists(file_path):
+            missing_files.append(file_name)
+            logging.warning(f"Missing required file: {file_name}")
+        else:
+            try:
+                if file_name.endswith('.csv'):
+                    data = load_csv_file(file_path)
+                    logging.info(f"Loaded {len(data)} entries from {file_name}")
+                elif file_name.endswith('.txt'):
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        lines = f.readlines()
+                        logging.info(f"Loaded {len(lines)} entries from {file_name}")
+            except Exception as e:
+                logging.error(f"Error loading file: {file_name}. Error: {e}", exc_info=True)
+                sys.exit(1)
+
+    if missing_files:
+        missing_files_str = ', '.join(missing_files)
+        logging.error(f"Missing required files: {missing_files_str}. Terminating the script.")
+        sys.exit(1)

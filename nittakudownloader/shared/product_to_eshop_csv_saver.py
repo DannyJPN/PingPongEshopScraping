@@ -5,7 +5,7 @@ import json
 
 def export_to_csv(csv_output_path, products):
     with open(csv_output_path, 'w', newline='', encoding='utf-8') as csvfile:
-        fieldnames = ['name', 'short_description', 'description', 'main_photo_filepath', 'gallery_photo_filepaths', 'variants', 'url']
+        csvwriter.writerow(['Name', 'Short Description', 'Description',  'Main Photo Filepath', 'Gallery Filepaths', 'Variants','URL'])
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
         writer.writeheader()

@@ -2,35 +2,40 @@ import os
 import sys
 import argparse
 import logging
-from pathlib import Path
+from datetime import datetime
+from tqdm import tqdm
 from shared.logging_config import setup_logging
-from shared.csv_handler import load_csv, save_csv
 from shared.utils import get_log_filename
-from unifierlib.file_validator import validate_file_system
-from unifierlib.memory_files import create_memory_files
-from unifierlib.eshop_handler import process_eshop_list, generate_script_name
-from unifierlib.script_executor import execute_scripts_parallel
-from unifierlib.eshop_scanner import scan_eshop_folders
-from unifierlib.json_handler import load_pinces_json
-from unifierlib.product_transformer import ProductTransformer
+from unifierlib.file_validator import validate_file_system,validate_required_files
+from shared.file_loader import load_supported_languages,load_json_file
+from unifierlib.memory_loader import load_memory_files
+from unifierlib.eshop_handler import load_eshop_names
+from unifierlib.script_generator import generate_eshop_scripts
+from unifierlib.parallel_executor import execute_scripts_in_parallel
+from unifierlib.eshop_data_handler import load_eshop_csv_files,find_newest_eshop_csv_files,transform_csv_data,transform_json_data,find_newest_json_file
+from unifierlib.downloaded_product import DownloadedProduct
+
 from unifierlib.constants import (
     DEFAULT_LANGUAGE,
     DEFAULT_RESULT_DIR,
     DEFAULT_MEMORY_DIR,
     DEFAULT_EXPORT_DIR,
     DEFAULT_CONFIRM_AI_RESULTS,
-    DEFAULT_UNIFIED_PRODUCT_VALUES,
     LOG_DIR
 )
 
 def validate_language(value):
-    """Validate that language is 2 characters and convert to uppercase."""
-    value = value.upper()
-    if len(value) != 2:
-        raise argparse.ArgumentTypeError(
-            f"Language must be exactly 2 characters long, got {len(value)}"
-        )
-    return value
+    """Validate that language is a 2-character ISO 639-1 code and convert to uppercase."""
+    try:
+        value = value.upper()  # Convert to uppercase immediately
+        if len(value) != 2:
+            raise argparse.ArgumentTypeError(
+                f"Language must be exactly 2 characters long, got {len(value)}"
+            )
+        return value
+    except Exception as e:
+        logging.error(f"Error validating language: {e}", exc_info=True)
+        raise
 
 def parse_arguments():
     """Parse and validate command line arguments."""
@@ -88,127 +93,84 @@ def parse_arguments():
     return args
 
 def main():
+
+    # Ensure the log directory exists
+    if not os.path.exists(LOG_DIR):
+        os.makedirs(LOG_DIR)
+        logging.debug(f"Created log directory: {LOG_DIR}")
+
+    # Parse arguments first to get debug flag
+    args = parse_arguments()
+
+    # Generate the log filename
+    log_file = get_log_filename(LOG_DIR)
+    logging.debug(f"Generated log filename: {log_file}")
+
+    # Setup logging with the log file path
+    setup_logging(args.Debug, log_file)
+
+    # Log script start time
+    start_time = datetime.now()
+    logging.info(f"Script started at {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    # Log script location and working directory
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    logging.debug(f"Script location: {script_dir}")
+    logging.debug(f"Current working directory: {os.getcwd()}")
+
+    # Validate and ensure necessary directories exist
+    validate_file_system(args.ResultDir, args.MemoryDir, args.ExportDir)
+
+    # Load supported languages
+    supported_languages = load_supported_languages(args.MemoryDir)
+
+    # Validate the provided language argument against the supported languages
+    if args.Language not in supported_languages:
+        logging.error(f"Unsupported language: {args.Language}. Supported languages are: {supported_languages}")
+        sys.exit(1)  # Exit the script with a non-zero status
+
+    logging.info(f"Language '{args.Language}' is supported and validated successfully.")
+
+    # Validate required files
+    validate_required_files(args.MemoryDir)
+
+    # Load memory files
     try:
-        # Ensure the log directory exists
-        if not os.path.exists(LOG_DIR):
-            os.makedirs(LOG_DIR)
-            logging.debug(f"Created log directory: {LOG_DIR}")
-
-        # Parse arguments first to get debug flag
-        args = parse_arguments()
-
-        # Generate the log filename
-        log_file = get_log_filename(LOG_DIR)
-        logging.debug(f"Generated log filename: {log_file}")
-
-        # Setup logging with the log file path
-        setup_logging(args.Debug, log_file)
-
-        # Log script location and working directory
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        logging.debug(f"Script location: {script_dir}")
-        logging.debug(f"Current working directory: {os.getcwd()}")
-
-        # Log all arguments after logging is configured
-        logging.debug("Application started with arguments:")
-        for arg, value in vars(args).items():
-            logging.debug(f"{arg}: {value}")
-
-        # Validate and create necessary directories and files
-        logging.debug("Starting file system validation...")
-        validate_file_system(args.ResultDir, args.MemoryDir, args.ExportDir)
-        logging.debug("File system validation completed successfully")
-
-        # Create memory files for all supported languages
-        logging.debug("Starting memory files creation...")
-        create_memory_files(args.MemoryDir)
-        logging.debug("Memory files creation completed successfully")
-
-        # Create download scripts for eshops
-        logging.debug("Starting eshop scripts creation...")
-        process_eshop_list(args.MemoryDir, script_dir)
-        logging.debug("Eshop scripts creation completed successfully")
-
-        # Load eshop list for parallel execution
-        eshop_list_path = os.path.join(args.MemoryDir, "EshopList.csv")
-        logging.debug(f"Loading eshop list from {eshop_list_path}")
-        eshops, _ = load_csv(eshop_list_path)
-        logging.debug(f"Loaded {len(eshops)} eshops from EshopList.csv")
-
-        # Execute download scripts in parallel
-        logging.debug("Starting parallel execution of download scripts...")
-        script_paths = [
-            os.path.join(script_dir, generate_script_name(eshop['Name']))
-            for eshop in eshops
-        ]
-        execution_results = execute_scripts_parallel(script_paths)
-
-        # Log execution results
-        successful = sum(1 for r in execution_results if r['status'] == 'completed' and r['returncode'] == 0)
-        failed = len(execution_results) - successful
-        logging.debug(f"Script execution completed: {successful} successful, {failed} failed")
-
-        # Log detailed results for each script
-        for result in execution_results:
-            if result['status'] == 'completed' and result['returncode'] == 0:
-                logging.debug(f"Script {result['script']} completed successfully")
-            else:
-                logging.error(
-                    f"Script {result['script']} failed with status {result['status']}"
-                    f"{f', error: {result['error']}' if result['error'] else ''}"
-                )
-
-        # Scan for newest CSV files in eshop folders
-        logging.info("Starting to scan for newest CSV files in eshop folders...")
-        result_dir = Path(args.ResultDir)
-        valid_eshops = [eshop['Name'] for eshop in eshops]
-        logging.debug(f"Valid eshop names: {valid_eshops}")
-        csv_files = scan_eshop_folders(result_dir, valid_eshops)
-
-        if not csv_files:
-            logging.error("No CSV files found in eshop folders")
-            return
-
-        logging.info(f"Found {len(csv_files)} CSV files to process")
-        for csv_file in csv_files:
-            logging.debug(f"Found CSV: {csv_file}")
-
-        # Load PincesObchod JSON data
-        logging.info("Loading PincesObchod JSON data...")
-        json_data = load_pinces_json(result_dir, args.Language.upper())
-        if not json_data:
-            logging.error("Failed to load PincesObchod JSON data")
-            return
-
-        logging.info(f"Successfully loaded PincesObchod JSON with {len(json_data)} items")
-
-        # Transform JSON data into UnifiedExportProduct objects
-        try:
-            default_values_path = Path(args.MemoryDir) / DEFAULT_UNIFIED_PRODUCT_VALUES
-            transformer = ProductTransformer(default_values_path)
-            logging.info("Created ProductTransformer instance")
-
-            # Get list of products from JSON
-            products_list = next((v for v in json_data.values() if isinstance(v, list)), [])
-            logging.info(f"Found {len(products_list)} products to transform")
-
-            transformed_products = transformer.transform_products(products_list)
-            logging.info(f"Successfully transformed {len(transformed_products)} products")
-
-            # Log some statistics about transformed products
-            total_variants = sum(len(product_group) - 1 for product_group in transformed_products)
-            logging.info(f"Total number of variants: {total_variants}")
-            logging.info(f"Average variants per product: {total_variants / len(transformed_products):.2f}")
-
-        except Exception as e:
-            logging.error(f"Error transforming products: {str(e)}", exc_info=True)
-            return 1
-
-        logging.debug("Desaka Unifier completed successfully")
-
+        memory_files_data = load_memory_files(args.MemoryDir, args.Language)
+        logging.info("All memory files loaded successfully.")
     except Exception as e:
-        logging.error(f"Error during initialization: {str(e)}", exc_info=True)
+        logging.error(f"Error loading or rewriting memory files: {e}", exc_info=True)
         sys.exit(1)
+
+    # Load e-shop names and generate script names
+    try:
+        eshop_names = load_eshop_names(args.MemoryDir)
+        logging.debug(f"Loaded e-shop names: {eshop_names}")
+        script_names = generate_eshop_scripts(eshop_names)
+    except Exception as e:
+        logging.error(f"Error generating script names: {e}", exc_info=True)
+        sys.exit(1)
+
+    # Execute scripts in parallel using the encapsulated function
+    execute_scripts_in_parallel(script_names)
+
+    # Load eShop CSV files
+    
+    eshop_csv_paths = find_newest_eshop_csv_files(args.ResultDir,eshop_names)
+    logging.debug(f"{type(eshop_csv_paths)} = {eshop_csv_paths}")
+    csv_data=load_eshop_csv_files(eshop_csv_paths)
+    downloaded_products = transform_csv_data(csv_data)
+    logging.info(f"Downloaded products {len(downloaded_products)} items")
+    # Load and transform JSON files
+    pinces_json_path = find_newest_json_file(args.ResultDir, args.Language)
+    json_data = load_json_file(pinces_json_path)['data']
+    existing_products = transform_json_data(json_data)
+    logging.info(f"Unified products {len(existing_products)} items.")
+
+    # Log script end time
+    end_time = datetime.now()
+    logging.info(f"Script ended at {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    logging.info(f"Total execution time: {end_time - start_time}")
 
 if __name__ == "__main__":
     main()

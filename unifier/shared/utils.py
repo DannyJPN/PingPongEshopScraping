@@ -2,10 +2,12 @@ import os
 from datetime import datetime
 import chardet
 import logging
-import sys  # Import sys to access sys.argv
+import sys
+import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def get_script_name():
-    script_name = os.path.splitext(os.path.basename(sys.argv[0]))[0]  # Use sys.argv[0] to get the main script name
+    script_name = os.path.splitext(os.path.basename(sys.argv[0]))[0]
     logging.debug(f"Script name determined as: {script_name}")
     return script_name
 
@@ -17,7 +19,5 @@ def get_log_filename(log_dir):
     logging.debug(f"Log filename generated as: {log_full_path}")
     return log_full_path
 
-def detect_encoding(filepath):
-    with open(filepath, 'rb') as f:
-        result = chardet.detect(f.read())
-    return result['encoding']
+
+

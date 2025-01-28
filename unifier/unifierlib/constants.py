@@ -30,7 +30,7 @@ CATEGORY_SUB_CODE_LIST = "CategorySubCodeList.csv"
 CATEGORY_LIST = "CategoryList.txt"
 CATEGORY_ID_LIST = "CategoryIDList.csv"
 DEFAULT_UNIFIED_PRODUCT_VALUES = "DefaultUnifiedProductValues.csv"
-SUPPORTED_LANGUAGES_LIST = "SupportedLanguagesList.txt"
+SUPPORTED_LANGUAGES_FILE = "SupportedLanguagesList.txt"
 ITEM_FILTER = "ItemFilter.csv"
 
 # Category mapping files
@@ -49,6 +49,4 @@ WRONGS_FILE = "Wrongs.txt"
 # Log directory
 LOG_DIR = r"H:/Logs"
 # Script execution settings
-SCRIPT_EXECUTION_TIMEOUT = 300  # 5 minutes timeout for script execution
 PROGRESS_BAR_UPDATE_INTERVAL = 0.1  # Update progress bar every 0.1 seconds
-
