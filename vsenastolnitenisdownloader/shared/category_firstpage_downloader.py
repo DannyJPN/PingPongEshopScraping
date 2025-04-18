@@ -1,4 +1,4 @@
-import os
+﻿import os
 import logging
 from tqdm import tqdm
 from urllib.parse import urlparse
@@ -51,3 +51,13 @@ def download_category_firstpages(category_urls, root_folder, overwrite=False, de
     except Exception as e:
         logging.error(f"Error in download_category_firstpages: {e}", exc_info=True)
         return []
+
+
+
+
+
+
+
+
+
+

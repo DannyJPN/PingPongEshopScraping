@@ -1,4 +1,4 @@
-import os
+﻿import os
 import logging
 import csv
 from argparse import ArgumentParser
@@ -85,7 +85,7 @@ def main():
     logging.info(f"Extracted paths : {len(product_detail_variant_page_paths)}")
     product_detail_all_variant_links = extract_all_product_variant_detail_links(product_detail_variant_page_paths)
     product_detail_all_variant_page_paths = download_product_detail_variant_pages(product_detail_all_variant_links, root_folder, overwrite)
-    
+    product_detail_all_variant_page_paths.extend(product_detail_variant_page_paths)
 
     # Step 8: Make a list of product class instances using the extraction methods
     products = extract_products(product_detail_all_variant_page_paths)
@@ -100,3 +100,13 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
+
+
+

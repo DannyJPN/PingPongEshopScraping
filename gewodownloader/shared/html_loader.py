@@ -1,4 +1,4 @@
-# html_loader.py
+﻿# html_loader.py
 import os
 import logging
 from bs4 import BeautifulSoup
@@ -21,3 +21,13 @@ def load_html_as_dom_tree(filepath):
     except Exception as e:
         logging.error(f"Error loading HTML file {filepath}: {e}", exc_info=True)
         return None
+
+
+
+
+
+
+
+
+
+

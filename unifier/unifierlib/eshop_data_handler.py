@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import os
 import sys
 import signal
@@ -257,3 +257,4 @@ def transform_csv_data(csv_data, max_threads=32):
     except Exception as e:
         logging.error(f"Error during CSV data transformation: {e}", exc_info=True)
         return []
+

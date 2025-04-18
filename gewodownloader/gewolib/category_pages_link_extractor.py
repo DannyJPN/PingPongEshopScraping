@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 from urllib.parse import urljoin
 from tqdm import tqdm
 from shared.html_loader import load_html_as_dom_tree
@@ -44,3 +44,13 @@ def extract_category_pages_links(category_page_dom):
     except Exception as e:
         logging.error(f"Error extracting category pages links: {e}", exc_info=True)
         return set()
+
+
+
+
+
+
+
+
+
+

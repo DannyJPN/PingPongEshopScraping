@@ -1,4 +1,4 @@
-def json_to_unified(data):
+﻿def json_to_unified(data):
 
     mappings = []
 

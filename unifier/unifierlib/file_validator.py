@@ -1,4 +1,4 @@
-import os
+﻿import os
 import logging
 import sys
 from shared.file_loader import load_csv_file

@@ -1,4 +1,4 @@
-Based on the development instructions and user feedback, I'll create a new file `unifierlib/json_transformer.py` that will separate the JSON loading and transformation logic from the `eshop_data_handler.py` file. Here's the implementation:
+﻿Based on the development instructions and user feedback, I'll create a new file `unifierlib/json_transformer.py` that will separate the JSON loading and transformation logic from the `eshop_data_handler.py` file. Here's the implementation:
 
 ```python
 import json

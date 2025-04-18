@@ -1,4 +1,4 @@
-# category_pages_downloader.py
+﻿# category_pages_downloader.py
 import os
 import logging
 from tqdm import tqdm
@@ -48,3 +48,13 @@ def download_category_pages(category_page_links, root_folder, overwrite=False, d
     unique_sorted_files = sorted(set(downloaded_files))
     logging.debug(f"Unique sorted downloaded category pages: {len(unique_sorted_files)}")
     return unique_sorted_files
+
+
+
+
+
+
+
+
+
+

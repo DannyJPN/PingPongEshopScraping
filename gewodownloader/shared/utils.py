@@ -1,4 +1,4 @@
-import re
+﻿import re
 from urllib.parse import quote
 import html
 from datetime import datetime
@@ -40,4 +40,15 @@ def get_log_filename(log_dir):
     log_full_path = os.path.join(log_dir, log_filename)
     logging.debug(f"Log filename generated as: {log_full_path}")
     return log_full_path
+
+
+
+
+
+
+
+
+
+
+
 

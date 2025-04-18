@@ -1,4 +1,4 @@
-# product_attribute_extractor.py
+﻿# product_attribute_extractor.py
 import os
 import logging
 from bs4 import BeautifulSoup
@@ -160,3 +160,13 @@ def extract_products(product_detail_page_paths):
                 products.append(product)
             pbar.update(1)
     return products
+
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-import os
+﻿import os
 import logging
 from tqdm import tqdm
 from urllib.parse import urlparse
@@ -52,3 +52,13 @@ def download_category_firstpages(category_urls, root_folder, overwrite=False, de
     unique_sorted_files = sorted(set(downloaded_files))
     logging.debug(f"Unique sorted downloaded category first pages: {len(unique_sorted_files)}")
     return unique_sorted_files
+
+
+
+
+
+
+
+
+
+

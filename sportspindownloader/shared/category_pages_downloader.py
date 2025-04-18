@@ -1,4 +1,4 @@
-# category_pages_downloader.py
+﻿# category_pages_downloader.py
 import os
 import logging
 from tqdm import tqdm
@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 from datetime import datetime
 from shared.webpage_downloader import download_webpage
 from shared.html_loader import load_html_as_dom_tree
-from sportspinlib.category_pages_link_extractor import extract_category_pages_links
+
 from shared.utils import sanitize_filename, get_pages_folder
 
 def download_category_pages(category_page_links, root_folder, overwrite=False, debug=False):
@@ -51,3 +51,13 @@ def download_category_pages(category_page_links, root_folder, overwrite=False, d
     unique_sorted_files = sorted(set(downloaded_files))
     logging.debug(f"Unique sorted downloaded category pages: {len(unique_sorted_files)}")
     return unique_sorted_files
+
+
+
+
+
+
+
+
+
+

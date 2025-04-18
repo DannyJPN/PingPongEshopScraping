@@ -1,4 +1,4 @@
-import csv
+﻿import csv
 import logging
 from tqdm import tqdm
 import json
@@ -23,3 +23,14 @@ def export_to_csv(csv_output_path,products):
                 pbar.update(1)
 
     logging.info(f"CSV output generated at: {csv_output_path}")
+
+
+
+
+
+
+
+
+
+
+

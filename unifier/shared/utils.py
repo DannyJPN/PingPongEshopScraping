@@ -1,4 +1,4 @@
-import os
+﻿import os
 from datetime import datetime
 import chardet
 import logging
@@ -18,6 +18,7 @@ def get_log_filename(log_dir):
     log_full_path = os.path.join(log_dir, log_filename)
     logging.debug(f"Log filename generated as: {log_full_path}")
     return log_full_path
+
 
 
 

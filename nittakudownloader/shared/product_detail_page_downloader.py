@@ -1,4 +1,4 @@
-import os
+﻿import os
 import logging
 from tqdm import tqdm
 from urllib.parse import urlparse
@@ -50,3 +50,13 @@ def download_product_detail_pages(product_detail_urls, root_folder, overwrite=Fa
     unique_sorted_files = sorted(set(downloaded_files))
     logging.debug(f"Unique sorted downloaded product detail pages: {len(unique_sorted_files)}")
     return unique_sorted_files
+
+
+
+
+
+
+
+
+
+

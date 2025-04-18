@@ -1,9 +1,10 @@
-import logging
+﻿import logging
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from vsenastolnitenislib.constants import MAIN_URL
 from tqdm import tqdm 
 
+from shared.html_loader import load_html_as_dom_tree
 def extract_category_links(main_page_html):
     """
     Extracts category links from the main page HTML.
@@ -35,3 +36,13 @@ def extract_category_links(main_page_html):
     except Exception as e:
         logging.error(f"Error extracting category links: {e}", exc_info=True)
         return set()
+
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-import subprocess
+﻿import subprocess
 import logging
 import platform
 from tqdm import tqdm

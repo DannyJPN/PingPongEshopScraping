@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 from urllib.parse import urljoin
 from tqdm import tqdm
 from gewolib.constants import MAIN_URL
@@ -35,3 +35,13 @@ def extract_category_links(main_page_soup):
     except Exception as e:
         logging.error(f"Error extracting category links: {e}", exc_info=True)
         return set()
+
+
+
+
+
+
+
+
+
+

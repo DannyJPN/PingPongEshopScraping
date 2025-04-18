@@ -1,12 +1,14 @@
-import csv
+﻿import csv
 import logging
 from tqdm import tqdm
 import json
 
 def export_to_csv(csv_output_path,products):
     with open(csv_output_path, 'w', newline='', encoding='utf-8') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(['Name', 'Short Description', 'Description',  'Main Photo Filepath', 'Gallery Filepaths', 'Variants','URL'])
+        csvwriter = csv.writer(csvfile)
+        # Write the header
+        csvwriter.writerow(['Name', 'Short Description', 'Description',  'Main Photo Filepath', 'Gallery Filepaths', 'Variants','URL'])
+        # Write product data
         with tqdm(total=len(products), desc="Exporting to csv") as pbar:
             for product in products:
                 csvwriter.writerow([
@@ -21,3 +23,14 @@ def export_to_csv(csv_output_path,products):
                 pbar.update(1)
 
     logging.info(f"CSV output generated at: {csv_output_path}")
+
+
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import re
 from tqdm import tqdm
 from urllib.parse import urljoin
@@ -100,16 +100,26 @@ def process_variant_value(value):
     """
     value = value.lower()
     # Replace special characters with their phonetic equivalents
-    value = value.replace('ü', 'ue').replace('ß', 'ss')
-    value = value.replace('ä', 'ae').replace('ö', 'oe')
-    value = value.replace('č', 'c').replace('š', 's').replace('ž', 'z')
-    value = value.replace('á', 'a').replace('é', 'e').replace('í', 'i')
-    value = value.replace('ó', 'o').replace('ú', 'u').replace('ý', 'y')
-    value = value.replace('ě', 'e').replace('ř', 'r').replace('ť', 't')
-    value = value.replace('ň', 'n').replace('ď', 'd')
+    value = value.replace('ĂĽ', 'ue').replace('Ăź', 'ss')
+    value = value.replace('Ă¤', 'ae').replace('Ă¶', 'oe')
+    value = value.replace('ÄŤ', 'c').replace('Ĺˇ', 's').replace('Ĺľ', 'z')
+    value = value.replace('Ăˇ', 'a').replace('Ă©', 'e').replace('Ă­', 'i')
+    value = value.replace('Ăł', 'o').replace('Ăş', 'u').replace('Ă˝', 'y')
+    value = value.replace('Ä›', 'e').replace('Ĺ™', 'r').replace('ĹĄ', 't')
+    value = value.replace('Ĺ', 'n').replace('ÄŹ', 'd')
     value = value.replace(' ', '-').replace('.', '-')
     value = re.sub(r'[-\/\+,]', '-', value)
     while '--' in value:
         value=value.replace("--","-")
     logging.debug(f"Processed variant value: {value}")
     return value
+
+
+
+
+
+
+
+
+
+

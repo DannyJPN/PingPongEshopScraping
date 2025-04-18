@@ -1,4 +1,4 @@
-import os
+﻿import os
 import logging
 from shared.file_loader import load_csv_file, save_csv_file
 from unifierlib.constants import (
@@ -42,4 +42,5 @@ def load_memory_files(memory_dir, language):
             raise
 
     return memory_files_data
+
 

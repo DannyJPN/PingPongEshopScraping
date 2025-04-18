@@ -1,4 +1,4 @@
-# product_attribute_extractor.py
+﻿# product_attribute_extractor.py
 import os
 import logging
 from bs4 import BeautifulSoup
@@ -99,14 +99,14 @@ def extract_product_variants(dom_tree):
                 current_price = 0
                 current_price_tag = variant_tag.find('div', {'class':'price-final', 'data-testid': 'productVariantPrice'})
                 if current_price_tag:
-                    current_price = int(current_price_tag.text.replace(' ', '').replace('Kč', ''))
+                    current_price = int(current_price_tag.text.replace(' ', '').replace('KÄŤ', ''))
 
                 basic_price = current_price
                 basic_price_tag = variant_tag.find('span', class_='price-standard')
                 if basic_price_tag:
                     basic_price_tag = basic_price_tag.find('span')
                 if basic_price_tag:
-                    basic_price = int(basic_price_tag.text.replace(' ', '').replace('Kč', ''))
+                    basic_price = int(basic_price_tag.text.replace(' ', '').replace('KÄŤ', ''))
 
                 stock_status = ""
                 stock_status_tag = name_tag.find_next_sibling('span')
@@ -131,13 +131,13 @@ def extract_product_prices(dom_tree):
         if price_tag:
             current_price_tag = price_tag.find('span', class_='price-final-holder')
             if current_price_tag:
-                current_price = int(current_price_tag.text.replace(' ', '').replace('Kč', ''))
+                current_price = int(current_price_tag.text.replace(' ', '').replace('KÄŤ', ''))
             basic_price = current_price
             basic_price_tag = price_tag.find('span', class_='price-standard')
             if basic_price_tag:
                 basic_price_tag = basic_price_tag.find('span')
             if basic_price_tag:
-                basic_price = int(basic_price_tag.text.replace(' ', '').replace('Kč', ''))
+                basic_price = int(basic_price_tag.text.replace(' ', '').replace('KÄŤ', ''))
     except Exception as e:
         logging.error(f"Error extracting product discount: {e}", exc_info=True)
     return basic_price, current_price
@@ -209,3 +209,13 @@ def extract_products(product_detail_page_paths):
                 products.append(product)
             pbar.update(1)
     return products
+
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 
 def generate_eshop_scripts(eshop_names):
     """Generate Python script names for each e-shop without creating files."""

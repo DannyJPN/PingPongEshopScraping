@@ -1,4 +1,4 @@
-# vsenastolnitenislib/product_attribute_extractor.py
+﻿# vsenastolnitenislib/product_attribute_extractor.py
 import os
 import logging
 import re
@@ -215,3 +215,13 @@ def extract_products(product_detail_page_paths):
                 products.append(product)
             pbar.update(1)
     return products
+
+
+
+
+
+
+
+
+
+

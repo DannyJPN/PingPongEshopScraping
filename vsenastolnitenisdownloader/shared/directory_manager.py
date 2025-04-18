@@ -1,4 +1,4 @@
-import os
+﻿import os
 from datetime import datetime
 import logging
 from shared.utils import get_full_day_folder
@@ -22,3 +22,13 @@ def ensure_directories(root_folder):
                 logging.debug(f"Created folder: {folder}")
     except Exception as e:
         logging.error(f"Error ensuring directories: {e}", exc_info=True)
+
+
+
+
+
+
+
+
+
+

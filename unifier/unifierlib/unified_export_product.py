@@ -1,6 +1,6 @@
-class UnifiedExportProduct:
+﻿class UnifiedExportProduct:
     def __init__(self):
-        # Základní atributy pro UnifiedExportProduct
+        # ZĂˇkladnĂ­ atributy pro UnifiedExportProduct
         self.id = None
         self.typ = None
         self.varianta_id = None
@@ -105,7 +105,7 @@ class UnifiedExportProduct:
 class UnifiedExportProductMain(UnifiedExportProduct):
     def __init__(self):
         super().__init__()
-        # Nastavení výchozích hodnot pro main produkt
+        # NastavenĂ­ vĂ˝chozĂ­ch hodnot pro main produkt
         self.typ = 'produkt'
         self.varianta_id = "#"
         self.varianta1_nazev = "#"
@@ -202,7 +202,7 @@ class UnifiedExportProductMain(UnifiedExportProduct):
 class UnifiedExportProductVariant(UnifiedExportProduct):
     def __init__(self):
         super().__init__()
-        # Nastavení výchozích hodnot pro variantu
+        # NastavenĂ­ vĂ˝chozĂ­ch hodnot pro variantu
         self.typ = 'varianta'
         self.varianta_id = ""
         self.varianta1_nazev = ""
@@ -293,3 +293,4 @@ class UnifiedExportProductVariant(UnifiedExportProduct):
         self.sklad_minimalni = ""
         self.sklad_optimalni = ""
         self.sklad_maximalni = ""
+

@@ -1,4 +1,4 @@
-import os
+﻿import os
 import logging
 from shared.file_loader import load_csv_file
 from unifierlib.constants import ESHOP_LIST

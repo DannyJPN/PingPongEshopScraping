@@ -1,4 +1,4 @@
-import os
+﻿import os
 import logging
 import requests
 from shared.utils import sanitize_filename  # Ensure updated import
@@ -34,3 +34,13 @@ def download_image(url, filepath, overwrite=False, debug=False):
     except Exception as e:
         logging.error(f"Error downloading {url} to {sanitized_filepath}: {e}", exc_info=True)
         return None
+
+
+
+
+
+
+
+
+
+

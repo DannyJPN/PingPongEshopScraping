@@ -1,4 +1,4 @@
-import os
+﻿import os
 import logging
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
@@ -52,3 +52,13 @@ def extract_product_detail_links(category_page_filepath):
     except Exception as e:
         logging.error(f"Error extracting product detail links from {category_page_filepath}: {e}", exc_info=True)
         return set()
+
+
+
+
+
+
+
+
+
+

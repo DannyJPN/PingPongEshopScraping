@@ -1,4 +1,4 @@
-class DownloadedProduct:
+﻿class DownloadedProduct:
     def __init__(self):
         self.name = None
         self.short_description = None

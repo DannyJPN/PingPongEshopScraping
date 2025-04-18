@@ -1,4 +1,4 @@
-import os
+﻿import os
 import logging
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
@@ -31,3 +31,13 @@ def extract_product_detail_links(category_page_filepath):
             product_links.add(absolute_url)
 
     return sorted(product_links)
+
+
+
+
+
+
+
+
+
+

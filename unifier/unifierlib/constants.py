@@ -1,4 +1,4 @@
-import os
+﻿import os
 
 # Get the script's directory
 SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

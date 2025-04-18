@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from vsenastolnitenislib.constants import MAIN_URL
@@ -56,3 +56,13 @@ def extract_category_pages_links(category_page_dom):
     except Exception as e:
         logging.error(f"Error extracting category pages links: {e}", exc_info=True)
         return set()
+
+
+
+
+
+
+
+
+
+

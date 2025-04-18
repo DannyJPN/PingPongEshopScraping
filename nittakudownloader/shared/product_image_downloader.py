@@ -1,4 +1,4 @@
-import os
+﻿import os
 import logging
 from tqdm import tqdm
 from shared.utils import get_photos_folder
@@ -41,3 +41,13 @@ def get_image_folder(product, root_folder, image_type):
         os.makedirs(folder)
         logging.debug(f"Created folder: {folder}")
     return folder
+
+
+
+
+
+
+
+
+
+

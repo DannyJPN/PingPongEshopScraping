@@ -1,4 +1,4 @@
-# category_pages_downloader.py
+﻿# category_pages_downloader.py
 import os
 import logging
 from tqdm import tqdm
@@ -52,3 +52,13 @@ def download_category_pages(category_page_links, root_folder, overwrite=False, d
     except Exception as e:
         logging.error(f"Error in download_category_pages: {e}", exc_info=True)
         return []
+
+
+
+
+
+
+
+
+
+
