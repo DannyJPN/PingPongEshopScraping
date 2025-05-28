@@ -1,4 +1,4 @@
-﻿import os
+import os
 import logging
 import requests
 from shared.utils import sanitize_filename  # Ensure updated import
@@ -9,7 +9,12 @@ def download_image(url, filepath, overwrite=False, debug=False):
         directory, filename = os.path.split(filepath)
 
         # Sanitize the filename
+        # ZDE - Odstranění části cesty za znakem procenta
         sanitized_filename = sanitize_filename(filename).split("%")[0]
+
+        # Change webp to jpg in the file path (not in the URL)
+        if '.webp' in sanitized_filename:
+            sanitized_filename = sanitized_filename.replace('.webp', '.jpg')
 
         # Reconstruct the sanitized filepath
         sanitized_filepath = os.path.join(directory, sanitized_filename)
@@ -34,13 +39,3 @@ def download_image(url, filepath, overwrite=False, debug=False):
     except Exception as e:
         logging.error(f"Error downloading {url} to {sanitized_filepath}: {e}", exc_info=True)
         return None
-
-
-
-
-
-
-
-
-
-

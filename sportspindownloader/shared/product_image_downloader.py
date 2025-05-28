@@ -1,4 +1,4 @@
-﻿import os
+import os
 import logging
 from tqdm import tqdm
 from shared.utils import get_photos_folder
@@ -12,7 +12,11 @@ def download_product_main_image(products, rootfolder, overwrite):
                 main_image_folder = get_image_folder(products[i], rootfolder, "MainImage")
                 file_path = os.path.join(main_image_folder, sanitize_filename(os.path.basename(products[i].main_photo_link)))
                 if download_image(products[i].main_photo_link, file_path, overwrite=overwrite):
-                    products[i].main_photo_filepath = os.path.abspath(file_path)
+                    # Use the same sanitization as in download_image function
+                    directory, filename = os.path.split(file_path)
+                    sanitized_filename = sanitize_filename(filename).split("%")[0]
+                    sanitized_filepath = os.path.join(directory, sanitized_filename)
+                    products[i].main_photo_filepath = os.path.abspath(sanitized_filepath)
                 pbar.update(1)
             except Exception as e:
                 logging.error(f"Error downloading main image for product {products[i].name}: {e}", exc_info=True)
@@ -27,7 +31,11 @@ def download_product_gallery_images(products, rootfolder, overwrite):
                 for link in products[i].photogallery_links:
                     file_path = os.path.join(gallery_image_folder, sanitize_filename(os.path.basename(link)))
                     if download_image(link, file_path, overwrite=overwrite):
-                        products[i].photogallery_filepaths.append(os.path.abspath(file_path))
+                        # Use the same sanitization as in download_image function
+                        directory, filename = os.path.split(file_path)
+                        sanitized_filename = sanitize_filename(filename).split("%")[0]
+                        sanitized_filepath = os.path.join(directory, sanitized_filename)
+                        products[i].photogallery_filepaths.append(os.path.abspath(sanitized_filepath))
                     pbar.update(1)
             except Exception as e:
                 logging.error(f"Error downloading gallery images for product {products[i].name}: {e}", exc_info=True)
@@ -42,13 +50,3 @@ def get_image_folder(product, root_folder, image_type):
         os.makedirs(folder)
         logging.debug(f"Created folder: {folder}")
     return folder
-
-
-
-
-
-
-
-
-
-

@@ -1,0 +1,2 @@
+# Products to be excluded from processing
+# One product name per line

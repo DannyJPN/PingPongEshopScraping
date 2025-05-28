@@ -1,4 +1,4 @@
-﻿import os
+﻿﻿import os
 import sys
 import argparse
 import logging
@@ -6,14 +6,17 @@ from datetime import datetime
 from tqdm import tqdm
 from shared.logging_config import setup_logging
 from shared.utils import get_log_filename
-from unifierlib.file_validator import validate_file_system,validate_required_files
-from shared.file_loader import load_supported_languages,load_json_file
+from unifierlib.file_validator import validate_file_system, validate_required_files
+from shared.file_loader import load_supported_languages, load_json_file
 from unifierlib.memory_loader import load_memory_files
 from unifierlib.eshop_handler import load_eshop_names
 from unifierlib.script_generator import generate_eshop_scripts
 from unifierlib.parallel_executor import execute_scripts_in_parallel
-from unifierlib.eshop_data_handler import load_eshop_csv_files,find_newest_eshop_csv_files,transform_csv_data,transform_json_data,find_newest_json_file
+from unifierlib.eshop_data_handler import load_eshop_csv_files, find_newest_eshop_csv_files, transform_csv_data, transform_json_data, find_newest_json_file
 from unifierlib.downloaded_product import DownloadedProduct
+from unifierlib.repaired_product import RepairedProduct
+from unifierlib.unified_export_product import UnifiedExportProduct, UnifiedExportProductMain, UnifiedExportProductVariant
+from unifierlib.unified_product_attribute_extractor import extract_product_attributes
 
 from unifierlib.constants import (
     DEFAULT_LANGUAGE,
@@ -21,7 +24,8 @@ from unifierlib.constants import (
     DEFAULT_MEMORY_DIR,
     DEFAULT_EXPORT_DIR,
     DEFAULT_CONFIRM_AI_RESULTS,
-    LOG_DIR
+    LOG_DIR,
+    WRONGS_FILE
 )
 
 def validate_language(value):
@@ -152,20 +156,55 @@ def main():
         sys.exit(1)
 
     # Execute scripts in parallel using the encapsulated function
-    execute_scripts_in_parallel(script_names)
+    with tqdm(total=len(script_names), desc="Executing download scripts") as pbar:
+        execute_scripts_in_parallel(script_names, progress_callback=lambda: pbar.update(1))
 
     # Load eShop CSV files
-    
-    eshop_csv_paths = find_newest_eshop_csv_files(args.ResultDir,eshop_names)
+    eshop_csv_paths = find_newest_eshop_csv_files(args.ResultDir, eshop_names)
     logging.debug(f"{type(eshop_csv_paths)} = {eshop_csv_paths}")
-    csv_data=load_eshop_csv_files(eshop_csv_paths)
-    downloaded_products = transform_csv_data(csv_data)
-    logging.info(f"Downloaded products {len(downloaded_products)} items")
+
+    with tqdm(total=len(eshop_csv_paths), desc="Loading CSV files") as pbar:
+        csv_data = load_eshop_csv_files(eshop_csv_paths, progress_callback=lambda: pbar.update(1))
+
+    with tqdm(desc="Transforming CSV data") as pbar:
+        downloaded_products = transform_csv_data(csv_data, progress_callback=lambda x: pbar.update(x))
+    logging.info(f"Downloaded products: {len(downloaded_products)} items")
+
     # Load and transform JSON files
     pinces_json_path = find_newest_json_file(args.ResultDir, args.Language)
-    json_data = load_json_file(pinces_json_path)['data']
-    existing_products = transform_json_data(json_data)
-    logging.info(f"Unified products {len(existing_products)} items.")
+    if pinces_json_path:
+        json_data = load_json_file(pinces_json_path)['data']
+        with tqdm(desc="Transforming JSON data") as pbar:
+            existing_products = transform_json_data(json_data, progress_callback=lambda x: pbar.update(x))
+        logging.info(f"Existing unified products: {len(existing_products)} items")
+    else:
+        existing_products = []
+        logging.info("No existing unified products found")
+
+    # Process downloaded products to repaired products
+    repaired_products = []
+    with tqdm(total=len(downloaded_products), desc="Processing products") as pbar:
+        for product in downloaded_products:
+            try:
+                repaired_product = extract_product_attributes(product, memory_files_data, args.Language, existing_products)
+                repaired_products.append(repaired_product)
+            except Exception as e:
+                logging.error(f"Error processing product {product.name}: {str(e)}", exc_info=True)
+            pbar.update(1)
+
+    logging.info(f"Repaired products: {len(repaired_products)} items")
+
+    # Create a list to track products that should be excluded
+    wrongs_file_path = os.path.join(args.MemoryDir, WRONGS_FILE)
+    wrong_products = []
+    if os.path.exists(wrongs_file_path):
+        with open(wrongs_file_path, 'r', encoding='utf-8') as f:
+            wrong_products = [line.strip() for line in f.readlines() if line.strip()]
+
+    # Filter out wrong products
+    filtered_products = [p for p in repaired_products if p.name not in wrong_products]
+    if len(filtered_products) < len(repaired_products):
+        logging.info(f"Filtered out {len(repaired_products) - len(filtered_products)} products listed in {WRONGS_FILE}")
 
     # Log script end time
     end_time = datetime.now()

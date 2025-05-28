@@ -1,4 +1,4 @@
-﻿import os
+import os
 import logging
 import requests
 from shared.utils import sanitize_filename  # Ensure updated import
@@ -20,7 +20,7 @@ def download_image(url, filepath, overwrite=False, debug=False):
         # Check if file already exists
         if not overwrite and os.path.exists(sanitized_filepath):
             logging.debug(f"File already exists and overwrite is not set: {sanitized_filepath}")
-            return
+            return True
 
         # Download the image
         logging.debug(f"Downloading image from URL: {url} to filepath: {sanitized_filepath}")
@@ -30,18 +30,9 @@ def download_image(url, filepath, overwrite=False, debug=False):
         # Write the content to a file
         with open(sanitized_filepath, 'wb') as file:
             file.write(response.content)
-        
+
+        return True
 
     except Exception as e:
         logging.error(f"Error downloading {url} to {sanitized_filepath}: {e}", exc_info=True)
-        
-
-
-
-
-
-
-
-
-
-
+        return False

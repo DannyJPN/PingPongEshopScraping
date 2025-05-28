@@ -1,4 +1,4 @@
-﻿import csv
+import csv
 import logging
 from tqdm import tqdm
 import json
@@ -17,20 +17,9 @@ def export_to_csv(csv_output_path,products):
                     product.description,
                     product.main_photo_filepath,
                     '|'.join(product.photogallery_filepaths),
-                    '|'.join([json.dumps({"key_value_pairs": variant.key_value_pairs,"current_price": variant.current_price,"basic_price": variant.basic_price,"stock_status": variant.stock_status},ensure_ascii=False) for variant in product.variants]),
+                    json.dumps(product.variants, ensure_ascii=False),
                     product.url
                 ])
                 pbar.update(1)
 
     logging.info(f"CSV output generated at: {csv_output_path}")
-
-
-
-
-
-
-
-
-
-
-

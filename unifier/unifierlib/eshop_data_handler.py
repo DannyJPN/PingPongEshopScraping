@@ -1,4 +1,4 @@
-﻿import logging
+﻿﻿import logging
 import os
 import sys
 import signal
@@ -68,19 +68,28 @@ def find_newest_csv_file(base_dir: str, eshop_name: str) -> Optional[str]:
         logging.error(f"Error finding newest CSV file: {str(e)}", exc_info=True)
         return None
 
-def load_eshop_csv_files(csv_paths: List[str]):
-    """Load all eShop CSV files and convert to DownloadedProduct instances."""
+def load_eshop_csv_files(csv_paths: List[str], progress_callback=None):
+    """Load all eShop CSV files and convert to DownloadedProduct instances.
+
+    Args:
+        csv_paths: List of CSV file paths to load
+        progress_callback: Optional callback function to update external progress bar
+    """
     products = []
 
-    for csv_path in tqdm(csv_paths, desc="Loading eShop CSV files"):
+    for csv_path in csv_paths:
         if shutdown_flag.is_set():
             logging.info("Shutdown requested, stopping CSV file loading")
             break
-            
+
         logging.info(f"Loading products from {csv_path}({type(csv_path)})")
         csv_data = load_csv_file(csv_path)
         products.extend(csv_data)
         logging.info(f"Loaded {len(csv_data)} products from {csv_path}")
+
+        # Update progress using callback if provided
+        if progress_callback:
+            progress_callback()
 
     return products
 
@@ -91,7 +100,7 @@ def find_newest_eshop_csv_files(result_dir: str, eshop_names: List[str]):
         if shutdown_flag.is_set():
             logging.info("Shutdown requested, stopping CSV file search")
             break
-            
+
         try:
             csv_path = find_newest_csv_file(result_dir, eshop_name)
             if csv_path:
@@ -108,7 +117,7 @@ def process_json_item(item):
     try:
         if shutdown_flag.is_set():
             return None
-            
+
         transformed_items = json_to_unified(item)
 
         unified_products = []
@@ -130,7 +139,7 @@ def process_csv_item(item):
     try:
         if shutdown_flag.is_set():
             return None
-            
+
         transformed_items = csv_to_downloaded(item)
         logging.debug(f"Processing CSV item with name: {item.get('name', 'unknown')} : {len(transformed_items)}")
         downloaded_products = []
@@ -145,8 +154,14 @@ def process_csv_item(item):
         logging.error(f"Error processing CSV item {item}: {str(e)}", exc_info=True)
         return None
 
-def transform_json_data(json_data, max_threads=32):
-    """Transform JSON data into UnifiedExportProduct objects using parallel processing."""
+def transform_json_data(json_data, max_threads=32, progress_callback=None):
+    """Transform JSON data into UnifiedExportProduct objects using parallel processing.
+
+    Args:
+        json_data: JSON data to transform
+        max_threads: Maximum number of threads to use
+        progress_callback: Optional callback function to update external progress bar
+    """
     if not json_data:
         logging.warning("No JSON data to transform")
         return []
@@ -162,20 +177,21 @@ def transform_json_data(json_data, max_threads=32):
                 for item in json_data
             }
 
-            with tqdm(total=len(future_to_item), desc="Processing products") as pbar:
-                for future in as_completed(future_to_item):
-                    if shutdown_flag.is_set():
-                        logging.info("Shutdown requested, stopping JSON transformation")
-                        executor.shutdown(wait=False)
-                        break
-                    try:
-                        result = future.result()
-                        if result:
-                            unified_products.extend(result)
-                    except Exception as e:
-                        logging.error(f"Thread execution failed: {str(e)}", exc_info=True)
-                    finally:
-                        pbar.update(1)
+            for future in as_completed(future_to_item):
+                if shutdown_flag.is_set():
+                    logging.info("Shutdown requested, stopping JSON transformation")
+                    executor.shutdown(wait=False)
+                    break
+                try:
+                    result = future.result()
+                    if result:
+                        unified_products.extend(result)
+                except Exception as e:
+                    logging.error(f"Thread execution failed: {str(e)}", exc_info=True)
+                finally:
+                    # Update progress using callback if provided
+                    if progress_callback:
+                        progress_callback(1)
 
         logging.info(f"Transformed JSON data into {len(unified_products)} UnifiedExportProduct objects")
         return unified_products
@@ -219,8 +235,14 @@ def find_newest_json_file(base_dir: str, language_code: str) -> Optional[str]:
         logging.error(f"Error finding newest JSON file: {str(e)}", exc_info=True)
         return None
 
-def transform_csv_data(csv_data, max_threads=32):
-    """Transform CSV data into DownloadedProduct objects using parallel processing."""
+def transform_csv_data(csv_data, max_threads=32, progress_callback=None):
+    """Transform CSV data into DownloadedProduct objects using parallel processing.
+
+    Args:
+        csv_data: CSV data to transform
+        max_threads: Maximum number of threads to use
+        progress_callback: Optional callback function to update external progress bar
+    """
     if not csv_data:
         logging.warning("No CSV data to transform")
         return []
@@ -236,20 +258,21 @@ def transform_csv_data(csv_data, max_threads=32):
                 for item in csv_data
             }
 
-            with tqdm(total=len(future_to_item), desc="Processing products") as pbar:
-                for future in as_completed(future_to_item):
-                    if shutdown_flag.is_set():
-                        logging.info("Shutdown requested, stopping CSV transformation")
-                        executor.shutdown(wait=False)
-                        break
-                    try:
-                        result = future.result()
-                        if result:
-                            downloaded_products.extend(result)
-                    except Exception as e:
-                        logging.error(f"Thread execution failed: {str(e)}", exc_info=True)
-                    finally:
-                        pbar.update(1)
+            for future in as_completed(future_to_item):
+                if shutdown_flag.is_set():
+                    logging.info("Shutdown requested, stopping CSV transformation")
+                    executor.shutdown(wait=False)
+                    break
+                try:
+                    result = future.result()
+                    if result:
+                        downloaded_products.extend(result)
+                except Exception as e:
+                    logging.error(f"Thread execution failed: {str(e)}", exc_info=True)
+                finally:
+                    # Update progress using callback if provided
+                    if progress_callback:
+                        progress_callback(1)
 
         logging.info(f"Transformed CSV data into {len(downloaded_products)} DownloadedProduct objects")
         return downloaded_products

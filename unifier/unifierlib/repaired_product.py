@@ -1,4 +1,5 @@
-﻿import logging
+﻿﻿import logging
+from .downloaded_product import DownloadedProduct
 
 
 class RepairedProduct:
@@ -21,3 +22,20 @@ class RepairedProduct:
         self.variants = []
         self.zbozi_category = ""
         self.zbozi_keywords = []
+
+        # Original attributes from DownloadedProduct
+        self.url = None
+        self.main_photo_filepath = None
+        self.gallery_photo_filepaths = None
+
+    def fill_from_downloaded(self, downloaded_product: DownloadedProduct):
+        """Fill attributes from a DownloadedProduct instance"""
+        if not downloaded_product:
+            return
+
+        self.original_name = downloaded_product.name
+        self.desc = downloaded_product.description
+        self.shortdesc = downloaded_product.short_description
+        self.url = downloaded_product.url
+        self.main_photo_filepath = downloaded_product.main_photo_filepath
+        self.gallery_photo_filepaths = downloaded_product.gallery_photo_filepaths

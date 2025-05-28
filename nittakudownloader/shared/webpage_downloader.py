@@ -1,4 +1,4 @@
-﻿import os
+import os
 import logging
 import requests
 from shared.utils import sanitize_filename
@@ -30,27 +30,18 @@ def download_webpage(url, filepath, overwrite=False, debug=False):
         if response.status_code == 404:
             logging.debug(f"404 Not Found for URL: {url}")
             return False
-        else:
-            response.raise_for_status()  # Raise an HTTPError for other bad responses
+        
+        # Comment out raise_for_status to avoid exceptions for non-404 errors
+        # response.raise_for_status()  # Raise an HTTPError for other bad responses
 
         logging.debug(f"Downloading webpage from URL: {url} to filepath: {sanitized_filepath}")
 
-        # Write the content to a file
-        with open(sanitized_filepath, 'w', encoding='utf-8') as file:
-            file.write(response.text)
+        # Write the content to a file in binary mode to preserve encoding
+        with open(sanitized_filepath, 'wb') as file:
+            file.write(response.content)
 
         return True
 
     except Exception as e:
-        logging.error(f"Error downloading {url} to {sanitized_filepath}: {e}", exc_info=True)
+        logging.error(f"Error downloading {url} to {filepath}: {e}", exc_info=True)
         return False
-
-
-
-
-
-
-
-
-
-

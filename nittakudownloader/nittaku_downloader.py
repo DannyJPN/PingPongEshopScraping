@@ -17,7 +17,7 @@ from shared.product_image_downloader import download_product_main_image
 from shared.product_image_downloader import download_product_gallery_images
 from nittakulib.constants import DEFAULT_RESULT_FOLDER
 from shared.logging_config import setup_logging
-from nittakulib.constants import CSV_OUTPUT_NAME 
+from nittakulib.constants import CSV_OUTPUT_NAME
 from shared.product_to_eshop_csv_saver import export_to_csv
 from tqdm import tqdm
 from nittakulib.constants import MAIN_URL
@@ -47,7 +47,7 @@ def main():
 
     root_folder = args.result_folder
     overwrite = args.overwrite
-    
+
 
     # Ensure directories
     ensure_directories(root_folder)

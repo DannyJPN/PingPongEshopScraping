@@ -1,4 +1,4 @@
-﻿import os
+import os
 import logging
 from datetime import datetime
 from shared.webpage_downloader import download_webpage
@@ -17,13 +17,3 @@ def download_main_page(root_folder,MAIN_URL,MAIN_PAGE_FILENAME, overwrite=False)
     except Exception as e:
         logging.error(f"Error downloading main page: {e}", exc_info=True)
         return None
-
-
-
-
-
-
-
-
-
-

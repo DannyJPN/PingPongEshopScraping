@@ -1,4 +1,4 @@
-﻿import csv
+import csv
 import logging
 from tqdm import tqdm
 import json
@@ -11,6 +11,11 @@ def export_to_csv(csv_output_path,products):
         # Write product data
         with tqdm(total=len(products), desc="Exporting to csv") as pbar:
             for product in products:
+                # Log the values being written to CSV
+                logging.debug(f"Product: {product.name}")
+                logging.debug(f"Main Photo Filepath: {product.main_photo_filepath}")
+                logging.debug(f"Gallery Filepaths: {product.photogallery_filepaths}")
+                
                 csvwriter.writerow([
                     product.name,
                     product.short_description,
@@ -23,14 +28,3 @@ def export_to_csv(csv_output_path,products):
                 pbar.update(1)
 
     logging.info(f"CSV output generated at: {csv_output_path}")
-
-
-
-
-
-
-
-
-
-
-
