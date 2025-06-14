@@ -83,7 +83,7 @@ def extract_product_variants(dom_tree):
                 if name_tag:
                     raw_content = name_tag.decode_contents().replace('<br />', '\n').replace('<br/>', '\n')
                     raw_pairs = raw_content.split('\n')
-                    for pair in raw_pairs:
+                    for pair in raw_pairs:  
                         if ':' in pair:
                             key, value = pair.split(':', 1)
                             key_value_pairs[key.strip()] = value.strip()
@@ -93,7 +93,7 @@ def extract_product_variants(dom_tree):
                 if current_price_tag:
                     strong_tag = current_price_tag.find('strong')
                     if strong_tag:
-                        current_price = float(strong_tag.text.replace(' ', '').replace('KÄŤ', '').replace(',', '.'))
+                        current_price = float(strong_tag.text.replace(' ', '').replace('Kč', '').replace(',', '.'))
                         current_prices.append(current_price)
                         logging.debug(f"Found current price for variant: {current_price}")
 
@@ -132,14 +132,14 @@ def extract_product_prices(dom_tree):
 
         current_price_tag = dom_tree.find('strong', class_='price sub-left-position', attrs={'data-testid': 'productCardPrice'})
         if current_price_tag:
-            current_price = float(current_price_tag.text.replace(' ', '').replace('KÄŤ', '').replace(',', '.'))
+            current_price = float(current_price_tag.text.replace(' ', '').replace('Kč', '').replace(',', '.'))
             logging.debug(f"Found current price: {current_price}")
 
         basic_price_tag = dom_tree.find('td', class_='td-normal-price')
         if basic_price_tag:
             line_span = basic_price_tag.find('span', class_='line')
             if line_span:
-                basic_price = float(line_span.text.replace(' ', '').replace('KÄŤ', '').replace(',', '.'))
+                basic_price = float(line_span.text.replace(' ', '').replace('Kč', '').replace(',', '.'))
                 logging.debug(f"Found basic price: {basic_price}")
             else:
                 basic_price = current_price
@@ -147,7 +147,7 @@ def extract_product_prices(dom_tree):
         else:
             basic_price = current_price
             logging.debug(f"No basic price tag found, setting basic price to current price: {basic_price}")
-
+ 
         return basic_price, current_price
     except Exception as e:
         logging.error(f"Error extracting product prices: {e}", exc_info=True)

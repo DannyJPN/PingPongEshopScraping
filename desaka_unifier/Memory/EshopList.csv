@@ -1,0 +1,8 @@
+﻿"Name","URL","Script"
+"Stoten","https://stoten.cz","../stotendownloader/stoten_downloader.py"
+"Sportspin","https://www.sportspin.cz/","../sportspindownloader/sport_spin_downloader.py"
+"VseNaStolniTenis","https://www.vsenastolnitenis.cz/","../vsenastolnitenisdownloader/vse_na_stolni_tenis_downloader.py"
+"Spinway","https://www.spinway.sk/","../spinwaydownloader/spinway_downloader.py"
+"Pincesobchod","https://www.pincesobchod.cz","../pincesobchoddownloader/pincesobchod_downloader.py"
+"Gewo","https://www.contra.de/","../gewodownloader/gewo_downloader.py"
+"Nittaku","https://nittaku.tt/","../nittakudownloader/nittaku_downloader.py"

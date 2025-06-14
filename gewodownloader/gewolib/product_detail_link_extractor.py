@@ -13,7 +13,7 @@ def extract_all_product_detail_links(category_pages_downloaded_paths):
             product_detail_links.update(extract_product_detail_links(category_page_path))
             pbar.update(1)
     logging.debug(product_detail_links)
-    return sorted(product_detail_links)
+    return sorted(set(product_detail_links))
 
 def extract_product_detail_links(category_page_filepath):
     # Load the HTML content of the category page
@@ -30,7 +30,7 @@ def extract_product_detail_links(category_page_filepath):
             absolute_url = urljoin(MAIN_URL, href)
             product_links.add(absolute_url)
 
-    return sorted(product_links)
+    return sorted(set(product_links))
 
 
 
