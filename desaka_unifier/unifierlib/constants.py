@@ -13,6 +13,9 @@ DEFAULT_ENABLE_FINE_TUNING = False
 DEFAULT_USE_FINE_TUNED_MODELS = False
 DEFAULT_MAX_TOKENS = 4000
 
+# Memory checker constants
+MAX_ITERATIONS = 10  # Maximální počet iterací pro řešení překrývajících se hodnot
+
 # Fine-tuning constants
 FINE_TUNED_MODELS_FILE = "fine_tuned_models.json"
 

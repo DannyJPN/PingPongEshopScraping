@@ -4,6 +4,7 @@ Contains logic for converting pincesobchod JSON to ExportProduct array.
 """
 
 from typing import Dict, Any, List, Optional
+import time
 import json
 import logging
 import os
@@ -385,6 +386,12 @@ class ProductParser:
         # url = DownloadedProduct.url (direct access)
         repaired.url = downloaded.url
 
+        # desc = from DescMemory or OpenAI
+        repaired.desc = self._get_description(downloaded)
+
+        # shortdesc = from ShortDescMemory or OpenAI
+        repaired.shortdesc = self._get_short_description(downloaded)
+
         # category = from CategoryMemory or OpenAI (needed for code generation)
         repaired.category = self._get_category(downloaded)
 
@@ -397,13 +404,6 @@ class ProductParser:
 
         # name = from NameMemory or OpenAI
         repaired.name = self._get_product_name(downloaded)
-
-        # desc = from DescMemory or OpenAI
-        repaired.desc = self._get_description(downloaded)
-
-        # shortdesc = from ShortDescMemory or OpenAI
-        repaired.shortdesc = self._get_short_description(downloaded)
-
 
         # code = complex code generation (needs brand and category)
         repaired.code = self._generate_code(repaired.brand, repaired.category, downloaded.name)
@@ -430,10 +430,91 @@ class ProductParser:
 
         # zbozi_keywords = from KeywordsZbozi or OpenAI
         repaired.zbozi_keywords = self._get_zbozi_keywords(downloaded)
+
         return repaired
 
+    def _find_exact_matches_in_text(self, text: str, values: List[str]) -> List[str]:
+        """
+        Find exact matches of values in text.
+
+        Args:
+            text (str): Text to search in
+            values (List[str]): List of values to search for
+
+        Returns:
+            List[str]: List of found values
+        """
+        if not text or not values:
+            return []
+
+        # Normalize text for searching (convert to lowercase)
+        normalized_text = text.lower()
+
+        # Find exact matches (case insensitive)
+        matches = []
+        for value in values:
+            if value and value.lower() in normalized_text:
+                matches.append(value)
+
+        return matches
+
+    def _heuristic_extraction(self, downloaded: DownloadedProduct, values: List[str]) -> tuple:
+        """
+        Perform heuristic extraction on downloaded product.
+
+        Args:
+            downloaded (DownloadedProduct): Product to extract from
+            values (List[str]): List of values to search for
+
+        Returns:
+            tuple: (Single match if exactly one found or None, List of all matches)
+        """
+        if not values:
+            return None, []
+
+        # Collect all texts to search in
+        texts = []
+
+        # Add original_name if available
+        if downloaded.name:
+            texts.append(downloaded.name)
+
+        # Add URL if available
+        if downloaded.url:
+            texts.append(downloaded.url)
+
+        # Add desc if available
+        # For RepairProduct, use desc attribute; for DownloadedProduct, use description
+        if hasattr(downloaded, 'desc') and downloaded.desc:
+            texts.append(downloaded.desc)
+        elif hasattr(downloaded, 'description') and downloaded.description:
+            texts.append(downloaded.description)
+
+        # Add shortdesc if available
+        # For RepairProduct, use shortdesc attribute; for DownloadedProduct, use short_description
+        if hasattr(downloaded, 'shortdesc') and downloaded.shortdesc:
+            texts.append(downloaded.shortdesc)
+        elif hasattr(downloaded, 'short_description') and downloaded.short_description:
+            texts.append(downloaded.short_description)
+
+        # Perform matching on all texts
+        all_matches = set()
+        for text in texts:
+            if text:  # Check if text is not None or empty
+                matches = self._find_exact_matches_in_text(text, values)
+                all_matches.update(matches)
+
+        # Convert set back to list for consistent ordering
+        all_matches_list = list(all_matches)
+
+        # Return single match if exactly one found, otherwise None and list of all matches
+        if len(all_matches_list) == 1:
+            return all_matches_list[0], all_matches_list
+        else:
+            return None, all_matches_list
+
     def _get_category(self, downloaded: DownloadedProduct) -> str:
-        """Get category from memory or OpenAI with user confirmation."""
+        """Get category from memory, heuristics, or OpenAI with user confirmation."""
         memory_key = MEMORY_KEY_CATEGORY_MEMORY.format(language=self.language)
         if memory_key in self.memory:
             category_memory = self.memory[memory_key]
@@ -443,15 +524,40 @@ class ProductParser:
                 standardized_key = self._standardize_category_by_key(category_key)
                 return self._get_translated_category_name(standardized_key)
 
-        # Use OpenAI with CategoryNameMemory (translated category names) even if memory is empty
+        # Get available category names (translated values from CategoryNameMemory)
         category_name_memory_key = MEMORY_KEY_CATEGORY_NAME_MEMORY.format(language=self.language)
         category_name_memory = self.memory.get(category_name_memory_key, {})
-
-        # Get available category names (translated values from CategoryNameMemory)
         available_categories = list(category_name_memory.values()) if category_name_memory else []
 
+        # Try heuristic extraction
+        single_match = None
+        all_matches = []
+        if available_categories:
+            single_match, all_matches = self._heuristic_extraction(downloaded, available_categories)
+
+            # If exactly one match found, use it
+            if single_match:
+                # Find the key for this category value
+                category_key = self._find_category_key_by_value(single_match)
+                if category_key:
+                    # First standardize the category key
+                    standardized_key = self._standardize_category_by_key(category_key)
+                    # Save the standardized category key to memory
+                    if memory_key not in self.memory:
+                        self.memory[memory_key] = {}
+                    self.memory[memory_key][downloaded.name] = standardized_key
+                    self._save_memory_file(memory_key)
+                    # Return the translated category name for this language
+                    return self._get_translated_category_name(standardized_key)
+
+        # Use OpenAI with CategoryNameMemory (translated category names) even if memory is empty
         if self.openai:
-            category = self.openai.find_category(downloaded, available_categories, self.language)
+            # Include information about heuristic matches in the AI prompt if any were found
+            heuristic_info = ""
+            if all_matches:
+                heuristic_info = f"Heuristic analysis found these potential categories in the text: {', '.join(all_matches)}. Please evaluate these candidates in your decision."
+
+            category = self.openai.find_category(downloaded, available_categories, self.language, heuristic_info)
             if category:
                 # Confirm with user if needed
                 confirmed_category = self._confirm_ai_result(
@@ -499,65 +605,8 @@ class ProductParser:
 
         return ""
 
-    def _standardize_category(self, category: str) -> str:
-        """
-        Standardize category name based on CategoryList.
-        Converts short names to full hierarchical names.
-
-        Examples:
-        - "Trika" -> "Textil>Trika"
-        - "Na 2 pálky" -> "Pouzdra>Na 2 pálky"
-        - "Dřeva>OFF" -> "Dřeva>Dřeva OFF"
-        - "Potahy>Softy>OFF" -> "Potahy>Softy>Softy OFF"
-        """
-        if not category or not category.strip():
-            return category
-
-        # Get CategoryList from memory (it's loaded as list of lines)
-        category_list = self.memory.get(MEMORY_KEY_CATEGORY_LIST, [])
-        if not category_list:
-            logging.warning("CategoryList not found in memory, returning category as-is")
-            return category
-
-        # Filter out empty lines and strip whitespace
-        category_list = [line.strip() for line in category_list if line.strip()]
-
-        # Split category into parts
-        parts = [part.strip() for part in category.split('>')]
-        if not parts:
-            return category
-
-        # For multi-part categories, check for special OFF/ALL/DEF expansion FIRST
-        # Example: "Potahy>Softy>OFF" should become "Potahy>Softy>Softy OFF"
-        # Example: "Dřeva>OFF" should become "Dřeva>Dřeva OFF"
-        if len(parts) >= 2 and parts[-1] in ['OFF', 'ALL', 'DEF']:
-            # Try to find expanded version first
-            expanded_parts = parts[:-1] + [f"{parts[-2]} {parts[-1]}"]
-            expanded_category = '>'.join(expanded_parts)
-            if expanded_category in category_list:
-                return expanded_category
-
-        # Try to find exact match
-        if category in category_list:
-            return category
-
-        # For single part categories, find the full hierarchical path
-        if len(parts) == 1:
-            search_term = parts[0]
-            for full_category in category_list:
-                # Check if this is the last part of a hierarchical category
-                if '>' in full_category:
-                    full_parts = [part.strip() for part in full_category.split('>')]
-                    if full_parts[-1] == search_term:
-                        return full_category
-            # If not found as last part, return as-is
-            return category
-
-        # If still no match found, return original category
-        return category
-
     def _get_brand(self, downloaded: DownloadedProduct) -> str:
-        """Get brand from memory or OpenAI with user confirmation."""
+        """Get brand from memory, heuristics, or OpenAI with user confirmation."""
         memory_key = MEMORY_KEY_PRODUCT_BRAND_MEMORY.format(language=self.language)
         if memory_key in self.memory:
             brand_memory = self.memory[memory_key]
@@ -566,10 +615,31 @@ class ProductParser:
                 # Handle Desaka brand - treat as empty brand but keep for code generation
                 return brand
 
+        # Try heuristic extraction
+        brand_list = list(self.memory.get(MEMORY_KEY_BRAND_CODE_LIST, {}).keys())
+
+        single_match = None
+        all_matches = []
+        if brand_list:
+            single_match, all_matches = self._heuristic_extraction(downloaded, brand_list)
+
+            # If exactly one match found, use it
+            if single_match:
+                # Save to memory
+                if memory_key not in self.memory:
+                    self.memory[memory_key] = {}
+                self.memory[memory_key][downloaded.name] = single_match
+                self._save_memory_file(memory_key)
+                return single_match
+
         # Use OpenAI even if memory is empty or product not found
-        brand_list = self.memory.get(MEMORY_KEY_BRAND_CODE_LIST, {})
         if self.openai:
-            brand = self.openai.find_brand(downloaded, list(brand_list.keys()) if brand_list else [], self.language)
+            # Include information about heuristic matches in the AI prompt if any were found
+            heuristic_info = ""
+            if all_matches:
+                heuristic_info = f"Heuristic analysis found these potential brands in the text: {', '.join(all_matches)}. Please evaluate these candidates in your decision."
+
+            brand = self.openai.find_brand(downloaded, brand_list if brand_list else [], self.language, heuristic_info)
             if brand:
                 # Confirm with user if needed
                 confirmed_brand = self._confirm_ai_result(
@@ -594,6 +664,201 @@ class ProductParser:
             return user_brand
 
         return ""
+
+    def _get_product_type(self, downloaded: DownloadedProduct) -> str:
+        """Get product type from memory, heuristics, or AI."""
+        memory_key = MEMORY_KEY_PRODUCT_TYPE_MEMORY.format(language=self.language)
+        if memory_key in self.memory:
+            type_memory = self.memory[memory_key]
+            if downloaded.name in type_memory:
+                return type_memory[downloaded.name]
+
+        # Try heuristic extraction
+        # Get all existing product types from memory
+        all_types = set()
+        if memory_key in self.memory:
+            all_types.update(self.memory[memory_key].values())
+
+        type_list = list(all_types)
+        single_match = None
+        all_matches = []
+        if type_list:
+            single_match, all_matches = self._heuristic_extraction(downloaded, type_list)
+
+            # If exactly one match found, use it
+            if single_match:
+                # Save to memory
+                if memory_key not in self.memory:
+                    self.memory[memory_key] = {}
+                self.memory[memory_key][downloaded.name] = single_match
+                self._save_memory_file(memory_key)
+                return single_match
+
+        # Use OpenAI if memory is empty or product not found
+        if self.openai:
+            # Include information about heuristic matches in the AI prompt if any were found
+            heuristic_info = ""
+            if all_matches:
+                heuristic_info = f"Heuristic analysis found these potential product types in the text: {', '.join(all_matches)}. Please evaluate these candidates in your decision."
+
+            product_type = self.openai.get_product_type(downloaded, self.language, heuristic_info)
+            if product_type:
+                # Confirm with user if needed
+                confirmed_type = self._confirm_ai_result(
+                    "Product Type", "", product_type, downloaded.name, downloaded.url
+                )
+                if confirmed_type:
+                    # Save to memory
+                    if memory_key not in self.memory:
+                        self.memory[memory_key] = {}
+                    self.memory[memory_key][downloaded.name] = confirmed_type
+                    self._save_memory_file(memory_key)
+                    return confirmed_type
+
+        # Ask user directly if AI not available or failed
+        user_type = self._ask_user_for_product_value("Product Type", downloaded)
+        if user_type:
+            # Save to memory
+            if memory_key not in self.memory:
+                self.memory[memory_key] = {}
+            self.memory[memory_key][downloaded.name] = user_type
+            self._save_memory_file(memory_key)
+            return user_type
+
+        return "Product"  # Default fallback
+
+    def _get_product_model(self, downloaded: DownloadedProduct) -> str:
+        """Get product model from memory, heuristics, or AI."""
+        memory_key = MEMORY_KEY_PRODUCT_MODEL_MEMORY.format(language=self.language)
+        if memory_key in self.memory:
+            model_memory = self.memory[memory_key]
+            if downloaded.name in model_memory:
+                return model_memory[downloaded.name]
+
+        # Try heuristic extraction
+        # Get all existing product models from memory
+        all_models = set()
+        if memory_key in self.memory:
+            all_models.update(self.memory[memory_key].values())
+
+        model_list = list(all_models)
+        single_match = None
+        all_matches = []
+        if model_list:
+            single_match, all_matches = self._heuristic_extraction(downloaded, model_list)
+
+            # If exactly one match found, use it
+            if single_match:
+                # Save to memory
+                if memory_key not in self.memory:
+                    self.memory[memory_key] = {}
+                self.memory[memory_key][downloaded.name] = single_match
+                self._save_memory_file(memory_key)
+                return self._format_model_name(single_match)
+
+        # Use OpenAI if memory is empty or product not found
+        if self.openai:
+            # Include information about heuristic matches in the AI prompt if any were found
+            heuristic_info = ""
+            if all_matches:
+                heuristic_info = f"Heuristic analysis found these potential product models in the text: {', '.join(all_matches)}. Please evaluate these candidates in your decision."
+
+            product_model = self.openai.get_product_model(downloaded, self.language, heuristic_info)
+            if product_model:
+                # Confirm with user if needed
+                confirmed_model = self._confirm_ai_result(
+                    "Product Model", "", product_model, downloaded.name, downloaded.url
+                )
+                if confirmed_model:
+                    # Save to memory
+                    if memory_key not in self.memory:
+                        self.memory[memory_key] = {}
+                    self.memory[memory_key][downloaded.name] = confirmed_model
+                    self._save_memory_file(memory_key)
+                    return self._format_model_name(confirmed_model)
+
+        # Ask user directly if AI not available or failed
+        user_model = self._ask_user_for_product_value("Product Model", downloaded)
+        if user_model:
+            # Save to memory
+            if memory_key not in self.memory:
+                self.memory[memory_key] = {}
+            self.memory[memory_key][downloaded.name] = user_model
+            self._save_memory_file(memory_key)
+            return self._format_model_name(user_model)
+
+        return "Standard"  # Default fallback
+
+    def _get_product_brand_for_name(self, downloaded: DownloadedProduct) -> str:
+        """Get product brand for name composition from memory, heuristics, or AI."""
+        memory_key = MEMORY_KEY_PRODUCT_BRAND_MEMORY.format(language=self.language)
+        if memory_key in self.memory:
+            brand_memory = self.memory[memory_key]
+            if downloaded.name in brand_memory:
+                brand = brand_memory[downloaded.name]
+                # Special handling for Desaka brand - return empty string for name composition
+                if brand and self._is_desaka_brand(brand):
+                    return ""
+                return brand
+
+        # Try heuristic extraction
+        brand_list = list(self.memory.get(MEMORY_KEY_BRAND_CODE_LIST, {}).keys())
+
+        single_match = None
+        all_matches = []
+        if brand_list:
+            single_match, all_matches = self._heuristic_extraction(downloaded, brand_list)
+
+            # If exactly one match found, use it
+            if single_match:
+                # Save to memory
+                if memory_key not in self.memory:
+                    self.memory[memory_key] = {}
+                self.memory[memory_key][downloaded.name] = single_match
+                self._save_memory_file(memory_key)
+                # Special handling for Desaka brand - return empty string for name composition
+                if self._is_desaka_brand(single_match):
+                    return ""
+                return self._format_brand_name(single_match)
+
+        # Use OpenAI if memory is empty or product not found
+        if self.openai:
+            # Include information about heuristic matches in the AI prompt if any were found
+            heuristic_info = ""
+            if all_matches:
+                heuristic_info = f"Heuristic analysis found these potential brands in the text: {', '.join(all_matches)}. Please evaluate these candidates in your decision."
+
+            product_brand = self.openai.get_product_brand(downloaded, brand_list if brand_list else [], heuristic_info)
+            if product_brand:
+                # Confirm with user if needed
+                confirmed_brand = self._confirm_ai_result(
+                    "Product Brand", "", product_brand, downloaded.name, downloaded.url
+                )
+                if confirmed_brand:
+                    # Save to memory
+                    if memory_key not in self.memory:
+                        self.memory[memory_key] = {}
+                    self.memory[memory_key][downloaded.name] = confirmed_brand
+                    self._save_memory_file(memory_key)
+                    # Special handling for Desaka brand - return empty string for name composition
+                    if self._is_desaka_brand(confirmed_brand):
+                        return ""
+                    return self._format_brand_name(confirmed_brand)
+
+        # Ask user directly if AI not available or failed
+        user_brand = self._ask_user_for_product_value("Product Brand", downloaded)
+        if user_brand:
+            # Save to memory
+            if memory_key not in self.memory:
+                self.memory[memory_key] = {}
+            self.memory[memory_key][downloaded.name] = user_brand
+            self._save_memory_file(memory_key)
+            # Special handling for Desaka brand - return empty string for name composition
+            if self._is_desaka_brand(user_brand):
+                return ""
+            return self._format_brand_name(user_brand)
+
+        return "Unknown"  # Default fallback
 
     def _find_category_key_by_value(self, category_value: str) -> Optional[str]:
         """Find category key by its translated value in CategoryNameMemory."""
@@ -1119,125 +1384,6 @@ class ProductParser:
         self._save_memory_file(memory_key)
 
         return formatted_name
-
-    def _get_product_type(self, downloaded: DownloadedProduct) -> str:
-        """Get product type from memory or AI."""
-        memory_key = MEMORY_KEY_PRODUCT_TYPE_MEMORY.format(language=self.language)
-        if memory_key in self.memory:
-            type_memory = self.memory[memory_key]
-            if downloaded.name in type_memory:
-                return type_memory[downloaded.name]
-
-        # Use OpenAI if memory is empty or product not found
-        if self.openai:
-            product_type = self.openai.get_product_type(downloaded, self.language)
-            if product_type:
-                # Confirm with user if needed
-                confirmed_type = self._confirm_ai_result(
-                    "Product Type", "", product_type, downloaded.name, downloaded.url
-                )
-                if confirmed_type:
-                    # Save to memory
-                    if memory_key not in self.memory:
-                        self.memory[memory_key] = {}
-                    self.memory[memory_key][downloaded.name] = confirmed_type
-                    self._save_memory_file(memory_key)
-                    return confirmed_type
-
-        # Ask user directly if AI not available or failed
-        user_type = self._ask_user_for_product_value("Product Type", downloaded)
-        if user_type:
-            # Save to memory
-            if memory_key not in self.memory:
-                self.memory[memory_key] = {}
-            self.memory[memory_key][downloaded.name] = user_type
-            self._save_memory_file(memory_key)
-            return user_type
-
-        return "Product"  # Default fallback
-
-    def _get_product_brand_for_name(self, downloaded: DownloadedProduct) -> str:
-        """Get product brand for name composition from memory or AI."""
-        memory_key = MEMORY_KEY_PRODUCT_BRAND_MEMORY.format(language=self.language)
-        if memory_key in self.memory:
-            brand_memory = self.memory[memory_key]
-            if downloaded.name in brand_memory:
-                brand = brand_memory[downloaded.name]
-                # Special handling for Desaka brand - return empty string for name composition
-                if brand and self._is_desaka_brand(brand):
-                    return ""
-                return brand
-
-        # Use OpenAI if memory is empty or product not found
-        if self.openai:
-            brand_list = self.memory.get(MEMORY_KEY_BRAND_CODE_LIST, {})
-            product_brand = self.openai.get_product_brand(downloaded, list(brand_list.keys()) if brand_list else [])
-            if product_brand:
-                # Confirm with user if needed
-                confirmed_brand = self._confirm_ai_result(
-                    "Product Brand", "", product_brand, downloaded.name, downloaded.url
-                )
-                if confirmed_brand:
-                    # Save to memory
-                    if memory_key not in self.memory:
-                        self.memory[memory_key] = {}
-                    self.memory[memory_key][downloaded.name] = confirmed_brand
-                    self._save_memory_file(memory_key)
-                    # Special handling for Desaka brand - return empty string for name composition
-                    if self._is_desaka_brand(confirmed_brand):
-                        return ""
-                    return self._format_brand_name(confirmed_brand)
-
-        # Ask user directly if AI not available or failed
-        user_brand = self._ask_user_for_product_value("Product Brand", downloaded)
-        if user_brand:
-            # Save to memory
-            if memory_key not in self.memory:
-                self.memory[memory_key] = {}
-            self.memory[memory_key][downloaded.name] = user_brand
-            self._save_memory_file(memory_key)
-            # Special handling for Desaka brand - return empty string for name composition
-            if self._is_desaka_brand(user_brand):
-                return ""
-            return self._format_brand_name(user_brand)
-
-        return "Unknown"  # Default fallback
-
-    def _get_product_model(self, downloaded: DownloadedProduct) -> str:
-        """Get product model from memory or AI."""
-        memory_key = MEMORY_KEY_PRODUCT_MODEL_MEMORY.format(language=self.language)
-        if memory_key in self.memory:
-            model_memory = self.memory[memory_key]
-            if downloaded.name in model_memory:
-                return model_memory[downloaded.name]
-
-        # Use OpenAI if memory is empty or product not found
-        if self.openai:
-            product_model = self.openai.get_product_model(downloaded, self.language)
-            if product_model:
-                # Confirm with user if needed
-                confirmed_model = self._confirm_ai_result(
-                    "Product Model", "", product_model, downloaded.name, downloaded.url
-                )
-                if confirmed_model:
-                    # Save to memory
-                    if memory_key not in self.memory:
-                        self.memory[memory_key] = {}
-                    self.memory[memory_key][downloaded.name] = confirmed_model
-                    self._save_memory_file(memory_key)
-                    return self._format_model_name(confirmed_model)
-
-        # Ask user directly if AI not available or failed
-        user_model = self._ask_user_for_product_value("Product Model", downloaded)
-        if user_model:
-            # Save to memory
-            if memory_key not in self.memory:
-                self.memory[memory_key] = {}
-            self.memory[memory_key][downloaded.name] = user_model
-            self._save_memory_file(memory_key)
-            return self._format_model_name(user_model)
-
-        return "Standard"  # Default fallback
 
     def _format_brand_name(self, brand: str) -> str:
         """Format brand name with proper capitalization."""
@@ -1922,7 +2068,7 @@ class ProductParser:
 
         return main_product
 
-    def _create_variant_export_product_complete(self, repaired: RepairedProduct, variant: Any, variant_index: int) -> ExportProductVariant:
+    def _create_variant_export_product(self, repaired: RepairedProduct, variant: Any, variant_index: int) -> ExportProductVariant:
         """Create variant export product with complete 96-column specification."""
         variant_product = ExportProductVariant()
 

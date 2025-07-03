@@ -7,6 +7,7 @@ Contains only general methods that OpenAI API supports.
 
 import os
 import json
+import time
 import logging
 from typing import Dict, Any, Optional, List
 from unifierlib.constants import DEFAULT_MAX_TOKENS
@@ -69,10 +70,10 @@ class OpenAIClient:
             'reasoning': self.models['reasoning'],
             'creative': self.models['creative'],
             'fine_tuning': self.models['fine_tuning'],
-            'category_mapping': self.models['efficient'],
+            'category_mapping': self.models['flagship'],
             'product_analysis': self.models['flagship'],  # Complex analysis
-            'text_generation': self.models['efficient'],  # Simple text tasks
-            'translation': self.models['efficient'],  # Translation tasks
+            'text_generation': self.models['flagship'],  # Simple text tasks
+            'translation': self.models['flagship'],  # Translation tasks
             'name_generation': self.models['flagship'],  # Product name generation
             'description_translation': self.models['flagship'],  # Description translation
             'brand_detection': self.models['efficient'],  # Brand detection
@@ -110,7 +111,7 @@ class OpenAIClient:
         try:
             logging.debug(f"OpenAI API call - Model: {model}, Temperature: {temperature}, Max tokens: {max_tokens}")
             logging.debug(f"OpenAI API call - Messages: {len(messages)} messages")
-
+            time.sleep(10)
             response = self.client.chat.completions.create(
                 model=model,
                 messages=messages,

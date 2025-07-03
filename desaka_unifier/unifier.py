@@ -133,6 +133,13 @@ def parse_arguments():
         help="Use fine-tuned models instead of generic ones when available (default: False)"
     )
 
+    parser.add_argument(
+        "--MaxParallel",
+        type=int,
+        default=3,
+        help="Maximum number of eshop scripts to run in parallel (default: 3)"
+    )
+
     args = parser.parse_args()
 
     return args
@@ -219,7 +226,7 @@ def main():
             try:
                 success = script_runner_instance.run_scripts_parallel(
                     eshop_list, args.Language, args.ResultDir,
-                    debug=args.Debug, overwrite=args.Overwrite, max_workers=3
+                    debug=args.Debug, overwrite=args.Overwrite, max_workers=args.MaxParallel
                 )
 
                 if success:

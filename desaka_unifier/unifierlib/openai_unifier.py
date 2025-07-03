@@ -8,6 +8,7 @@ and use humble requests with explicit JSON return format.
 
 import json
 import logging
+import random
 from typing import Dict, Any, Optional, List
 from unifierlib.openai_client import OpenAIClient
 from unifierlib.downloaded_product import DownloadedProduct
@@ -80,7 +81,7 @@ CRITICAL: Always use table tennis slang and industry terminology, not literal tr
 
 Your task requires accurate analysis and proper translation to {target_language} using correct table tennis slang and terminology when needed.""")
 
-    def find_category(self, product: DownloadedProduct, category_list: List[str], language: str = 'CS') -> Optional[str]:
+    def find_category(self, product: DownloadedProduct, category_list: List[str], language: str = 'CS', heuristic_info: str = "") -> Optional[str]:
         """
         Find category for product using OpenAI.
 
@@ -88,6 +89,7 @@ Your task requires accurate analysis and proper translation to {target_language}
             product (DownloadedProduct): Product to categorize
             category_list (List[str]): List of available categories
             language (str): Target language code
+            heuristic_info (str): Information about heuristic extraction results
 
         Returns:
             Optional[str]: Selected category or None if error
@@ -106,10 +108,13 @@ Your task requires accurate analysis and proper translation to {target_language}
 
         system_prompt = self._create_system_prompt('category_mapping', language)
 
+        # Add heuristic info to the prompt if available
+        heuristic_section = f"\n\n{heuristic_info}" if heuristic_info else ""
+
         user_prompt = f"""I humbly request your assistance in categorizing a product. Please help me select the most appropriate category from the provided list.
 
 Product information:
-{product_json}
+{product_json}{heuristic_section}
 
 Available categories:
 {categories_text}
@@ -143,7 +148,7 @@ Please return your response as valid JSON only."""
 
         return None
 
-    def find_brand(self, product: DownloadedProduct, brand_list: List[str], language: str = 'CS') -> Optional[str]:
+    def find_brand(self, product: DownloadedProduct, brand_list: List[str], language: str = 'CS', heuristic_info: str = "") -> Optional[str]:
         """
         Find brand for product using OpenAI.
 
@@ -151,6 +156,7 @@ Please return your response as valid JSON only."""
             product (DownloadedProduct): Product to analyze
             brand_list (List[str]): List of available brands
             language (str): Target language code
+            heuristic_info (str): Information about heuristic extraction results
 
         Returns:
             Optional[str]: Selected brand or None if error
@@ -169,10 +175,13 @@ Please return your response as valid JSON only."""
 
         system_prompt = self._create_system_prompt('brand_detection', language)
 
+        # Add heuristic info to the prompt if available
+        heuristic_section = f"\n\n{heuristic_info}" if heuristic_info else ""
+
         user_prompt = f"""I humbly request your help in identifying the brand of a product. Please assist me in selecting the correct brand from the provided list.
 
 Product information:
-{product_json}
+{product_json}{heuristic_section}
 
 Available brands:
 {brands_text}
@@ -207,6 +216,58 @@ Please return your response as valid JSON only."""
 
         return None
 
+    def _get_diverse_memory_items(self, memory_content: Dict[str, str], max_items: int = 1000) -> List[str]:
+        """
+        Selects a diverse subset of memory items, aiming to represent all unique values
+        if possible within max_items.
+
+        Args:
+            memory_content (Dict[str, str]): The memory content dictionary.
+            max_items (int): Maximum number of items to return.
+
+        Returns:
+            List[str]: A list of formatted memory items.
+        """
+        if not memory_content:
+            return []
+
+        # Step 1: Collect one (key, value) pair for each unique value.
+        # The first encountered (key, value) for a unique value is taken.
+        unique_value_representatives_map = {}  # Maps value -> (key, value)
+        for k, v in memory_content.items():
+            if v not in unique_value_representatives_map:
+                unique_value_representatives_map[v] = (k, v)
+
+        items_representing_all_uniques = list(unique_value_representatives_map.values())
+
+        formatted_unique_items = [f"- {k} -> {v}" for k, v in items_representing_all_uniques]
+
+        # Step 2: Decide what to return based on counts
+        if len(formatted_unique_items) >= max_items:
+            # If we have more (or equal) unique items than max_items,
+            # select a random subset of these items.
+            random.shuffle(formatted_unique_items)
+            return formatted_unique_items[:max_items]
+        else:
+            # All unique values are included, and we have space for more items.
+            result_items = formatted_unique_items
+
+            # Collect all other items from memory_content that are not yet included.
+            # A set of (k,v) pairs already included for efficient lookup.
+            selected_pairs_set = set(items_representing_all_uniques)
+
+            additional_items_candidates_formatted = []
+            for k, v in memory_content.items():
+                if (k, v) not in selected_pairs_set:
+                    additional_items_candidates_formatted.append(f"- {k} -> {v}")
+
+            random.shuffle(additional_items_candidates_formatted)
+
+            num_needed = max_items - len(result_items)
+            result_items.extend(additional_items_candidates_formatted[:num_needed])
+
+            return result_items
+
     def generate_google_keywords(self, product: DownloadedProduct, memory_content: Dict[str, str] = None, language: str = 'CS') -> Optional[str]:
         """Generate Google keywords for product using OpenAI with memory content."""
         from unifierlib.memory_manager import get_language_name
@@ -222,8 +283,9 @@ Please return your response as valid JSON only."""
         # Include memory content in prompt if available
         memory_section = ""
         if memory_content:
-            memory_items = [f"- {key} -> {value}" for key, value in list(memory_content.items())[:1000]]
-            memory_section = f"""
+            memory_items = self._get_diverse_memory_items(memory_content)
+            if memory_items: # check if memory_items is not empty
+                memory_section = f"""
 
 Existing Google keywords from memory:
 {chr(10).join(memory_items)}
@@ -278,8 +340,9 @@ Please return your response as valid JSON only."""
         # Include memory content in prompt if available
         memory_section = ""
         if memory_content:
-            memory_items = [f"- {key} -> {value}" for key, value in list(memory_content.items())[:1000]]
-            memory_section = f"""
+            memory_items = self._get_diverse_memory_items(memory_content)
+            if memory_items: # check if memory_items is not empty
+                memory_section = f"""
 
 Existing Zbozi keywords from memory:
 {chr(10).join(memory_items)}
@@ -329,8 +392,9 @@ Please return your response as valid JSON only."""
         # Include memory content in prompt if available
         memory_section = ""
         if memory_content:
-            memory_items = [f"- {key} -> {value}" for key, value in list(memory_content.items())[:1000]]
-            memory_section = f"""
+            memory_items = self._get_diverse_memory_items(memory_content)
+            if memory_items: # check if memory_items is not empty
+                memory_section = f"""
 
 Existing standardized variant names from memory:
 {chr(10).join(memory_items)}
@@ -376,8 +440,9 @@ Please return your response as valid JSON only."""
         # Include memory content in prompt if available
         memory_section = ""
         if memory_content:
-            memory_items = [f"- {key} -> {value}" for key, value in list(memory_content.items())[:1000]]
-            memory_section = f"""
+            memory_items = self._get_diverse_memory_items(memory_content)
+            if memory_items: # check if memory_items is not empty
+                memory_section = f"""
 
 Existing standardized variant values from memory:
 {chr(10).join(memory_items)}
@@ -423,8 +488,9 @@ Please return your response as valid JSON only."""
         # Include memory content in prompt if available
         memory_section = ""
         if memory_content:
-            memory_items = [f"- {key} -> {value}" for key, value in list(memory_content.items())[:1000]]
-            memory_section = f"""
+            memory_items = self._get_diverse_memory_items(memory_content)
+            if memory_items: # check if memory_items is not empty
+                memory_section = f"""
 
 Existing {platform} category mappings from memory:
 {chr(10).join(memory_items)}
@@ -519,7 +585,7 @@ Please return your response as valid JSON only."""
             {"role": "user", "content": user_prompt}
         ]
 
-        response = self.client.json_completion(messages, task_type='translation', max_tokens=2000)
+        response = self.client.json_completion(messages, task_type='translation', max_tokens=16384)
 
         if response and 'description' in response:
             return response['description']
@@ -578,7 +644,7 @@ Please return your response as valid JSON only."""
         return None
 
     def translate_and_validate_short_description(self, short_description: str, language: str, description: str = "") -> Optional[str]:
-        """Translate and validate short description using OpenAI, or generate from description if short description is empty."""
+        """Translate and validate short description using OpenAI, or generate from description if short_description is empty."""
         from unifierlib.memory_manager import get_language_name
         target_language = get_language_name(language, self.supported_languages_data)
 
@@ -635,7 +701,7 @@ Please return your response as valid JSON only."""
 
         return None
 
-    def get_product_type(self, product: DownloadedProduct, language: str) -> Optional[str]:
+    def get_product_type(self, product: DownloadedProduct, language: str, heuristic_info: str = "") -> Optional[str]:
         """Get product type using OpenAI."""
         product_json = json.dumps({
             'name': product.name,
@@ -649,10 +715,13 @@ Please return your response as valid JSON only."""
 
         system_prompt = self._create_system_prompt('product_analysis', language)
 
+        # Add heuristic info to the prompt if available
+        heuristic_section = f"\n\n{heuristic_info}" if heuristic_info else ""
+
         user_prompt = f"""I humbly request your assistance in identifying the product type. Please help me determine what type of product this is.
 
 Product information:
-{product_json}
+{product_json}{heuristic_section}
 
 I respectfully ask you to:
 1. Analyze the product information carefully
@@ -676,11 +745,11 @@ Please return your response as valid JSON only."""
 
         return None
 
-    def get_product_brand(self, product: DownloadedProduct, brand_list: List[str]) -> Optional[str]:
+    def get_product_brand(self, product: DownloadedProduct, brand_list: List[str], heuristic_info: str = "") -> Optional[str]:
         """Get product brand using OpenAI (similar to find_brand but for name composition)."""
-        return self.find_brand(product, brand_list)
+        return self.find_brand(product, brand_list, 'CS', heuristic_info)
 
-    def get_product_model(self, product: DownloadedProduct, language: str) -> Optional[str]:
+    def get_product_model(self, product: DownloadedProduct, language: str, heuristic_info: str = "") -> Optional[str]:
         """Get product model using OpenAI."""
         product_json = json.dumps({
             'name': product.name,
@@ -694,10 +763,13 @@ Please return your response as valid JSON only."""
 
         system_prompt = self._create_system_prompt('product_analysis', language)
 
+        # Add heuristic info to the prompt if available
+        heuristic_section = f"\n\n{heuristic_info}" if heuristic_info else ""
+
         user_prompt = f"""I humbly request your help in identifying the product model. Please assist me in determining the specific model of this product.
 
 Product information:
-{product_json}
+{product_json}{heuristic_section}
 
 I respectfully ask you to:
 1. Analyze the product information thoroughly
@@ -729,8 +801,9 @@ Please return your response as valid JSON only."""
         # Include memory content in prompt if available
         memory_section = ""
         if memory_content:
-            memory_items = [f"- {key} -> {value}" for key, value in list(memory_content.items())[:1000]]
-            memory_section = f"""
+            memory_items = self._get_diverse_memory_items(memory_content)
+            if memory_items: # check if memory_items is not empty
+                memory_section = f"""
 
 Existing stock status translations from memory:
 {chr(10).join(memory_items)}

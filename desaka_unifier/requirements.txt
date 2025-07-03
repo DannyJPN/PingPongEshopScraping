@@ -1,0 +1,46 @@
+# Requirements for desaka_unifier project
+# Core dependencies for the unifier script
+
+# Progress bars and user interface
+tqdm>=4.64.0
+
+# OpenAI API client
+openai>=1.0.0
+
+# HTTP requests (if needed for web scraping)
+requests>=2.28.0
+
+# CSV and data processing
+pandas>=1.5.0
+
+# Excel file support
+openpyxl>=3.0.0
+xlwt>=1.3.0
+
+# JSON handling (built-in, but some advanced features)
+# json is built-in
+
+# Logging and configuration
+# logging is built-in
+
+# File operations and path handling
+# os, sys, pathlib are built-in
+
+# Date and time handling
+# datetime is built-in
+
+# Argument parsing
+# argparse is built-in
+
+# Type hints
+# typing is built-in
+
+# Regular expressions
+# re is built-in
+
+# Concurrent execution
+# concurrent.futures is built-in
+
+# Development and testing dependencies (optional)
+# pytest>=7.0.0
+# pytest-cov>=4.0.0

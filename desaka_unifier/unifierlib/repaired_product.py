@@ -21,6 +21,8 @@ class RepairedProduct:
         self.original_name: str = ""
         self.category: str = ""
         self.brand: str = ""
+        self.type: str = ""  # Typ produktu
+        self.model: str = ""  # Model produktu
         self.category_ids: str = ""
         self.code: str = ""
         self.desc: str = ""
@@ -40,7 +42,5 @@ class RepairedProduct:
     def __str__(self) -> str:
         """Return string representation of RepairedProduct."""
         return (f"RepairedProduct(name='{self.name}', code='{self.code}', "
-                f"brand='{self.brand}', category='{self.category}', "
-                f"price='{self.price}', variants={len(self.Variants)})")
-
-
+                f"brand='{self.brand}', type='{self.type}', model='{self.model}', "
+                f"category='{self.category}', price='{self.price}', variants={len(self.Variants)})")

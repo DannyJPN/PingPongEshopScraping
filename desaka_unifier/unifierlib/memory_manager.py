@@ -331,3 +331,4 @@ def get_language_name(language_code: str, supported_languages_data: list = None)
         logging.warning(f"Error getting language name for {language_code}: {str(e)}")
         return 'English'
 
+

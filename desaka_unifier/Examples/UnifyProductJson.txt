@@ -1,0 +1,260 @@
+def create_mappings(data):
+    """
+    Creates mappings for main product and its variants into a unified format.
+    Explicitly maps all attributes according to UnifyProductMapping.
+    """
+    mappings = []
+
+    # Main product mapping
+    base_mapping = {
+        # Product identification
+        'id': data['id'],
+        'typ': 'produkt',
+        'varianta_id': "#",
+        'varianta1_nazev': "#",
+        'varianta1_hodnota': "#",
+        'varianta2_nazev': "#",
+        'varianta2_hodnota': "#",
+        'varianta3_nazev': "#",
+        'varianta3_hodnota': "#",
+        'varianta_stejne': "#",
+
+        # Visibility and status
+        'zobrazit': int(data.get('visibility', 1)),
+        'archiv': int(data.get('archive', 0)),
+
+        # Basic product information
+        'kod': data.get('catalogNumber', ""),
+        'kod_vyrobku': data.get('mpn', ""),
+        'ean': data.get('ean', ""),
+        'isbn': data.get('isbn', ""),
+        'nazev': data['translations']['cs']['name'],
+        'privlastek': data['translations']['cs'].get('nameext', ""),
+        'vyrobce': data['manufacturer']['name'],
+        'dodavatel_id': data.get('supplier_id', ""),
+
+        # Pricing information
+        'cena': data.get('price', 0),
+        'cena_bezna': data.get('standardPrice', 0),
+        'cena_nakupni': data.get('purchasePrice', ""),
+        'recyklacni_poplatek': data.get('recycle_fee', ""),
+        'dph': data['vat'].get('rate', 21),
+        'sleva': data.get('discount', 0),
+        'sleva_od': data.get('discount_from', ""),
+        'sleva_do': data.get('discount_to', ""),
+
+        # Description and content
+        'popis': data['translations']['cs'].get('description', ""),
+        'popis_strucny': data['translations']['cs'].get('annotation', ""),
+
+        # Product attributes
+        'kosik': int(data.get('sales', 1)),
+        'home': int(data.get('homepage', 0)),
+        'dostupnost': data.get('availability', "#"),
+        'doprava_zdarma': int(data.get('deliveryFree', 0)),
+        'dodaci_doba': data.get('deliveryTime', "#"),
+        'dodaci_doba_auto': data.get('deliveryTimeAuto', "#"),
+        'sklad': data.get('stock', "#"),
+        'na_sklade': data.get('inStock', "#"),
+        'hmotnost': data.get('weight', ""),
+        'delka': data.get('length', ""),
+        'jednotka': data.get('unit', "ks"),
+        'odber_po': data.get('limitMultiple', 1),
+        'odber_min': data.get('limitMin', 1),
+        'odber_max': data.get('limitMax', ""),
+        'pocet': data.get('quantityPack', 1),
+        'zaruka': data['guarantee'].get('name', ""),
+        'marze_dodavatel': data.get('margin', ""),
+
+        # SEO and marketing
+        'seo_titulek': data['translations']['cs'].get('metaTitle', ""),
+        'seo_popis': data['translations']['cs'].get('metaDescription', ""),
+
+        # Special properties
+        'eroticke': int(data.get('erotic', 0)),
+        'pro_dospele': int(data.get('adult', 0)),
+        'slevovy_kupon': int(data.get('voucherDiscount', 1)),
+        'darek_objednavka': int(data.get('gift_free', 1)),
+        'priorita': data.get('priority', 0),
+
+        # Notes and tags
+        'poznamka': data.get('comment', ""),
+        'stitky': ",".join([str(tag['name']) for tag in data.get('tags', [])]),
+
+        # Categories and related products
+        'kategorie_id': ",".join([str(cat['id']) for cat in data.get('categories', [])]),
+        'podobne': ",".join([str(rel['id']) for rel in data.get('related', [])]),
+        'prislusenstvi': ",".join([str(acc['id']) for acc in data.get('accessory', [])]),
+        'variantove': ",".join([str(var['id']) for var in data.get('variants', [])]),
+        'zdarma': ",".join([str(fr['id']) for fr in data.get('free', [])]),
+        'sluzby': ",".join([str(serv['id']) for serv in data.get('services', [])]),
+        'rozsirujici_obsah': ",".join([str(ext['id']) for ext in data.get('extended_content', [])]),
+
+        # Zbozi.cz
+        'zbozicz_skryt': int(data['feeds']['zbozi'].get('hidden', 0)),
+        'zbozicz_productname': data['feeds']['zbozi'].get('productname', ""),
+        'zbozicz_product': data['feeds']['zbozi'].get('product', ""),
+        'zbozicz_cpc': data['feeds']['zbozi'].get('cpc', 5),
+        'zbozicz_cpc_search': data['feeds']['zbozi'].get('cpc_search', 5),
+        'zbozicz_kategorie': data['feeds']['zbozi'].get('category', ""),
+        'zbozicz_stitek_0': data['feeds']['zbozi'].get('customeLabel0', ""),
+        'zbozicz_stitek_1': data['feeds']['zbozi'].get('customeLabel1', ""),
+        'zbozicz_extra': data['feeds']['zbozi'].get('extraMessage', ""),
+
+        # Heureka.cz
+        'heurekacz_skryt': int(data['feeds']['heurekacs'].get('hidden', 0)),
+        'heurekacz_productname': data['feeds']['heurekacs'].get('productname', ""),
+        'heurekacz_product': data['feeds']['heurekacs'].get('product', ""),
+        'heurekacz_cpc': data['feeds']['heurekacs'].get('cpc', 1),
+        'heurekacz_kategorie': data['feeds']['heurekacs'].get('category', ""),
+
+        # Google
+        'google_skryt': int(data['feeds']['google'].get('hidden', 0)),
+        'google_kategorie': data['feeds']['google'].get('category', ""),
+        'google_stitek_0': data['feeds']['google'].get('customeLabel0', ""),
+        'google_stitek_1': data['feeds']['google'].get('customeLabel1', ""),
+        'google_stitek_2': data['feeds']['google'].get('customeLabel2', ""),
+        'google_stitek_3': data['feeds']['google'].get('customeLabel3', ""),
+        'google_stitek_4': data['feeds']['google'].get('customeLabel4', ""),
+
+        # Glami
+        'glami_skryt': int(data['feeds']['glami'].get('hidden', 0)),
+        'glami_kategorie': data['feeds']['glami'].get('category', ""),
+        'glami_cpc': data['feeds']['glami'].get('cpc', 1),
+        'glami_voucher': data['feeds']['glami'].get('promotionId', ""),
+        'glami_material': data['feeds']['glami'].get('material', ""),
+        'glamisk_material': data['feeds']['glami'].get('material', ""),
+
+        # Warehouse
+        'sklad_umisteni': data['warehouse'].get('location', "#"),
+        'sklad_minimalni': data['warehouse'].get('stockMinimum', "#"),
+        'sklad_optimalni': data['warehouse'].get('stockOptimal', "#"),
+        'sklad_maximalni': data['warehouse'].get('stockMaximum', "#")
+    }
+
+    # Add main product mapping
+    mappings.append(base_mapping)
+
+    # Process variants
+    for variant in data.get('variants', []):
+        variant_mapping = {
+            'id': data['id'],
+            'typ': 'varianta',
+            'varianta_id': variant['id'],
+            'varianta1_nazev': "#",
+            'varianta1_hodnota': "#",
+            'varianta2_nazev': "#",
+            'varianta2_hodnota': "#",
+            'varianta3_nazev': "#",
+            'varianta3_hodnota': "#",
+            'varianta_stejne': "#",
+            
+            'zobrazit': "#",
+            'archiv': "#",
+            
+            'kod': variant.get('catalogNumber', ""),
+            'kod_vyrobku': variant.get('mpn', ""),
+            'ean': variant.get('ean', ""),
+            'isbn': "#",
+            'nazev': "#",
+            'privlastek': "#",
+            'vyrobce': "#",
+            'dodavatel_id': "#",
+            
+            'cena': variant.get('price', 0),
+            'cena_bezna': variant.get('standardPrice', 0),
+            'cena_nakupni': variant.get('purchasePrice', ""),
+            'recyklacni_poplatek': "#",
+            'dph': "#",
+            'sleva': "#",
+            'sleva_od': "#",
+            'sleva_do': "#",
+            
+            'popis': "#",
+            'popis_strucny': "#",
+            
+            'kosik': "#",
+            'home': "#",
+            'dostupnost': ".",
+            'doprava_zdarma': "#",
+            'dodaci_doba': "#",
+            'dodaci_doba_auto': "#",
+            'sklad': "#",
+            'na_sklade': "#",
+            'hmotnost': variant.get('weight', ""),
+            'delka': variant.get('length', ""),
+            'jednotka': "#",
+            'odber_po': "#",
+            'odber_min': "#",
+            'odber_max': "#",
+            'pocet': "#",
+            'zaruka': "#",
+            'marze_dodavatel': "#",
+            
+            'seo_titulek': "#",
+            'seo_popis': "#",
+            
+            'eroticke': "#",
+            'pro_dospele': "#",
+            'slevovy_kupon': "#",
+            'darek_objednavka': "#",
+            'priorita': "#",
+            
+            'poznamka': "#",
+            'stitky': "#",
+            
+            'kategorie_id': "#",
+            'podobne': "#",
+            'prislusenstvi': "#",
+            'variantove': "#",
+            'zdarma': "#",
+            'sluzby': "#",
+            'rozsirujici_obsah': "#",
+            
+            'zbozicz_skryt': "#",
+            'zbozicz_productname': "#",
+            'zbozicz_product': "#",
+            'zbozicz_cpc': "#",
+            'zbozicz_cpc_search': "#",
+            'zbozicz_kategorie': "#",
+            'zbozicz_stitek_0': "#",
+            'zbozicz_stitek_1': "#",
+            'zbozicz_extra': "#",
+            
+            'heurekacz_skryt': "#",
+            'heurekacz_productname': "#",
+            'heurekacz_product': "#",
+            'heurekacz_cpc': "#",
+            'heurekacz_kategorie': "#",
+            
+            'google_skryt': "#",
+            'google_kategorie': "#",
+            'google_stitek_0': "#",
+            'google_stitek_1': "#",
+            'google_stitek_2': "#",
+            'google_stitek_3': "#",
+            'google_stitek_4': "#",
+            
+            'glami_skryt': "#",
+            'glami_kategorie': "#",
+            'glami_cpc': "#",
+            'glami_voucher': "#",
+            'glami_material': "#",
+            'glamisk_material': "#",
+            
+            'sklad_umisteni': variant.get('warehouse', {}).get('location', ""),
+            'sklad_minimalni': variant.get('warehouse', {}).get('stockMinimum', ""),
+            'sklad_optimalni': variant.get('warehouse', {}).get('stockOptimal', ""),
+            'sklad_maximalni': variant.get('warehouse', {}).get('stockMaximum', "")
+        }
+
+        # Process variant options
+        if variant.get('options'):
+            for i, option in enumerate(variant['options'], 1):
+                if i <= 3:  # Maximum 3 variants
+                    variant_mapping[f'varianta{i}_nazev'] = option.get('name', "").strip()
+                    variant_mapping[f'varianta{i}_hodnota'] = option.get('value', "").strip()
+
+        mappings.append(variant_mapping)
+
+    return mappings
