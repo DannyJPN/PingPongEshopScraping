@@ -420,7 +420,7 @@ class ProductParser:
         repaired.google_category = self._get_category_mapping(repaired.category, 'Google')
 
         # google_keywords = from KeywordsGoogle or OpenAI
-        repaired.google_keywords = self._get_google_keywords(downloaded)
+ #       repaired.google_keywords = self._get_google_keywords(downloaded)
 
         # heureka_category = from CategoryMappingHeureka or user input
         repaired.heureka_category = self._get_category_mapping(repaired.category, 'Heureka')
@@ -429,13 +429,13 @@ class ProductParser:
         repaired.zbozi_category = self._get_category_mapping(repaired.category, 'Zbozi')
 
         # zbozi_keywords = from KeywordsZbozi or OpenAI
-        repaired.zbozi_keywords = self._get_zbozi_keywords(downloaded)
+ #       repaired.zbozi_keywords = self._get_zbozi_keywords(downloaded)
 
         return repaired
 
     def _find_exact_matches_in_text(self, text: str, values: List[str]) -> List[str]:
         """
-        Find exact matches of values in text.
+        Find exact matches of values in text as whole words only.
 
         Args:
             text (str): Text to search in
@@ -447,14 +447,22 @@ class ProductParser:
         if not text or not values:
             return []
 
+        import re
+        
         # Normalize text for searching (convert to lowercase)
         normalized_text = text.lower()
 
-        # Find exact matches (case insensitive)
+        # Find exact matches (case insensitive, whole words only)
         matches = []
         for value in values:
-            if value and value.lower() in normalized_text:
-                matches.append(value)
+            if value and value.strip():
+                # Escape special regex characters in the value
+                escaped_value = re.escape(value.lower().strip())
+                # Use word boundaries to match whole words only
+                pattern = r'\b' + escaped_value + r'\b'
+                
+                if re.search(pattern, normalized_text):
+                    matches.append(value)
 
         return matches
 
@@ -507,6 +515,14 @@ class ProductParser:
         # Convert set back to list for consistent ordering
         all_matches_list = list(all_matches)
 
+        # Log heuristic results
+        if len(all_matches_list) == 1:
+            print(f"\n🔍 HEURISTIC ANALYSIS: Found exact match: '{all_matches_list[0]}'")
+        elif len(all_matches_list) > 1:
+            print(f"\n🔍 HEURISTIC ANALYSIS: Found multiple possible matches: {', '.join(all_matches_list)}")
+        else:
+            print(f"\n🔍 HEURISTIC ANALYSIS: No matches found")
+
         # Return single match if exactly one found, otherwise None and list of all matches
         if len(all_matches_list) == 1:
             return all_matches_list[0], all_matches_list
@@ -535,6 +551,14 @@ class ProductParser:
         if available_categories:
             single_match, all_matches = self._heuristic_extraction(downloaded, available_categories)
 
+            # Log heuristic results
+            if single_match:
+                print(f"\n🔍 HEURISTIC ANALYSIS: Found exact category match: '{single_match}'")
+            elif all_matches:
+                print(f"\n🔍 HEURISTIC ANALYSIS: Found multiple possible category matches: {', '.join(all_matches)}")
+            else:
+                print(f"\n🔍 HEURISTIC ANALYSIS: No category matches found in text")
+
             # If exactly one match found, use it
             if single_match:
                 # Find the key for this category value
@@ -556,12 +580,14 @@ class ProductParser:
             heuristic_info = ""
             if all_matches:
                 heuristic_info = f"Heuristic analysis found these potential categories in the text: {', '.join(all_matches)}. Please evaluate these candidates in your decision."
+            else:
+                heuristic_info = "Heuristic analysis did not find any matching categories in the text."
 
             category = self.openai.find_category(downloaded, available_categories, self.language, heuristic_info)
             if category:
                 # Confirm with user if needed
                 confirmed_category = self._confirm_ai_result(
-                    "Category", "", category, downloaded.name, downloaded.url
+                    "Category", "", category, downloaded.name, downloaded.url, all_matches
                 )
                 if confirmed_category:
                     # Find the key for this category value
@@ -578,6 +604,12 @@ class ProductParser:
                         return self._get_translated_category_name(standardized_key)
 
         # Ask user directly if AI not available or failed
+        print("\n🔍 HEURISTIC ANALYSIS RESULTS FOR CATEGORY:")
+        if all_matches:
+            print(f"  Found potential matches: {', '.join(all_matches)}")
+        else:
+            print("  No matches found in product text")
+
         user_category = self._ask_user_for_value(f"Enter category for product '{downloaded.name}'")
         if user_category:
             # Find the key for this category value
@@ -605,15 +637,23 @@ class ProductParser:
 
         return ""
 
-    def _get_brand(self, downloaded: DownloadedProduct) -> str:
-        """Get brand from memory, heuristics, or OpenAI with user confirmation."""
+    def _get_brand(self, downloaded: DownloadedProduct, for_name_composition: bool = False) -> str:
+        """
+        Get brand from memory, heuristics, or OpenAI with user confirmation.
+
+        Args:
+            downloaded: The product to get the brand for
+            for_name_composition: If True, returns empty string for Desaka brand and formats the brand name
+        """
         memory_key = MEMORY_KEY_PRODUCT_BRAND_MEMORY.format(language=self.language)
         if memory_key in self.memory:
             brand_memory = self.memory[memory_key]
             if downloaded.name in brand_memory:
                 brand = brand_memory[downloaded.name]
-                # Handle Desaka brand - treat as empty brand but keep for code generation
-                return brand
+                # Handle Desaka brand based on for_name_composition parameter
+                if for_name_composition and brand and self._is_desaka_brand(brand):
+                    return ""
+                return brand if not for_name_composition else self._format_brand_name(brand)
 
         # Try heuristic extraction
         brand_list = list(self.memory.get(MEMORY_KEY_BRAND_CODE_LIST, {}).keys())
@@ -623,6 +663,14 @@ class ProductParser:
         if brand_list:
             single_match, all_matches = self._heuristic_extraction(downloaded, brand_list)
 
+            # Log heuristic results
+            if single_match:
+                print(f"\n🔍 HEURISTIC ANALYSIS: Found exact brand match: '{single_match}'")
+            elif all_matches:
+                print(f"\n🔍 HEURISTIC ANALYSIS: Found multiple possible brand matches: {', '.join(all_matches)}")
+            else:
+                print(f"\n🔍 HEURISTIC ANALYSIS: No brand matches found in text")
+
             # If exactly one match found, use it
             if single_match:
                 # Save to memory
@@ -630,7 +678,10 @@ class ProductParser:
                     self.memory[memory_key] = {}
                 self.memory[memory_key][downloaded.name] = single_match
                 self._save_memory_file(memory_key)
-                return single_match
+                # Handle return based on for_name_composition
+                if for_name_composition and self._is_desaka_brand(single_match):
+                    return ""
+                return single_match if not for_name_composition else self._format_brand_name(single_match)
 
         # Use OpenAI even if memory is empty or product not found
         if self.openai:
@@ -638,12 +689,14 @@ class ProductParser:
             heuristic_info = ""
             if all_matches:
                 heuristic_info = f"Heuristic analysis found these potential brands in the text: {', '.join(all_matches)}. Please evaluate these candidates in your decision."
+            else:
+                heuristic_info = "Heuristic analysis did not find any matching brands in the text."
 
             brand = self.openai.find_brand(downloaded, brand_list if brand_list else [], self.language, heuristic_info)
             if brand:
                 # Confirm with user if needed
                 confirmed_brand = self._confirm_ai_result(
-                    "Brand", "", brand, downloaded.name, downloaded.url
+                    "Brand", "", brand, downloaded.name, downloaded.url, all_matches
                 )
                 if confirmed_brand:
                     # Save to memory
@@ -651,9 +704,18 @@ class ProductParser:
                         self.memory[memory_key] = {}
                     self.memory[memory_key][downloaded.name] = confirmed_brand
                     self._save_memory_file(memory_key)
-                    return confirmed_brand
+                    # Handle return based on for_name_composition
+                    if for_name_composition and self._is_desaka_brand(confirmed_brand):
+                        return ""
+                    return confirmed_brand if not for_name_composition else self._format_brand_name(confirmed_brand)
 
         # Ask user directly if AI not available or failed
+        print("\n🔍 HEURISTIC ANALYSIS RESULTS FOR BRAND:")
+        if all_matches:
+            print(f"  Found potential matches: {', '.join(all_matches)}")
+        else:
+            print("  No matches found in product text")
+
         user_brand = self._ask_user_for_product_value("Brand", downloaded)
         if user_brand:
             # Save to memory
@@ -661,9 +723,17 @@ class ProductParser:
                 self.memory[memory_key] = {}
             self.memory[memory_key][downloaded.name] = user_brand
             self._save_memory_file(memory_key)
-            return user_brand
+            # Handle return based on for_name_composition
+            if for_name_composition and self._is_desaka_brand(user_brand):
+                return ""
+            return user_brand if not for_name_composition else self._format_brand_name(user_brand)
 
-        return ""
+        return "" if for_name_composition else "Unknown"  # Default fallback
+
+    def _get_product_brand_for_name(self, downloaded: DownloadedProduct) -> str:
+        """Get product brand for name composition from memory, heuristics, or AI."""
+        # Use the unified _get_brand method with for_name_composition=True
+        return self._get_brand(downloaded, for_name_composition=True)
 
     def _get_product_type(self, downloaded: DownloadedProduct) -> str:
         """Get product type from memory, heuristics, or AI."""
@@ -685,6 +755,14 @@ class ProductParser:
         if type_list:
             single_match, all_matches = self._heuristic_extraction(downloaded, type_list)
 
+            # Log heuristic results
+            if single_match:
+                print(f"\n🔍 HEURISTIC ANALYSIS: Found exact product type match: '{single_match}'")
+            elif all_matches:
+                print(f"\n🔍 HEURISTIC ANALYSIS: Found multiple possible product type matches: {', '.join(all_matches)}")
+            else:
+                print(f"\n🔍 HEURISTIC ANALYSIS: No product type matches found in text")
+
             # If exactly one match found, use it
             if single_match:
                 # Save to memory
@@ -700,12 +778,14 @@ class ProductParser:
             heuristic_info = ""
             if all_matches:
                 heuristic_info = f"Heuristic analysis found these potential product types in the text: {', '.join(all_matches)}. Please evaluate these candidates in your decision."
+            else:
+                heuristic_info = "Heuristic analysis did not find any matching product types in the text."
 
             product_type = self.openai.get_product_type(downloaded, self.language, heuristic_info)
             if product_type:
                 # Confirm with user if needed
                 confirmed_type = self._confirm_ai_result(
-                    "Product Type", "", product_type, downloaded.name, downloaded.url
+                    "Product Type", "", product_type, downloaded.name, downloaded.url, all_matches
                 )
                 if confirmed_type:
                     # Save to memory
@@ -716,6 +796,12 @@ class ProductParser:
                     return confirmed_type
 
         # Ask user directly if AI not available or failed
+        print("\n🔍 HEURISTIC ANALYSIS RESULTS FOR PRODUCT TYPE:")
+        if all_matches:
+            print(f"  Found potential matches: {', '.join(all_matches)}")
+        else:
+            print("  No matches found in product text")
+
         user_type = self._ask_user_for_product_value("Product Type", downloaded)
         if user_type:
             # Save to memory
@@ -747,6 +833,14 @@ class ProductParser:
         if model_list:
             single_match, all_matches = self._heuristic_extraction(downloaded, model_list)
 
+            # Log heuristic results
+            if single_match:
+                print(f"\n🔍 HEURISTIC ANALYSIS: Found exact product model match: '{single_match}'")
+            elif all_matches:
+                print(f"\n🔍 HEURISTIC ANALYSIS: Found multiple possible product model matches: {', '.join(all_matches)}")
+            else:
+                print(f"\n🔍 HEURISTIC ANALYSIS: No product model matches found in text")
+
             # If exactly one match found, use it
             if single_match:
                 # Save to memory
@@ -762,12 +856,14 @@ class ProductParser:
             heuristic_info = ""
             if all_matches:
                 heuristic_info = f"Heuristic analysis found these potential product models in the text: {', '.join(all_matches)}. Please evaluate these candidates in your decision."
+            else:
+                heuristic_info = "Heuristic analysis did not find any matching product models in the text."
 
             product_model = self.openai.get_product_model(downloaded, self.language, heuristic_info)
             if product_model:
                 # Confirm with user if needed
                 confirmed_model = self._confirm_ai_result(
-                    "Product Model", "", product_model, downloaded.name, downloaded.url
+                    "Product Model", "", product_model, downloaded.name, downloaded.url, all_matches
                 )
                 if confirmed_model:
                     # Save to memory
@@ -778,6 +874,12 @@ class ProductParser:
                     return self._format_model_name(confirmed_model)
 
         # Ask user directly if AI not available or failed
+        print("\n🔍 HEURISTIC ANALYSIS RESULTS FOR PRODUCT MODEL:")
+        if all_matches:
+            print(f"  Found potential matches: {', '.join(all_matches)}")
+        else:
+            print("  No matches found in product text")
+
         user_model = self._ask_user_for_product_value("Product Model", downloaded)
         if user_model:
             # Save to memory
@@ -791,74 +893,8 @@ class ProductParser:
 
     def _get_product_brand_for_name(self, downloaded: DownloadedProduct) -> str:
         """Get product brand for name composition from memory, heuristics, or AI."""
-        memory_key = MEMORY_KEY_PRODUCT_BRAND_MEMORY.format(language=self.language)
-        if memory_key in self.memory:
-            brand_memory = self.memory[memory_key]
-            if downloaded.name in brand_memory:
-                brand = brand_memory[downloaded.name]
-                # Special handling for Desaka brand - return empty string for name composition
-                if brand and self._is_desaka_brand(brand):
-                    return ""
-                return brand
-
-        # Try heuristic extraction
-        brand_list = list(self.memory.get(MEMORY_KEY_BRAND_CODE_LIST, {}).keys())
-
-        single_match = None
-        all_matches = []
-        if brand_list:
-            single_match, all_matches = self._heuristic_extraction(downloaded, brand_list)
-
-            # If exactly one match found, use it
-            if single_match:
-                # Save to memory
-                if memory_key not in self.memory:
-                    self.memory[memory_key] = {}
-                self.memory[memory_key][downloaded.name] = single_match
-                self._save_memory_file(memory_key)
-                # Special handling for Desaka brand - return empty string for name composition
-                if self._is_desaka_brand(single_match):
-                    return ""
-                return self._format_brand_name(single_match)
-
-        # Use OpenAI if memory is empty or product not found
-        if self.openai:
-            # Include information about heuristic matches in the AI prompt if any were found
-            heuristic_info = ""
-            if all_matches:
-                heuristic_info = f"Heuristic analysis found these potential brands in the text: {', '.join(all_matches)}. Please evaluate these candidates in your decision."
-
-            product_brand = self.openai.get_product_brand(downloaded, brand_list if brand_list else [], heuristic_info)
-            if product_brand:
-                # Confirm with user if needed
-                confirmed_brand = self._confirm_ai_result(
-                    "Product Brand", "", product_brand, downloaded.name, downloaded.url
-                )
-                if confirmed_brand:
-                    # Save to memory
-                    if memory_key not in self.memory:
-                        self.memory[memory_key] = {}
-                    self.memory[memory_key][downloaded.name] = confirmed_brand
-                    self._save_memory_file(memory_key)
-                    # Special handling for Desaka brand - return empty string for name composition
-                    if self._is_desaka_brand(confirmed_brand):
-                        return ""
-                    return self._format_brand_name(confirmed_brand)
-
-        # Ask user directly if AI not available or failed
-        user_brand = self._ask_user_for_product_value("Product Brand", downloaded)
-        if user_brand:
-            # Save to memory
-            if memory_key not in self.memory:
-                self.memory[memory_key] = {}
-            self.memory[memory_key][downloaded.name] = user_brand
-            self._save_memory_file(memory_key)
-            # Special handling for Desaka brand - return empty string for name composition
-            if self._is_desaka_brand(user_brand):
-                return ""
-            return self._format_brand_name(user_brand)
-
-        return "Unknown"  # Default fallback
+        # Use the unified _get_brand method with for_name_composition=True
+        return self._get_brand(downloaded, for_name_composition=True)
 
     def _find_category_key_by_value(self, category_value: str) -> Optional[str]:
         """Find category key by its translated value in CategoryNameMemory."""
@@ -1091,7 +1127,7 @@ class ProductParser:
         except KeyboardInterrupt:
             return None
 
-    def _confirm_ai_result(self, property_name: str, current_value: str, ai_suggestion: str, product_name: str, product_url: str = "") -> str:
+    def _confirm_ai_result(self, property_name: str, current_value: str, ai_suggestion: str, product_name: str, product_url: str = "", heuristic_matches: List[str] = None) -> str:
         """Confirm AI result with user or return suggestion if auto-confirm is enabled."""
         if self.confirm_ai_results:
             return ai_suggestion.strip() if ai_suggestion else ""
@@ -1104,6 +1140,16 @@ class ProductParser:
             print(f"📦 Product: {product_name}")
             if product_url:
                 print(f"🔗 URL: {product_url}")
+            print("-" * 80)
+
+            # Display heuristic results if available
+            print(f"🔍 HEURISTIC ANALYSIS RESULTS:")
+            if heuristic_matches:
+                print(f"   Found potential {property_name.lower()} candidates in product text:")
+                for match in heuristic_matches:
+                    print(f"   • {match}")
+            else:
+                print(f"   No potential {property_name.lower()} matches found in product text")
             print("-" * 80)
 
             # Display current value
@@ -1136,45 +1182,6 @@ class ProductParser:
             return response if response else ai_suggestion.strip() if ai_suggestion else ""
         except KeyboardInterrupt:
             return ai_suggestion.strip() if ai_suggestion else ""
-
-    def _format_html_for_display(self, html_content: str) -> str:
-        """Format HTML content for better readability in console (display only)."""
-        import re
-
-        # Remove HTML tags for display but preserve structure
-        formatted = html_content
-
-        # Replace common HTML tags with readable equivalents
-        formatted = re.sub(r'<br\s*/?>', '\n   ', formatted)
-        formatted = re.sub(r'<p>', '\n   ', formatted)
-        formatted = re.sub(r'</p>', '', formatted)
-        formatted = re.sub(r'<strong>(.*?)</strong>', r'**\1**', formatted)
-        formatted = re.sub(r'<b>(.*?)</b>', r'**\1**', formatted)
-        formatted = re.sub(r'<em>(.*?)</em>', r'*\1*', formatted)
-        formatted = re.sub(r'<i>(.*?)</i>', r'*\1*', formatted)
-        formatted = re.sub(r'<ul>', '\n   List:', formatted)
-        formatted = re.sub(r'</ul>', '', formatted)
-        formatted = re.sub(r'<li>', '\n   • ', formatted)
-        formatted = re.sub(r'</li>', '', formatted)
-
-        # Remove any remaining HTML tags
-        formatted = re.sub(r'<[^>]+>', '', formatted)
-
-        # Clean up extra whitespace
-        formatted = re.sub(r'\n\s*\n', '\n   \n', formatted)
-        formatted = formatted.strip()
-
-
-
-        return formatted
-
-    def _ask_user_for_value(self, prompt: str) -> str:
-        """Ask user for input value."""
-        try:
-            response = input(f"{prompt}: ").strip()
-            return response if response else ""
-        except KeyboardInterrupt:
-            return ""
 
     def _ask_user_for_product_value(self, property_name: str, downloaded: DownloadedProduct, current_value: str = "") -> str:
         """Ask user for product property value with detailed product information display."""
@@ -1368,7 +1375,7 @@ class ProductParser:
 
         # Get individual components
         product_type = self._get_product_type(downloaded)
-        product_brand = self._get_product_brand_for_name(downloaded)
+        product_brand = self._get_brand(downloaded, for_name_composition=True)  # Use unified method with parameter
         product_model = self._get_product_model(downloaded)
 
         # Format: type brand model (skip brand if empty)
