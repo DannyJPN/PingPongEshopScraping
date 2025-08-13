@@ -36,7 +36,8 @@ class ProductParser:
     def __init__(self, memory_data: Optional[Dict[str, Any]] = None, language: Optional[str] = None,
                  export_products: Optional[List[Any]] = None, repaired_products: Optional[List[Any]] = None,
                  confirm_ai_results: bool = False, use_fine_tuned_models: bool = False,
-                 fine_tuned_models: Optional[Dict[str, str]] = None, supported_languages_data: Optional[list] = None):
+                 fine_tuned_models: Optional[Dict[str, str]] = None, supported_languages_data: Optional[list] = None,
+                 skip_ai: bool = False):
         """
         Initialize parser with optional memory data, language, export products and AI confirmation setting.
 
@@ -49,6 +50,7 @@ class ProductParser:
             use_fine_tuned_models (bool): Whether to use fine-tuned models (default: False)
             fine_tuned_models (Optional[Dict[str, str]]): Dictionary mapping task types to model IDs
             supported_languages_data (Optional[list]): Pre-loaded supported languages data
+            skip_ai (bool): Whether to skip using AI for property evaluation (default: False)
         """
         self.memory = memory_data or {}
         self.language = language or 'CS'
@@ -64,14 +66,16 @@ class ProductParser:
         # Initialize assigned codes from existing products
         self._initialize_assigned_codes()
 
-        # Initialize OpenAI only if memory data is provided and API key is available
+        # Initialize OpenAI only if memory data is provided, API key is available, and AI is not skipped
         self.openai = None
-        if memory_data:
+        if memory_data and not skip_ai:
             try:
                 self.openai = OpenAIUnifier(use_fine_tuned_models, fine_tuned_models, supported_languages_data)
             except (ValueError, ImportError) as e:
                 logging.warning(f"OpenAI not available: {str(e)}")
                 self.openai = None
+        elif skip_ai:
+            logging.info("AI usage is disabled by the --SkipAI flag.")
 
     def _initialize_assigned_codes(self):
         """Initialize assigned codes from existing export and repaired products."""
@@ -387,46 +391,47 @@ class ProductParser:
         repaired.url = downloaded.url
 
         # desc = from DescMemory or OpenAI
-        repaired.desc = self._get_description(downloaded)
+        #repaired.desc = self._get_description(downloaded)
 
         # shortdesc = from ShortDescMemory or OpenAI
-        repaired.shortdesc = self._get_short_description(downloaded)
+        #repaired.shortdesc = self._get_short_description(downloaded)
 
+        # name = from NameMemory or OpenAI
+        #repaired.name = self._get_product_name(downloaded)
         # category = from CategoryMemory or OpenAI (needed for code generation)
-        repaired.category = self._get_category(downloaded)
+       # repaired.category = self._get_category(downloaded)
 
         # brand = from ProductBrandMemory or OpenAI (needed for code generation)
         repaired.brand = self._get_brand(downloaded)
 
 
         # category_ids = derived from category using CategoryIDList
-        repaired.category_ids = self._get_category_ids(repaired.category)
+       # repaired.category_ids = self._get_category_ids(repaired.category, downloaded)
 
-        # name = from NameMemory or OpenAI
-        repaired.name = self._get_product_name(downloaded)
+
 
         # code = complex code generation (needs brand and category)
-        repaired.code = self._generate_code(repaired.brand, repaired.category, downloaded.name)
+       # repaired.code = self._generate_code(repaired.brand, repaired.category, downloaded.name)
 
         # Variants = complex variant processing (needs code for variant codes)
         repaired.Variants = self._process_variants(downloaded, repaired.code)
         # price and price_standard = from variants
-        repaired.price, repaired.price_standard = self._get_prices(downloaded)
+      #  repaired.price, repaired.price_standard = self._get_prices(downloaded)
 
         # glami_category = from CategoryMappingGlami or user input
-        repaired.glami_category = self._get_category_mapping(repaired.category, 'Glami')
+       # repaired.glami_category = self._get_category_mapping(repaired.category, 'Glami', downloaded)
 
         # google_category = from CategoryMappingGoogle or user input
-        repaired.google_category = self._get_category_mapping(repaired.category, 'Google')
+       # repaired.google_category = self._get_category_mapping(repaired.category, 'Google', downloaded)
 
         # google_keywords = from KeywordsGoogle or OpenAI
  #       repaired.google_keywords = self._get_google_keywords(downloaded)
 
         # heureka_category = from CategoryMappingHeureka or user input
-        repaired.heureka_category = self._get_category_mapping(repaired.category, 'Heureka')
+      #  repaired.heureka_category = self._get_category_mapping(repaired.category, 'Heureka', downloaded)
 
         # zbozi_category = from CategoryMappingZbozi or user input
-        repaired.zbozi_category = self._get_category_mapping(repaired.category, 'Zbozi')
+       # repaired.zbozi_category = self._get_category_mapping(repaired.category, 'Zbozi', downloaded)
 
         # zbozi_keywords = from KeywordsZbozi or OpenAI
  #       repaired.zbozi_keywords = self._get_zbozi_keywords(downloaded)
@@ -515,14 +520,6 @@ class ProductParser:
         # Convert set back to list for consistent ordering
         all_matches_list = list(all_matches)
 
-        # Log heuristic results
-        if len(all_matches_list) == 1:
-            print(f"\n🔍 HEURISTIC ANALYSIS: Found exact match: '{all_matches_list[0]}'")
-        elif len(all_matches_list) > 1:
-            print(f"\n🔍 HEURISTIC ANALYSIS: Found multiple possible matches: {', '.join(all_matches_list)}")
-        else:
-            print(f"\n🔍 HEURISTIC ANALYSIS: No matches found")
-
         # Return single match if exactly one found, otherwise None and list of all matches
         if len(all_matches_list) == 1:
             return all_matches_list[0], all_matches_list
@@ -551,31 +548,8 @@ class ProductParser:
         if available_categories:
             single_match, all_matches = self._heuristic_extraction(downloaded, available_categories)
 
-            # Log heuristic results
-            if single_match:
-                print(f"\n🔍 HEURISTIC ANALYSIS: Found exact category match: '{single_match}'")
-            elif all_matches:
-                print(f"\n🔍 HEURISTIC ANALYSIS: Found multiple possible category matches: {', '.join(all_matches)}")
-            else:
-                print(f"\n🔍 HEURISTIC ANALYSIS: No category matches found in text")
-
-            # If exactly one match found, use it
-            if single_match:
-                # Find the key for this category value
-                category_key = self._find_category_key_by_value(single_match)
-                if category_key:
-                    # First standardize the category key
-                    standardized_key = self._standardize_category_by_key(category_key)
-                    # Save the standardized category key to memory
-                    if memory_key not in self.memory:
-                        self.memory[memory_key] = {}
-                    self.memory[memory_key][downloaded.name] = standardized_key
-                    self._save_memory_file(memory_key)
-                    # Return the translated category name for this language
-                    return self._get_translated_category_name(standardized_key)
-
-        # Use OpenAI with CategoryNameMemory (translated category names) even if memory is empty
-        if self.openai:
+            # Use OpenAI with CategoryNameMemory (translated category names) even if memory is empty
+        if not single_match and self.openai:
             # Include information about heuristic matches in the AI prompt if any were found
             heuristic_info = ""
             if all_matches:
@@ -663,28 +637,8 @@ class ProductParser:
         if brand_list:
             single_match, all_matches = self._heuristic_extraction(downloaded, brand_list)
 
-            # Log heuristic results
-            if single_match:
-                print(f"\n🔍 HEURISTIC ANALYSIS: Found exact brand match: '{single_match}'")
-            elif all_matches:
-                print(f"\n🔍 HEURISTIC ANALYSIS: Found multiple possible brand matches: {', '.join(all_matches)}")
-            else:
-                print(f"\n🔍 HEURISTIC ANALYSIS: No brand matches found in text")
-
-            # If exactly one match found, use it
-            if single_match:
-                # Save to memory
-                if memory_key not in self.memory:
-                    self.memory[memory_key] = {}
-                self.memory[memory_key][downloaded.name] = single_match
-                self._save_memory_file(memory_key)
-                # Handle return based on for_name_composition
-                if for_name_composition and self._is_desaka_brand(single_match):
-                    return ""
-                return single_match if not for_name_composition else self._format_brand_name(single_match)
-
-        # Use OpenAI even if memory is empty or product not found
-        if self.openai:
+            # Use OpenAI even if memory is empty or product not found
+        if not single_match and self.openai:
             # Include information about heuristic matches in the AI prompt if any were found
             heuristic_info = ""
             if all_matches:
@@ -755,25 +709,8 @@ class ProductParser:
         if type_list:
             single_match, all_matches = self._heuristic_extraction(downloaded, type_list)
 
-            # Log heuristic results
-            if single_match:
-                print(f"\n🔍 HEURISTIC ANALYSIS: Found exact product type match: '{single_match}'")
-            elif all_matches:
-                print(f"\n🔍 HEURISTIC ANALYSIS: Found multiple possible product type matches: {', '.join(all_matches)}")
-            else:
-                print(f"\n🔍 HEURISTIC ANALYSIS: No product type matches found in text")
-
-            # If exactly one match found, use it
-            if single_match:
-                # Save to memory
-                if memory_key not in self.memory:
-                    self.memory[memory_key] = {}
-                self.memory[memory_key][downloaded.name] = single_match
-                self._save_memory_file(memory_key)
-                return single_match
-
-        # Use OpenAI if memory is empty or product not found
-        if self.openai:
+            # Use OpenAI if memory is empty or product not found
+        if not single_match and self.openai:
             # Include information about heuristic matches in the AI prompt if any were found
             heuristic_info = ""
             if all_matches:
@@ -833,25 +770,8 @@ class ProductParser:
         if model_list:
             single_match, all_matches = self._heuristic_extraction(downloaded, model_list)
 
-            # Log heuristic results
-            if single_match:
-                print(f"\n🔍 HEURISTIC ANALYSIS: Found exact product model match: '{single_match}'")
-            elif all_matches:
-                print(f"\n🔍 HEURISTIC ANALYSIS: Found multiple possible product model matches: {', '.join(all_matches)}")
-            else:
-                print(f"\n🔍 HEURISTIC ANALYSIS: No product model matches found in text")
-
-            # If exactly one match found, use it
-            if single_match:
-                # Save to memory
-                if memory_key not in self.memory:
-                    self.memory[memory_key] = {}
-                self.memory[memory_key][downloaded.name] = single_match
-                self._save_memory_file(memory_key)
-                return self._format_model_name(single_match)
-
-        # Use OpenAI if memory is empty or product not found
-        if self.openai:
+            # Use OpenAI if memory is empty or product not found
+        if not single_match and self.openai:
             # Include information about heuristic matches in the AI prompt if any were found
             heuristic_info = ""
             if all_matches:
@@ -960,7 +880,7 @@ class ProductParser:
         # This is for backward compatibility
         return self._standardize_category(category_key)
 
-    def _get_category_ids(self, category: str) -> str:
+    def _get_category_ids(self, category: str, downloaded: DownloadedProduct) -> str:
         """Get category IDs from category path using the new key-based system."""
         if not category:
             return ""
@@ -989,7 +909,7 @@ class ProductParser:
                 ids.append(str(category_id_list[part]))
             else:
                 # Ask user for missing category ID
-                category_id = self._ask_user_for_category_id(part)
+                category_id = self._ask_user_for_category_id(part, downloaded)
                 if category_id:
                     category_id_list[part] = category_id
                     self._save_memory_file(MEMORY_KEY_CATEGORY_ID_LIST)
@@ -1092,10 +1012,17 @@ class ProductParser:
 
         return next_index
 
-    def _ask_user_for_category_id(self, category: str) -> Optional[int]:
+    def _ask_user_for_category_id(self, category: str, downloaded: DownloadedProduct) -> Optional[int]:
         """Ask user for category ID."""
         try:
-            response = input(f"Enter category ID for '{category}': ")
+            print("\n" + "=" * 80)
+            print("👤 USER INPUT REQUIRED FOR: Category ID")
+            print("=" * 80)
+            print(f"📦 Product: {downloaded.name}")
+            if downloaded.url:
+                print(f"🔗 URL: {downloaded.url}")
+            print("-" * 80)
+            response = input(f"✏️  Enter category ID for '{category}': ")
             return int(response.strip())
         except (ValueError, KeyboardInterrupt):
             return None
@@ -1119,10 +1046,19 @@ class ProductParser:
         except (ValueError, KeyboardInterrupt):
             return None
 
-    def _ask_user_for_category_mapping(self, category: str, platform: str) -> Optional[str]:
+    def _ask_user_for_category_mapping(self, category: str, platform: str, downloaded: DownloadedProduct) -> Optional[str]:
         """Ask user for category mapping."""
         try:
-            response = input(f"Enter {platform} category mapping for '{category}': ")
+            print("\n" + "=" * 80)
+            print(f"👤 USER INPUT REQUIRED FOR: {platform} Category Mapping")
+            print("=" * 80)
+            print(f"📦 Product: {downloaded.name}")
+            if downloaded.url:
+                print(f"🔗 URL: {downloaded.url}")
+            print("-" * 80)
+            print(f"📄 Category to map: {category}")
+            print("=" * 80)
+            response = input(f"✏️  Enter {platform} category mapping for '{category}': ")
             return response.strip()
         except KeyboardInterrupt:
             return None
@@ -1225,13 +1161,17 @@ class ProductParser:
         except KeyboardInterrupt:
             return ""
 
-    def _ask_user_for_variant_value(self, property_name: str, original_value: str, context_info: str = "") -> str:
+    def _ask_user_for_variant_value(self, property_name: str, original_value: str, downloaded: DownloadedProduct, context_info: str = "") -> str:
         """Ask user for variant property value with context information display."""
         try:
             # Create a more readable display format similar to AI confirmation
             print("\n" + "=" * 80)
             print(f"👤 USER INPUT REQUIRED FOR: {property_name}")
             print("=" * 80)
+            print(f"📦 Product: {downloaded.name}")
+            if downloaded.url:
+                print(f"🔗 URL: {downloaded.url}")
+            print("-" * 80)
             if context_info:
                 print(f"📄 Context: {context_info}")
                 print("-" * 80)
@@ -1290,7 +1230,7 @@ class ProductParser:
 
         return downloaded.description
 
-    def _get_category_mapping(self, category: str, platform: str) -> str:
+    def _get_category_mapping(self, category: str, platform: str, downloaded: DownloadedProduct) -> str:
         """Get category mapping for specific platform using AI or user input."""
         memory_key = f"CategoryMapping{platform}_{self.language}"
         if memory_key in self.memory:
@@ -1306,7 +1246,7 @@ class ProductParser:
             if suggested_mapping:
                 # Confirm with user if needed
                 confirmed_mapping = self._confirm_ai_result(
-                    f"{platform} Category Mapping", "", suggested_mapping, f"Category: {category}", ""
+                    f"{platform} Category Mapping", "", suggested_mapping, downloaded.name, downloaded.url
                 )
                 if confirmed_mapping:
                     # Save to memory only after confirmation
@@ -1317,7 +1257,7 @@ class ProductParser:
                     return confirmed_mapping
 
         # Ask user directly if AI not available or failed
-        mapped_category = self._ask_user_for_category_mapping(category, platform)
+        mapped_category = self._ask_user_for_category_mapping(category, platform, downloaded)
         if mapped_category:
             if memory_key not in self.memory:
                 self.memory[memory_key] = {}
@@ -1624,8 +1564,8 @@ class ProductParser:
                 standardized_pairs = {}
 
                 for key, value in limited_pairs:
-                    standardized_key = self._standardize_variant_name(str(key).strip())
-                    standardized_value = self._standardize_variant_value(str(value).strip())
+                    standardized_key = self._standardize_variant_name(str(key).strip(), downloaded)
+                    standardized_value = self._standardize_variant_value(str(value).strip(), downloaded)
                     standardized_pairs[standardized_key] = standardized_value
 
                 processed_variant.key_value_pairs = standardized_pairs
@@ -1643,7 +1583,7 @@ class ProductParser:
 
         return processed_variants
 
-    def _standardize_variant_name(self, name: str) -> str:
+    def _standardize_variant_name(self, name: str, downloaded: DownloadedProduct) -> str:
         """Standardize variant name using memory or OpenAI with confirmation."""
         memory_key = f"VariantNameMemory_{self.language}"
         if memory_key in self.memory:
@@ -1659,7 +1599,7 @@ class ProductParser:
             if standardized:
                 # Confirm with user if needed
                 confirmed_name = self._confirm_ai_result(
-                    "Variant Name", name, standardized, f"Variant name: {name}", ""
+                    "Variant Name", name, standardized, downloaded.name, downloaded.url
                 )
                 if confirmed_name:
                     # Save to memory only after confirmation
@@ -1670,7 +1610,7 @@ class ProductParser:
                     return confirmed_name
 
         # Ask user directly if AI not available or failed
-        user_name = self._ask_user_for_variant_value("Variant Name", name, f"Variant name: {name}")
+        user_name = self._ask_user_for_variant_value("Variant Name", name, downloaded, f"Variant name: {name}")
         if user_name:
             # Save to memory
             if memory_key not in self.memory:
@@ -1681,7 +1621,7 @@ class ProductParser:
 
         return name
 
-    def _standardize_variant_value(self, value: str) -> str:
+    def _standardize_variant_value(self, value: str, downloaded: DownloadedProduct) -> str:
         """Standardize variant value using memory or OpenAI with confirmation."""
         memory_key = f"VariantValueMemory_{self.language}"
         if memory_key in self.memory:
@@ -1697,7 +1637,7 @@ class ProductParser:
             if standardized:
                 # Confirm with user if needed
                 confirmed_value = self._confirm_ai_result(
-                    "Variant Value", value, standardized, f"Variant value: {value}", ""
+                    "Variant Value", value, standardized, downloaded.name, downloaded.url
                 )
                 if confirmed_value:
                     # Save to memory only after confirmation
@@ -1708,7 +1648,7 @@ class ProductParser:
                     return confirmed_value
 
         # Ask user directly if AI not available or failed
-        user_value = self._ask_user_for_variant_value("Variant Value", value, f"Variant value: {value}")
+        user_value = self._ask_user_for_variant_value("Variant Value", value, downloaded, f"Variant value: {value}")
         if user_value:
             # Save to memory
             if memory_key not in self.memory:

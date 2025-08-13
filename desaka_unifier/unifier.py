@@ -140,6 +140,12 @@ def parse_arguments():
         help="Maximum number of eshop scripts to run in parallel (default: 3)"
     )
 
+    parser.add_argument(
+        "--SkipAI",
+        action="store_true",
+        help="Skip using AI for property evaluation"
+    )
+
     args = parser.parse_args()
 
     return args
@@ -290,7 +296,8 @@ def main():
             confirm_ai_results=args.ConfirmAIResults,
             use_fine_tuned_models=args.UseFineTunedModels,
             fine_tuned_models=fine_tuned_models,
-            supported_languages_data=supported_languages_data
+            supported_languages_data=supported_languages_data,
+            skip_ai=args.SkipAI
         )
 
         # Sort downloaded products by name before conversion
@@ -298,14 +305,15 @@ def main():
         results['downloaded_products'].sort(key=lambda x: x.name.lower() if x.name else '')
 
         repaired_products = []
-        for dp in tqdm(results['downloaded_products'], desc="Converting to RepairedProducts", unit="product"):
-            try:
-                repaired = parser.downloaded_to_repaired_product(dp)
-                repaired_products.append(repaired)
-                logging.debug(f"Successfully converted product: {dp.name}")
-            except Exception as e:
-                logging.error(f"Failed to convert product '{dp.name}': {str(e)}", exc_info=True)
-                # Continue with other products
+        with tqdm(total=len(results['downloaded_products']), desc="Converting to RepairedProducts", unit="product", miniters=1, mininterval=0.01) as pbar:
+            for dp in results['downloaded_products']:
+                try:
+                    repaired = parser.downloaded_to_repaired_product(dp)
+                    repaired_products.append(repaired)
+                    logging.debug(f"Successfully converted product: {dp.name}")
+                except Exception as e:
+                    logging.error(f"Failed to convert product '{dp.name}': {str(e)}", exc_info=True)
+                pbar.update(1)
 
         # Add repaired products to results
         results['repaired_products'] = repaired_products
