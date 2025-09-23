@@ -2,10 +2,28 @@ from bs4 import BeautifulSoup
 import json
 import logging
 from nittakulib.constants import MAIN_URL
-from nittakulib.product_model import Product, Variant
 from urllib.parse import urljoin
 from shared.html_loader import load_html_as_dom_tree
 from tqdm import tqdm
+
+class Product:
+    def __init__(self):
+        self.name = ""
+        self.short_description = ""
+        self.description = ""
+        self.variants = []  # List of Variant objects
+        self.main_photo_link = ""
+        self.main_photo_filepath = ""
+        self.photogallery_links = set()
+        self.photogallery_filepaths = []
+        self.url = ""
+
+class Variant:
+    def __init__(self, key_value_pairs, current_price, basic_price, stock_status):
+        self.key_value_pairs = key_value_pairs
+        self.current_price = current_price
+        self.basic_price = basic_price
+        self.stock_status = stock_status
 
 def get_self_link(dom_tree):
     canonical = dom_tree.find('link', rel='canonical')
@@ -214,11 +232,7 @@ def extract_product_variants(dom_tree):
                 key_value_pairs[dimension_names[i]] = value
 
             # Create variant object
-            variant = Variant()
-            variant.key_value_pairs = key_value_pairs
-            variant.current_price = base_price
-            variant.basic_price = base_price
-            variant.stock_status = base_stock_status
+            variant = Variant(key_value_pairs, base_price, base_price, base_stock_status)
 
             variant_objects.append(variant)
 
@@ -293,9 +307,9 @@ def extract_product_photogallery_links(dom_tree):
     Extract product gallery image URLs from the product detail page DOM.
 
     :param dom_tree: BeautifulSoup object containing the parsed HTML of a product detail page
-    :return: List of URLs of product gallery images
+    :return: Set of URLs of product gallery images
     """
-    links = []
+    links = set()
     try:
         # Find all product images in the gallery
         all_images = dom_tree.find_all('img')
@@ -327,14 +341,14 @@ def extract_product_photogallery_links(dom_tree):
 
                 # Add to links if not already there and not the main image
                 if img_url != main_img_url and img_url not in links:
-                    links.append(img_url)
+                    links.add(img_url)
                     logging.debug(f"Found gallery image: {img_url}")
 
         logging.debug(f"Extracted {len(links)} gallery images")
         return links
     except Exception as e:
         logging.error(f"Error extracting gallery photos: {e}")
-        return []
+        return set()
 
 def extract_product(filepath):
     try:
