@@ -34,7 +34,10 @@
       "Read(//f/tmp/claude/**)",
       "WebFetch(domain:www.nittaku.com)",
       "Bash(sort:*)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "Bash(git checkout:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr view:*)"
     ],
     "deny": [],
     "ask": []
