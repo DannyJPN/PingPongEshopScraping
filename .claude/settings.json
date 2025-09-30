@@ -18,11 +18,19 @@
       "Bash(git diff:*)",
       "Bash(git log:*)",
       "Bash(git show:*)",
+      "Bash(git fetch:*)",
 
       "Bash(git checkout -b claude/*:*)",
       "Bash(git switch -c claude/*:*)",
 
       "Bash(ping:*)",
+      "Bash(iconv:*)",
+      "Bash(sort:*)",
+      "Bash(gh issue create:*)",
+
+      "Read(//f/tmp/claude/**)",
+
+      "WebSearch",
 
       "WebFetch(domain:docs.python.org)",
       "WebFetch(domain:pypi.org)",
