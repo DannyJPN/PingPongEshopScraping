@@ -8,3 +8,7 @@
 __pycache__/
 *.pyc
 *.pyo
+
+# Temporary fix scripts
+desaka_unifier/fix_*.py
+desaka_unifier/populate_*.py
