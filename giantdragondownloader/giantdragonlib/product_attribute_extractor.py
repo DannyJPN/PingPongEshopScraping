@@ -1,6 +1,12 @@
 """
 Extracts product attributes from Giant Dragon product detail pages.
+
+Giant Dragon uses Shopify platform - utilizes Shopify standard structure:
+- Product JSON data in page
+- Standard Shopify CSS selectors
+- Meta tags (og:*, twitter:*)
 """
+import json
 import logging
 import re
 from urllib.parse import urljoin
@@ -56,29 +62,79 @@ def get_self_link(dom_tree):
         return ""
 
 
+def extract_shopify_product_json(dom_tree):
+    """
+    Extract Shopify product JSON data from page.
+
+    Shopify embeds product data in <script type="application/json"> or <script type="application/ld+json">
+
+    :param dom_tree: BeautifulSoup object
+    :return: Dict with product data or None
+    """
+    try:
+        # Try Shopify product JSON
+        scripts = dom_tree.find_all('script', type='application/json')
+        for script in scripts:
+            if script.string and 'product' in script.string.lower():
+                try:
+                    data = json.loads(script.string)
+                    if isinstance(data, dict) and 'product' in data:
+                        return data['product']
+                    if 'title' in data and 'variants' in data:
+                        return data
+                except:
+                    continue
+
+        # Try JSON-LD structured data
+        json_ld_scripts = dom_tree.find_all('script', type='application/ld+json')
+        for script in json_ld_scripts:
+            if script.string:
+                try:
+                    data = json.loads(script.string)
+                    if isinstance(data, dict) and data.get('@type') == 'Product':
+                        return data
+                except:
+                    continue
+
+        return None
+    except Exception as e:
+        logging.debug(f"Could not extract Shopify JSON: {e}")
+        return None
+
+
 def extract_product_name(dom_tree):
     """
-    Extract product name.
+    Extract product name using multiple methods.
 
     :param dom_tree: BeautifulSoup object of product page
     :return: Product name as string
     """
     try:
-        # Try multiple common patterns
+        # Try Shopify JSON first
+        product_json = extract_shopify_product_json(dom_tree)
+        if product_json and 'title' in product_json:
+            return product_json['title']
+        if product_json and 'name' in product_json:
+            return product_json['name']
+
+        # Try Shopify standard selectors
         name_element = (
-            dom_tree.find('h1', class_=lambda x: x and 'product' in x.lower()) or
-            dom_tree.find('h1', class_=lambda x: x and 'title' in x.lower()) or
-            dom_tree.find('h1') or
-            dom_tree.find('meta', property='og:title')
+            dom_tree.find('h1', class_=lambda x: x and 'product' in x.lower() and 'title' in x.lower()) or
+            dom_tree.select_one('.product-single__title') or
+            dom_tree.select_one('.product__title') or
+            dom_tree.select_one('.product-title') or
+            dom_tree.find('h1')
         )
 
         if name_element:
-            if name_element.name == 'meta':
-                name = name_element.get('content', '')
-            else:
-                name = name_element.get_text(strip=True)
+            name = name_element.get_text(strip=True)
             logging.debug(f"Extracted name: {name}")
             return name
+
+        # Fallback to og:title
+        og_title = dom_tree.find('meta', property='og:title')
+        if og_title:
+            return og_title.get('content', '')
 
         logging.warning("Product name not found")
         return ""
@@ -96,25 +152,15 @@ def extract_product_short_description(dom_tree):
     :return: Short description as HTML string (single-line with <br> tags)
     """
     try:
-        # Try meta description first
+        # Try meta description
         meta_desc = dom_tree.find('meta', {'name': 'description'})
-        if meta_desc:
-            desc = meta_desc.get('content', '')
-            if desc:
-                logging.debug("Extracted short description from meta tag")
-                return desc
+        if meta_desc and meta_desc.get('content'):
+            return meta_desc.get('content', '')
 
-        # Try common short description patterns
-        desc_element = (
-            dom_tree.find('div', class_=lambda x: x and 'short' in x.lower() and 'desc' in x.lower()) or
-            dom_tree.find('p', class_=lambda x: x and 'product' in x.lower() and 'desc' in x.lower())
-        )
-
-        if desc_element:
-            desc_html = str(desc_element)
-            desc_html = desc_html.replace('\n', '<br>').replace('\r', '')
-            logging.debug("Extracted short description")
-            return desc_html
+        # Try og:description
+        og_desc = dom_tree.find('meta', property='og:description')
+        if og_desc and og_desc.get('content'):
+            return og_desc.get('content', '')
 
         return ""
 
@@ -131,11 +177,13 @@ def extract_product_description(dom_tree):
     :return: Description as HTML string (single-line with <br> tags)
     """
     try:
-        # Try common description patterns
+        # Shopify product description selectors
         desc_element = (
-            dom_tree.find('div', class_=lambda x: x and 'description' in x.lower() and 'product' in x.lower()) or
-            dom_tree.find('div', class_=lambda x: x and 'desc' in x.lower()) or
-            dom_tree.find('div', id=lambda x: x and 'description' in x.lower())
+            dom_tree.find('div', class_=lambda x: x and 'product' in x.lower() and 'description' in x.lower()) or
+            dom_tree.select_one('.product-single__description') or
+            dom_tree.select_one('.product__description') or
+            dom_tree.select_one('.product-description') or
+            dom_tree.find('div', class_=lambda x: x and 'description' in x.lower())
         )
 
         if desc_element:
@@ -159,24 +207,26 @@ def extract_product_main_photo(dom_tree):
     :return: Absolute URL of main photo
     """
     try:
-        # Try og:image first (usually the main image)
+        # Try og:image first (usually best quality)
         og_image = dom_tree.find('meta', property='og:image')
-        if og_image:
+        if og_image and og_image.get('content'):
             img_url = og_image.get('content', '')
-            if img_url:
+            if img_url and not img_url.startswith('data:'):
                 absolute_url = urljoin(MAIN_URL, img_url)
                 logging.debug(f"Extracted main photo from og:image: {absolute_url}")
                 return absolute_url
 
-        # Try common product image patterns
+        # Try Shopify product image selectors
         img_element = (
-            dom_tree.find('img', class_=lambda x: x and ('product' in x.lower() or 'main' in x.lower())) or
-            dom_tree.find('img', id=lambda x: x and 'product' in x.lower())
+            dom_tree.select_one('.product-single__photo img') or
+            dom_tree.select_one('.product__main-photos img') or
+            dom_tree.select_one('.product-featured-img') or
+            dom_tree.find('img', class_=lambda x: x and 'product' in x.lower() and ('main' in x.lower() or 'featured' in x.lower()))
         )
 
         if img_element:
             img_url = img_element.get('src') or img_element.get('data-src') or img_element.get('data-original')
-            if img_url:
+            if img_url and not img_url.startswith('data:'):
                 absolute_url = urljoin(MAIN_URL, img_url)
                 logging.debug(f"Extracted main photo: {absolute_url}")
                 return absolute_url
@@ -199,16 +249,18 @@ def extract_product_gallery_photos(dom_tree):
     gallery_urls = []
 
     try:
-        # Try common gallery patterns
+        # Shopify thumbnail/gallery selectors
         gallery_elements = (
-            dom_tree.find_all('img', class_=lambda x: x and ('gallery' in x.lower() or 'thumbnail' in x.lower())) or
-            dom_tree.find_all('img', class_=lambda x: x and 'product' in x.lower())
+            dom_tree.select('.product-single__thumbnails img') +
+            dom_tree.select('.product__thumbs img') +
+            dom_tree.select('.product-thumbnails img') +
+            dom_tree.find_all('img', class_=lambda x: x and 'product' in x.lower() and ('thumb' in x.lower() or 'gallery' in x.lower()))
         )
 
         for img in gallery_elements:
             img_url = img.get('src') or img.get('data-src') or img.get('data-original')
-            if img_url:
-                # Skip placeholders and icons
+            if img_url and not img_url.startswith('data:'):
+                # Skip placeholder and icon images
                 if 'placeholder' not in img_url.lower() and 'icon' not in img_url.lower():
                     absolute_url = urljoin(MAIN_URL, img_url)
                     gallery_urls.append(absolute_url)
@@ -266,7 +318,7 @@ def parse_price(price_text):
 
 def extract_product_variants(dom_tree):
     """
-    Extract product variants (colors, sizes, etc.).
+    Extract product variants (sizes, colors, etc.) from Shopify product.
 
     :param dom_tree: BeautifulSoup object
     :return: List of Variant objects
@@ -274,53 +326,84 @@ def extract_product_variants(dom_tree):
     variants = []
 
     try:
-        # Try to find variant selectors
-        variant_selects = dom_tree.find_all('select', class_=lambda x: x and ('variant' in x.lower() or 'option' in x.lower()))
+        # Try to extract from Shopify JSON first
+        product_json = extract_shopify_product_json(dom_tree)
+        if product_json and 'variants' in product_json:
+            json_variants = product_json['variants']
+            for json_var in json_variants:
+                variant = Variant()
 
-        if variant_selects:
-            # Complex variant extraction (multiple select boxes)
-            for select in variant_selects:
-                option_name = select.get('name', 'Variant')
-                for option in select.find_all('option'):
-                    if option.get('value'):
-                        variant = Variant()
-                        variant.key_value_pairs[option_name] = option.get_text(strip=True)
+                # Extract variant options (size, color, etc.)
+                if 'option1' in json_var and json_var['option1']:
+                    variant.key_value_pairs['Option 1'] = json_var['option1']
+                if 'option2' in json_var and json_var['option2']:
+                    variant.key_value_pairs['Option 2'] = json_var['option2']
+                if 'option3' in json_var and json_var['option3']:
+                    variant.key_value_pairs['Option 3'] = json_var['option3']
 
-                        # Extract price (usually same for all variants or specified per variant)
-                        price_element = dom_tree.find('span', class_=lambda x: x and 'price' in x.lower())
-                        if price_element:
-                            price = parse_price(price_element.get_text())
-                            variant.current_price = price
-                            variant.basic_price = price
-
-                        variant.stock_status = "Available"
-                        variants.append(variant)
-        else:
-            # Simple product without variants - create default variant
-            variant = Variant()
-
-            # Extract price
-            price_elements = dom_tree.find_all('span', class_=lambda x: x and 'price' in x.lower())
-            if price_elements:
-                # Try to find current and basic price
-                if len(price_elements) >= 2:
-                    variant.current_price = parse_price(price_elements[0].get_text())
-                    variant.basic_price = parse_price(price_elements[1].get_text())
+                # Extract price
+                if 'price' in json_var:
+                    variant.current_price = float(json_var['price']) / 100  # Shopify stores in cents
+                if 'compare_at_price' in json_var and json_var['compare_at_price']:
+                    variant.basic_price = float(json_var['compare_at_price']) / 100
                 else:
-                    price = parse_price(price_elements[0].get_text())
-                    variant.current_price = price
-                    variant.basic_price = price
+                    variant.basic_price = variant.current_price
 
-            # Extract stock status
-            stock_element = dom_tree.find(class_=lambda x: x and 'stock' in x.lower())
-            if stock_element:
-                variant.stock_status = stock_element.get_text(strip=True)
+                # Extract stock status
+                if 'available' in json_var:
+                    variant.stock_status = "In stock" if json_var['available'] else "Out of stock"
+                else:
+                    variant.stock_status = "Unknown"
+
+                variants.append(variant)
+
+            if variants:
+                logging.debug(f"Extracted {len(variants)} variants from JSON")
+                return variants
+
+        # Fallback: Extract from HTML selectors
+        variant = Variant()
+
+        # Extract price from HTML
+        price_elements = (
+            dom_tree.select('.product-single__price') +
+            dom_tree.select('.product__price') +
+            dom_tree.find_all('span', class_=lambda x: x and 'price' in x.lower())
+        )
+
+        if price_elements:
+            # Try to find sale/current price
+            for price_el in price_elements:
+                if 'sale' in price_el.get('class', []) or 'current' in str(price_el.get('class', [])).lower():
+                    variant.current_price = parse_price(price_el.get_text())
+                    break
             else:
-                variant.stock_status = "Available"
+                # Use first price found
+                variant.current_price = parse_price(price_elements[0].get_text())
 
-            variants.append(variant)
+            # Try to find compare/original price
+            for price_el in price_elements:
+                if 'compare' in str(price_el.get('class', [])).lower() or 'original' in str(price_el.get('class', [])).lower():
+                    variant.basic_price = parse_price(price_el.get_text())
+                    break
+            else:
+                variant.basic_price = variant.current_price
 
-        logging.debug(f"Extracted {len(variants)} variants")
+        # Extract stock status
+        stock_element = dom_tree.find(class_=lambda x: x and 'stock' in x.lower())
+        if stock_element:
+            stock_text = stock_element.get_text(strip=True).lower()
+            if 'in stock' in stock_text or 'available' in stock_text:
+                variant.stock_status = "In stock"
+            elif 'out of stock' in stock_text or 'sold out' in stock_text:
+                variant.stock_status = "Out of stock"
+            else:
+                variant.stock_status = stock_text
+        else:
+            variant.stock_status = "Available"
+
+        variants.append(variant)
+        logging.debug(f"Extracted {len(variants)} variants from HTML")
 
     except Exception as e:
         logging.error(f"Error extracting variants: {e}", exc_info=True)

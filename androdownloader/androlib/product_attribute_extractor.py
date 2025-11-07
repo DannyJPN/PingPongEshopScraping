@@ -1,6 +1,13 @@
 """
 Extracts product attributes from Andro product detail pages.
+
+Andro uses Shopware/WooCommerce platform - German e-commerce:
+- JSON-LD structured data extraction (Schema.org Product)
+- Shopware standard CSS selectors and data attributes
+- WooCommerce standard classes and meta tags
+- German language price and stock patterns
 """
+import json
 import logging
 import re
 from urllib.parse import urljoin
@@ -56,29 +63,88 @@ def get_self_link(dom_tree):
         return ""
 
 
+def extract_json_ld_product(dom_tree):
+    """
+    Extract JSON-LD structured data (Schema.org Product).
+
+    Common in German e-commerce (Shopware, WooCommerce, etc.)
+
+    :param dom_tree: BeautifulSoup object
+    :return: Dict with product data or None
+    """
+    try:
+        # Find JSON-LD structured data
+        json_ld_scripts = dom_tree.find_all('script', type='application/ld+json')
+
+        for script in json_ld_scripts:
+            if script.string:
+                try:
+                    data = json.loads(script.string)
+
+                    # Handle single object
+                    if isinstance(data, dict):
+                        if data.get('@type') == 'Product':
+                            return data
+                        # Sometimes nested in @graph
+                        if '@graph' in data:
+                            for item in data['@graph']:
+                                if isinstance(item, dict) and item.get('@type') == 'Product':
+                                    return item
+
+                    # Handle array
+                    elif isinstance(data, list):
+                        for item in data:
+                            if isinstance(item, dict) and item.get('@type') == 'Product':
+                                return item
+
+                except json.JSONDecodeError:
+                    continue
+
+        return None
+
+    except Exception as e:
+        logging.debug(f"Could not extract JSON-LD: {e}")
+        return None
+
+
 def extract_product_name(dom_tree):
     """
-    Extract product name.
+    Extract product name using multiple methods.
 
     :param dom_tree: BeautifulSoup object of product page
     :return: Product name as string
     """
     try:
-        # Try multiple common patterns
+        # Try JSON-LD first (most reliable)
+        product_json = extract_json_ld_product(dom_tree)
+        if product_json and 'name' in product_json:
+            return product_json['name']
+
+        # Try Shopware/WooCommerce standard selectors
         name_element = (
-            dom_tree.find('h1', class_=lambda x: x and 'product' in x.lower()) or
+            # Shopware patterns
+            dom_tree.select_one('.product--title') or
+            dom_tree.select_one('.product-detail-name') or
+            dom_tree.select_one('.product-name') or
+            # WooCommerce patterns
+            dom_tree.select_one('.product_title') or
+            dom_tree.select_one('h1.entry-title') or
+            # Generic German patterns
+            dom_tree.find('h1', class_=lambda x: x and ('product' in x.lower() or 'produkt' in x.lower())) or
             dom_tree.find('h1', class_=lambda x: x and 'title' in x.lower()) or
-            dom_tree.find('h1') or
-            dom_tree.find('meta', property='og:title')
+            # Fallback to any h1
+            dom_tree.find('h1')
         )
 
         if name_element:
-            if name_element.name == 'meta':
-                name = name_element.get('content', '')
-            else:
-                name = name_element.get_text(strip=True)
+            name = name_element.get_text(strip=True)
             logging.debug(f"Extracted name: {name}")
             return name
+
+        # Try og:title meta tag
+        og_title = dom_tree.find('meta', property='og:title')
+        if og_title:
+            return og_title.get('content', '')
 
         logging.warning("Product name not found")
         return ""
@@ -96,18 +162,30 @@ def extract_product_short_description(dom_tree):
     :return: Short description as HTML string (single-line with <br> tags)
     """
     try:
-        # Try meta description first
-        meta_desc = dom_tree.find('meta', {'name': 'description'})
-        if meta_desc:
-            desc = meta_desc.get('content', '')
-            if desc:
-                logging.debug("Extracted short description from meta tag")
+        # Try JSON-LD first
+        product_json = extract_json_ld_product(dom_tree)
+        if product_json and 'description' in product_json:
+            # JSON-LD description is often the short one
+            desc = product_json['description']
+            if len(desc) < 500:  # Short description heuristic
                 return desc
 
-        # Try common short description patterns
+        # Try meta description
+        meta_desc = dom_tree.find('meta', {'name': 'description'})
+        if meta_desc and meta_desc.get('content'):
+            return meta_desc.get('content', '')
+
+        # Try og:description
+        og_desc = dom_tree.find('meta', property='og:description')
+        if og_desc and og_desc.get('content'):
+            return og_desc.get('content', '')
+
+        # Try Shopware/WooCommerce short description patterns
         desc_element = (
-            dom_tree.find('div', class_=lambda x: x and 'short' in x.lower() and 'desc' in x.lower()) or
-            dom_tree.find('p', class_=lambda x: x and 'product' in x.lower() and 'desc' in x.lower())
+            dom_tree.select_one('.product--description-short') or
+            dom_tree.select_one('.product-short-description') or
+            dom_tree.select_one('.woocommerce-product-details__short-description') or
+            dom_tree.find('div', class_=lambda x: x and 'short' in x.lower() and 'desc' in x.lower())
         )
 
         if desc_element:
@@ -131,11 +209,19 @@ def extract_product_description(dom_tree):
     :return: Description as HTML string (single-line with <br> tags)
     """
     try:
-        # Try common description patterns
+        # Try Shopware/WooCommerce description patterns
         desc_element = (
-            dom_tree.find('div', class_=lambda x: x and 'description' in x.lower() and 'product' in x.lower()) or
-            dom_tree.find('div', class_=lambda x: x and 'desc' in x.lower()) or
-            dom_tree.find('div', id=lambda x: x and 'description' in x.lower())
+            # Shopware patterns
+            dom_tree.select_one('.product--description') or
+            dom_tree.select_one('.product-detail--description') or
+            dom_tree.select_one('[itemprop="description"]') or
+            # WooCommerce patterns
+            dom_tree.select_one('.woocommerce-Tabs-panel--description') or
+            dom_tree.select_one('#tab-description') or
+            # Generic patterns
+            dom_tree.find('div', class_=lambda x: x and 'description' in x.lower() and ('product' in x.lower() or 'produkt' in x.lower())) or
+            dom_tree.find('div', class_=lambda x: x and 'beschreibung' in x.lower()) or
+            dom_tree.find('div', id=lambda x: x and ('description' in x.lower() or 'beschreibung' in x.lower()))
         )
 
         if desc_element:
@@ -159,24 +245,56 @@ def extract_product_main_photo(dom_tree):
     :return: Absolute URL of main photo
     """
     try:
-        # Try og:image first (usually the main image)
+        # Try JSON-LD first (highest quality)
+        product_json = extract_json_ld_product(dom_tree)
+        if product_json and 'image' in product_json:
+            image = product_json['image']
+            # Can be string or array
+            if isinstance(image, str):
+                img_url = image
+            elif isinstance(image, list) and len(image) > 0:
+                img_url = image[0] if isinstance(image[0], str) else image[0].get('url', '')
+            elif isinstance(image, dict):
+                img_url = image.get('url', '')
+            else:
+                img_url = None
+
+            if img_url and not img_url.startswith('data:'):
+                absolute_url = urljoin(MAIN_URL, img_url)
+                logging.debug(f"Extracted main photo from JSON-LD: {absolute_url}")
+                return absolute_url
+
+        # Try og:image (usually best quality)
         og_image = dom_tree.find('meta', property='og:image')
-        if og_image:
+        if og_image and og_image.get('content'):
             img_url = og_image.get('content', '')
-            if img_url:
+            if img_url and not img_url.startswith('data:'):
                 absolute_url = urljoin(MAIN_URL, img_url)
                 logging.debug(f"Extracted main photo from og:image: {absolute_url}")
                 return absolute_url
 
-        # Try common product image patterns
+        # Try Shopware/WooCommerce image patterns
         img_element = (
-            dom_tree.find('img', class_=lambda x: x and ('product' in x.lower() or 'main' in x.lower())) or
-            dom_tree.find('img', id=lambda x: x and 'product' in x.lower())
+            # Shopware patterns
+            dom_tree.select_one('.product--image img') or
+            dom_tree.select_one('.image-slider--item img') or
+            dom_tree.select_one('[itemprop="image"]') or
+            # WooCommerce patterns
+            dom_tree.select_one('.woocommerce-product-gallery__image img') or
+            dom_tree.select_one('.product-image img') or
+            # Generic patterns
+            dom_tree.find('img', class_=lambda x: x and ('product' in x.lower() or 'produkt' in x.lower())) or
+            dom_tree.find('img', class_=lambda x: x and 'main' in x.lower())
         )
 
         if img_element:
-            img_url = img_element.get('src') or img_element.get('data-src') or img_element.get('data-original')
-            if img_url:
+            img_url = (
+                img_element.get('src') or
+                img_element.get('data-src') or
+                img_element.get('data-original') or
+                img_element.get('data-lazy-src')
+            )
+            if img_url and not img_url.startswith('data:'):
                 absolute_url = urljoin(MAIN_URL, img_url)
                 logging.debug(f"Extracted main photo: {absolute_url}")
                 return absolute_url
@@ -199,17 +317,29 @@ def extract_product_gallery_photos(dom_tree):
     gallery_urls = []
 
     try:
-        # Try common gallery patterns
+        # Try Shopware/WooCommerce gallery patterns
         gallery_elements = (
-            dom_tree.find_all('img', class_=lambda x: x and ('gallery' in x.lower() or 'thumbnail' in x.lower())) or
-            dom_tree.find_all('img', class_=lambda x: x and 'product' in x.lower())
+            # Shopware patterns
+            dom_tree.select('.image-slider--item img') +
+            dom_tree.select('.product--image-thumbnails img') +
+            # WooCommerce patterns
+            dom_tree.select('.woocommerce-product-gallery__image img') +
+            dom_tree.select('.product-thumbnails img') +
+            # Generic patterns
+            dom_tree.find_all('img', class_=lambda x: x and ('gallery' in x.lower() or 'thumbnail' in x.lower() or 'thumb' in x.lower())) +
+            dom_tree.find_all('img', class_=lambda x: x and ('product' in x.lower() or 'produkt' in x.lower()))
         )
 
         for img in gallery_elements:
-            img_url = img.get('src') or img.get('data-src') or img.get('data-original')
-            if img_url:
-                # Skip placeholders and icons
-                if 'placeholder' not in img_url.lower() and 'icon' not in img_url.lower():
+            img_url = (
+                img.get('src') or
+                img.get('data-src') or
+                img.get('data-original') or
+                img.get('data-lazy-src')
+            )
+            if img_url and not img_url.startswith('data:'):
+                # Skip placeholder and icon images
+                if not any(x in img_url.lower() for x in ['placeholder', 'icon', 'logo', 'sprite']):
                     absolute_url = urljoin(MAIN_URL, img_url)
                     gallery_urls.append(absolute_url)
 
@@ -266,7 +396,7 @@ def parse_price(price_text):
 
 def extract_product_variants(dom_tree):
     """
-    Extract product variants (colors, sizes, etc.).
+    Extract product variants (colors, sizes, etc.) from Shopware/WooCommerce.
 
     :param dom_tree: BeautifulSoup object
     :return: List of Variant objects
@@ -274,49 +404,101 @@ def extract_product_variants(dom_tree):
     variants = []
 
     try:
-        # Try to find variant selectors
-        variant_selects = dom_tree.find_all('select', class_=lambda x: x and ('variant' in x.lower() or 'option' in x.lower()))
+        # Try JSON-LD first for structured offers data
+        product_json = extract_json_ld_product(dom_tree)
+        if product_json and 'offers' in product_json:
+            offers = product_json['offers']
+
+            # Handle single offer
+            if isinstance(offers, dict):
+                offers = [offers]
+
+            # Handle multiple offers (variants)
+            if isinstance(offers, list):
+                for offer in offers:
+                    variant = Variant()
+
+                    # Extract price from JSON-LD
+                    if 'price' in offer:
+                        variant.current_price = float(offer['price'])
+                        variant.basic_price = variant.current_price
+
+                    # Handle price specifications
+                    if 'priceSpecification' in offer:
+                        price_spec = offer['priceSpecification']
+                        if 'price' in price_spec:
+                            variant.current_price = float(price_spec['price'])
+
+                    # Extract stock status
+                    if 'availability' in offer:
+                        availability = offer['availability']
+                        if 'InStock' in availability:
+                            variant.stock_status = "In stock"
+                        elif 'OutOfStock' in availability:
+                            variant.stock_status = "Out of stock"
+                        elif 'LimitedAvailability' in availability:
+                            variant.stock_status = "Limited stock"
+                        else:
+                            variant.stock_status = "Available"
+                    else:
+                        variant.stock_status = "Available"
+
+                    variants.append(variant)
+
+                if variants:
+                    logging.debug(f"Extracted {len(variants)} variants from JSON-LD")
+                    return variants
+
+        # Fallback: Try to extract from HTML selectors
+        # Pattern 1: Shopware/WooCommerce variant select boxes
+        variant_selects = (
+            dom_tree.select('select.product-variant') +
+            dom_tree.select('select[name*="attribute"]') +
+            dom_tree.select('select.variations select') +
+            dom_tree.find_all('select', class_=lambda x: x and ('variant' in x.lower() or 'variante' in x.lower() or 'option' in x.lower()))
+        )
 
         if variant_selects:
             # Complex variant extraction (multiple select boxes)
+            # This creates a variant for each combination - simplified to just list all options
+            variant_options = {}
+
             for select in variant_selects:
-                option_name = select.get('name', 'Variant')
+                option_name = select.get('name', select.get('id', 'Option'))
+                option_name = option_name.replace('attribute', '').replace('[]', '').strip('_')
+
+                options = []
                 for option in select.find_all('option'):
-                    if option.get('value'):
-                        variant = Variant()
-                        variant.key_value_pairs[option_name] = option.get_text(strip=True)
+                    value = option.get('value')
+                    text = option.get_text(strip=True)
+                    if value and text and text.lower() not in ['', 'select', 'wählen', 'choose']:
+                        options.append(text)
 
-                        # Extract price (usually same for all variants or specified per variant)
-                        price_element = dom_tree.find('span', class_=lambda x: x and 'price' in x.lower())
-                        if price_element:
-                            price = parse_price(price_element.get_text())
-                            variant.current_price = price
-                            variant.basic_price = price
+                if options:
+                    variant_options[option_name] = options
 
-                        variant.stock_status = "Available"
-                        variants.append(variant)
+            # If we found variant options, create a single variant with first options
+            if variant_options:
+                variant = Variant()
+                for key, values in variant_options.items():
+                    variant.key_value_pairs[key] = values[0] if values else ""
+
+                # Extract price and stock
+                variant.current_price = _extract_price_from_html(dom_tree)
+                variant.basic_price = variant.current_price
+                variant.stock_status = _extract_stock_status(dom_tree)
+
+                variants.append(variant)
         else:
             # Simple product without variants - create default variant
             variant = Variant()
 
             # Extract price
-            price_elements = dom_tree.find_all('span', class_=lambda x: x and 'price' in x.lower())
-            if price_elements:
-                # Try to find current and basic price
-                if len(price_elements) >= 2:
-                    variant.current_price = parse_price(price_elements[0].get_text())
-                    variant.basic_price = parse_price(price_elements[1].get_text())
-                else:
-                    price = parse_price(price_elements[0].get_text())
-                    variant.current_price = price
-                    variant.basic_price = price
+            variant.current_price = _extract_price_from_html(dom_tree)
+            variant.basic_price = variant.current_price
 
             # Extract stock status
-            stock_element = dom_tree.find(class_=lambda x: x and 'stock' in x.lower())
-            if stock_element:
-                variant.stock_status = stock_element.get_text(strip=True)
-            else:
-                variant.stock_status = "Available"
+            variant.stock_status = _extract_stock_status(dom_tree)
 
             variants.append(variant)
 
@@ -331,6 +513,81 @@ def extract_product_variants(dom_tree):
             variants.append(variant)
 
     return variants
+
+
+def _extract_price_from_html(dom_tree):
+    """
+    Helper function to extract price from HTML.
+
+    :param dom_tree: BeautifulSoup object
+    :return: Price as float
+    """
+    try:
+        # Shopware/WooCommerce price patterns
+        price_elements = (
+            dom_tree.select('.product--price') +
+            dom_tree.select('.price .amount') +
+            dom_tree.select('[itemprop="price"]') +
+            dom_tree.select('.woocommerce-Price-amount') +
+            dom_tree.find_all('span', class_=lambda x: x and 'price' in x.lower() and 'preis' not in x.lower())
+        )
+
+        if price_elements:
+            # Try to find current/sale price first
+            for price_el in price_elements:
+                classes = price_el.get('class', [])
+                if any(x in str(classes).lower() for x in ['sale', 'current', 'special', 'angebot']):
+                    return parse_price(price_el.get_text())
+
+            # Use first price found
+            return parse_price(price_elements[0].get_text())
+
+        return 0.0
+
+    except Exception as e:
+        logging.debug(f"Error extracting price from HTML: {e}")
+        return 0.0
+
+
+def _extract_stock_status(dom_tree):
+    """
+    Helper function to extract stock status from HTML.
+
+    :param dom_tree: BeautifulSoup object
+    :return: Stock status as string
+    """
+    try:
+        # Shopware/WooCommerce stock patterns (German/English)
+        stock_element = (
+            dom_tree.select_one('.product--delivery') or
+            dom_tree.select_one('[itemprop="availability"]') or
+            dom_tree.select_one('.stock') or
+            dom_tree.find(class_=lambda x: x and ('stock' in x.lower() or 'lieferbar' in x.lower() or 'verfügbar' in x.lower()))
+        )
+
+        if stock_element:
+            stock_text = stock_element.get_text(strip=True).lower()
+
+            # German patterns
+            if any(x in stock_text for x in ['auf lager', 'lieferbar', 'verfügbar', 'sofort']):
+                return "In stock"
+            elif any(x in stock_text for x in ['nicht lieferbar', 'ausverkauft', 'nicht verfügbar']):
+                return "Out of stock"
+
+            # English patterns
+            elif any(x in stock_text for x in ['in stock', 'available']):
+                return "In stock"
+            elif any(x in stock_text for x in ['out of stock', 'sold out', 'unavailable']):
+                return "Out of stock"
+
+            # Return the text as-is if no pattern matches
+            return stock_text.capitalize()
+
+        return "Available"
+
+    except Exception as e:
+        logging.debug(f"Error extracting stock status: {e}")
+        return "Unknown"
 
 
 def extract_products(product_detail_page_paths):

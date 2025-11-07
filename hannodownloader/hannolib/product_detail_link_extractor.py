@@ -1,5 +1,10 @@
 """
 Extracts product detail page links from Hanno category pages.
+
+German e-commerce patterns:
+- Shopware/WooCommerce product URLs
+- Product card extraction
+- Multiple URL pattern matching
 """
 import logging
 from urllib.parse import urljoin
@@ -40,29 +45,88 @@ def extract_product_detail_links_from_page(page_dom):
     product_links = set()
 
     try:
-        # Pattern 1: Product card links
-        product_cards = page_dom.find_all('a', class_=lambda x: x and ('product' in x.lower() or 'item' in x.lower()))
+        # Pattern 1: Product URL patterns
+        all_links = page_dom.find_all('a', href=True)
+
+        for link in all_links:
+            href = link.get('href')
+            if href:
+                absolute_url = urljoin(MAIN_URL, href)
+
+                # German/English product patterns
+                if any(pattern in absolute_url for pattern in [
+                    '/product/', '/produkt/', '/detail/', '/p/',
+                    '/artikel/', '/item/'
+                ]):
+                    # Exclude category and system pages
+                    if not any(x in absolute_url.lower() for x in [
+                        '/category/', '/kategorie/', '/collection/',
+                        '?page=', '&page=', '/cart', '/checkout',
+                        '/account', '#', '?filter', '&filter'
+                    ]):
+                        # Exclude category list pages
+                        if not absolute_url.endswith('/products') and not absolute_url.endswith('/produkte'):
+                            product_links.add(absolute_url)
+
+        # Pattern 2: Product cards
+        product_cards = (
+            page_dom.find_all('article', class_=lambda x: x and ('product' in x.lower() or 'item' in x.lower())) +
+            page_dom.find_all('div', class_=lambda x: x and ('product' in x.lower() or 'item' in x.lower())) +
+            page_dom.find_all('li', class_=lambda x: x and ('product' in x.lower() or 'item' in x.lower()))
+        )
 
         for card in product_cards:
-            href = card.get('href')
-            if href:
+            link = card.find('a', href=True)
+            if link:
+                href = link.get('href')
                 absolute_url = urljoin(MAIN_URL, href)
-                # Filter for product-like URLs
-                if '/product/' in absolute_url or '/item/' in absolute_url:
+
+                if any(pattern in absolute_url for pattern in [
+                    '/product/', '/produkt/', '/detail/', '/p/', '/artikel/'
+                ]):
                     product_links.add(absolute_url)
 
-        # Pattern 2: Direct product links
-        product_elements = page_dom.select('a[href*="product"], a[href*="/p/"], a[href*="/item/"]')
+        # Pattern 3: Product title links
+        product_titles = (
+            page_dom.select('.product-name a') +
+            page_dom.select('.product-title a') +
+            page_dom.select('.produkt-name a') +
+            page_dom.select('h2 a') +
+            page_dom.select('h3 a')
+        )
 
-        for element in product_elements:
-            href = element.get('href')
+        for title_link in product_titles:
+            href = title_link.get('href')
             if href:
                 absolute_url = urljoin(MAIN_URL, href)
-                product_links.add(absolute_url)
+                if any(pattern in absolute_url for pattern in [
+                    '/product/', '/produkt/', '/detail/', '/p/', '/artikel/'
+                ]):
+                    product_links.add(absolute_url)
 
-        logging.debug(f"Extracted {len(product_links)} product links from page")
+        # Pattern 4: Product image links
+        product_images = page_dom.select('.product-image a, .product-img a, .produkt-bild a')
+
+        for img_link in product_images:
+            href = img_link.get('href')
+            if href:
+                absolute_url = urljoin(MAIN_URL, href)
+                if any(pattern in absolute_url for pattern in [
+                    '/product/', '/produkt/', '/detail/', '/p/', '/artikel/'
+                ]):
+                    product_links.add(absolute_url)
+
+        # Clean and filter
+        filtered_links = set()
+        for url in product_links:
+            clean_url = url.split('?')[0].split('#')[0]
+            path = clean_url.replace(MAIN_URL, '')
+            if len(path) > 5:
+                filtered_links.add(clean_url)
+
+        logging.debug(f"Extracted {len(filtered_links)} product links from page")
 
     except Exception as e:
         logging.error(f"Error extracting product links: {e}", exc_info=True)
 
-    return product_links
+    return filtered_links
