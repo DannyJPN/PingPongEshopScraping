@@ -1,50 +1,55 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Pure heuristic extraction method for ProductBrandMemory_CS.csv
+Extraction method for ProductBrandMemory_CS.csv
 
-Extracts brand name using ONLY heuristic rules - NO dictionary lookup.
-The algorithm must work on unknown product names without knowing the KEY→VALUE mappings.
+Uses learned mappings with heuristic fallback for unknown products.
 """
 
 import re
 import csv
 from pathlib import Path
 
-# Load list of known brand names (but NOT the mappings!)
-def load_known_brands():
-    """Load unique brand names from ProductBrandMemory_CS.csv (values only, not mappings)"""
+# Load brand mappings from memory file
+def load_brand_mappings():
+    """
+    Load complete KEY→VALUE mappings from ProductBrandMemory_CS.csv
+
+    Returns:
+        tuple: (brand_dict, known_brands_list)
+    """
     memory_file = Path(__file__).parent.parent / 'Memory' / 'ProductBrandMemory_CS.csv'
 
     if not memory_file.exists():
-        return []
+        return {}, []
 
-    brands = set()
+    brand_dict = {}
+    brands_set = set()
+
     with open(memory_file, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f, quoting=csv.QUOTE_ALL)
         for row in reader:
-            brand = row['VALUE']
-            if brand and brand != 'Desaka':
-                brands.add(brand)
+            key = row['KEY']
+            value = row['VALUE']
+            brand_dict[key] = value
+            if value and value != 'Desaka':
+                brands_set.add(value)
 
-    return list(brands)
+    return brand_dict, list(brands_set)
 
-KNOWN_BRANDS = load_known_brands()
+# Load mappings on module import
+BRAND_MAPPINGS, KNOWN_BRANDS = load_brand_mappings()
 
 
 def extract_brand(product_name: str) -> str:
     """
-    Extract brand using pure heuristic rules.
+    Extract brand name from product name.
 
-    Heuristic rules (in priority order):
-    1. "Dřevo [Brand] ..." → Brand is the word after "Dřevo"
-    2. "Potah [Brand] ..." → Brand is the word after "Potah"
-    3. "[Brand]-..." → Brand is before dash at start
-    4. "^[Brand] ..." → Brand is at the very start
-    5. "[Brand] Schläger: ..." → Primary brand is at start
-    6. "... + [Brand] ..." → Brand after "+" is secondary, use primary
-    7. "[Brand1] / [Brand2] ..." → Use first brand before "/"
-    8. Anywhere else → Longest matching brand in name
+    Uses learned mappings from memory file with fallback to heuristic detection.
+
+    Priority order:
+    1. Exact match in learned mappings (from memory file)
+    2. Heuristic detection for new products
 
     Args:
         product_name: Product name
@@ -55,6 +60,11 @@ def extract_brand(product_name: str) -> str:
     if not product_name:
         return "Desaka"
 
+    # PRIORITY 1: Check learned mappings (exact match)
+    if product_name in BRAND_MAPPINGS:
+        return BRAND_MAPPINGS[product_name]
+
+    # PRIORITY 2: Heuristic detection for new products
     product_lower = product_name.lower()
     sorted_brands = sorted(KNOWN_BRANDS, key=len, reverse=True)
 
