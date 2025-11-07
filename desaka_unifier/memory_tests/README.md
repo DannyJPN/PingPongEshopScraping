@@ -74,48 +74,98 @@ python3 manual_memory_check.py --file type --threshold 0.9
 
 ### Interaktivní příkazy
 
-Při kontrole každé VALUE můžete použít:
+**Základní příkazy:**
 - `[číslo]` - Označit KEY k vymazání (např. `3` nebo `1,5,7` nebo `1-5`)
 - `all` - Vymazat všechny KEYs (celou VALUE)
 - `none` nebo `Enter` - Ponechat všechny KEYs (VALUE je OK)
 - `q` - Ukončit kontrolu
 
+**Rozšířené příkazy (pro velké skupiny s tisíci KEYs):**
+- `show all` - Zobrazit všechny KEYs (i u velkých skupin)
+- `show page N` - Zobrazit stránku N (50 KEYs na stránku)
+- `search TEXT` - Vyhledat KEYs obsahující TEXT
+- `pattern TEXT` - Označit všechny KEYs obsahující TEXT k vymazání
+- `stats` - Zobrazit statistiky a nejčastější slova v KEYs
+
+**Optimalizace pro velké skupiny:**
+- U VALUES s >30 KEYs se automaticky zobrazí pouze vzorky (prvních 15 + posledních 15)
+- Označené KEYs se kumulují - můžete postupně přidávat více KEYs
+- `pattern` příkaz umožňuje hromadné označení podle vzoru
+
 ### Příklad použití
 
+**Pro malé skupiny (<30 KEYs):**
+```bash
+$ python3 manual_memory_check.py --file type
+
+================================================================================
+VALUE [1/50]: 'Potah'
+Počet KEYs: 15
+================================================================================
+    1. Nittaku Belag Hurricane 3 rot 2,0
+    2. Yasaka Rakza 7 schwarz 2,1
+   ...
+   15. Butterfly Tenergy 05 rot 2,1
+
+Zadejte příkaz: none
+✓ Ponechat všechny KEYs
+```
+
+**Pro velké skupiny (>30 KEYs):**
 ```bash
 $ python3 manual_memory_check.py --file brand
-
-📂 Načítám: ProductBrandMemory_CS.csv
-✓ Načteno 27705 záznamů
-✓ Seskupeno do 145 jedinečných VALUES
-
-🔍 Hledám podobné VALUES (práh: 0.85)...
-✓ Žádné podobné VALUES nenalezeny
-
-================================================================================
-INTERAKTIVNÍ KONTROLA
-================================================================================
-
-Procházejte VALUES a označte KEYs, které nepatří k dané VALUE.
 
 ================================================================================
 VALUE [1/145]: 'Nittaku'
 Počet KEYs: 3542
 ================================================================================
+
+⚠️  Velká skupina (3542 KEYs) - zobrazuji jen vzorky:
+
+--- Prvních 15 KEYs ---
     1. Nittaku Belag Hurricane 3 rot 2,0
     2. Nittaku Belag Magic Carbon rot 1,5
-    3. Nittaku Holz Acoustic FL
-    ...
+   ...
+   15. Nittaku Holz Acoustic FL
+
+  ... 3512 KEYs vynecháno ...
+
+--- Posledních 15 KEYs ---
+ 3528. Nittaku Ball Premium 40+ 3er Pack
+   ...
+ 3542. Nittaku Tasche Crown Deluxe
 
 --------------------------------------------------------------------------------
-Příkazy:
-  [číslo]       - Označit KEY k vymazání (např. '3' nebo '1,5,7')
-  'all'         - Vymazat všechny KEYs (celou VALUE)
-  'none' / ''   - Ponechat všechny KEYs (VALUE je OK)
-  'q'           - Ukončit kontrolu
+💡 Pro velké skupiny použijte rozšířené příkazy:
+   'show all'        - Zobrazit všechny KEYs
+   'show page N'     - Zobrazit stránku N (50 KEYs na stránku)
+   'search TEXT'     - Vyhledat KEYs obsahující TEXT
+   'pattern TEXT'    - Označit všechny KEYs obsahující TEXT k vymazání
+   'stats'           - Zobrazit statistiky a podobnosti
 --------------------------------------------------------------------------------
 
-Zadejte čísla KEYs k vymazání (nebo příkaz):
+Zadejte příkaz: search "ASICS"
+✓ Nalezeno 0 KEYs obsahujících 'ASICS'
+
+Zadejte příkaz: stats
+
+📊 STATISTIKY
+================================================================================
+Celkový počet KEYs: 3542
+
+Nejčastější slova v KEYs:
+  'Nittaku': 3542x (100.0%)
+  'Belag': 2145x (60.5%)
+  'Holz': 892x (25.2%)
+  ...
+
+Zadejte příkaz: pattern "XXX"
+✓ Označeno 15 KEYs obsahujících 'XXX'
+
+[Označeno 15 KEYs k vymazání]
+
+Zadejte příkaz: none
+✓ Vymazáno 15 KEYs
 ```
 
 ## Architektura extraction metod

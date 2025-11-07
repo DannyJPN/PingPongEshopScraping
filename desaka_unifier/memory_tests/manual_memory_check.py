@@ -154,7 +154,7 @@ def find_similar_values(values: list, threshold: float = 0.85) -> list:
 
 def display_value_group(value: str, keys: list, index: int, total: int):
     """
-    Zobrazí skupinu KEYs pro danou VALUE.
+    Zobrazí skupinu KEYs pro danou VALUE s optimalizací pro velké skupiny.
 
     Args:
         value: VALUE
@@ -167,39 +167,175 @@ def display_value_group(value: str, keys: list, index: int, total: int):
     print(f"Počet KEYs: {len(keys)}")
     print("=" * 80)
 
-    for i, key in enumerate(keys, 1):
-        print(f"  {i:3d}. {key}")
+    # Pro velké skupiny zobrazit jen vzorky
+    if len(keys) <= 30:
+        # Malá skupina - zobrazit vše
+        for i, key in enumerate(keys, 1):
+            print(f"  {i:4d}. {key}")
+    else:
+        # Velká skupina - zobrazit vzorky
+        print(f"\n⚠️  Velká skupina ({len(keys)} KEYs) - zobrazuji jen vzorky:")
+        print("\n--- Prvních 15 KEYs ---")
+        for i in range(min(15, len(keys))):
+            print(f"  {i+1:4d}. {keys[i]}")
+
+        if len(keys) > 30:
+            print(f"\n  ... {len(keys) - 30} KEYs vynecháno ...")
+
+        print("\n--- Posledních 15 KEYs ---")
+        for i in range(max(0, len(keys) - 15), len(keys)):
+            print(f"  {i+1:4d}. {keys[i]}")
+
+        print("\n" + "-" * 80)
+        print("💡 Pro velké skupiny použijte rozšířené příkazy:")
+        print("   'show all'        - Zobrazit všechny KEYs")
+        print("   'show page N'     - Zobrazit stránku N (50 KEYs na stránku)")
+        print("   'search TEXT'     - Vyhledat KEYs obsahující TEXT")
+        print("   'pattern TEXT'    - Označit všechny KEYs obsahující TEXT k vymazání")
+        print("   'stats'           - Zobrazit statistiky a podobnosti")
+        print("-" * 80)
+
+
+def show_keys_page(keys: list, page: int, page_size: int = 50):
+    """Zobrazí stránku KEYs."""
+    start = (page - 1) * page_size
+    end = min(start + page_size, len(keys))
+    total_pages = (len(keys) + page_size - 1) // page_size
+
+    if page < 1 or page > total_pages:
+        print(f"❌ Stránka {page} neexistuje (celkem {total_pages} stránek)")
+        return
+
+    print(f"\n--- Stránka {page}/{total_pages} (KEYs {start+1}-{end} z {len(keys)}) ---")
+    for i in range(start, end):
+        print(f"  {i+1:4d}. {keys[i]}")
+
+
+def search_keys(keys: list, search_text: str):
+    """Vyhledá a zobrazí KEYs obsahující hledaný text."""
+    search_lower = search_text.lower()
+    matches = [(i, key) for i, key in enumerate(keys) if search_lower in key.lower()]
+
+    if not matches:
+        print(f"❌ Žádné KEYs neobsahují '{search_text}'")
+        return
+
+    print(f"\n✓ Nalezeno {len(matches)} KEYs obsahujících '{search_text}':")
+    for i, (idx, key) in enumerate(matches[:50], 1):  # Show max 50
+        print(f"  {idx+1:4d}. {key}")
+
+    if len(matches) > 50:
+        print(f"\n  ... a dalších {len(matches) - 50} KEYs")
+
+
+def show_stats(keys: list):
+    """Zobrazí statistiky o KEYs."""
+    print(f"\n📊 STATISTIKY")
+    print(f"{'=' * 80}")
+    print(f"Celkový počet KEYs: {len(keys)}")
+
+    # Analyze common patterns
+    words = []
+    for key in keys:
+        words.extend(key.split())
+
+    from collections import Counter
+    word_counts = Counter(words)
+
+    print(f"\nNejčastější slova v KEYs:")
+    for word, count in word_counts.most_common(10):
+        if len(word) > 3:  # Skip short words
+            pct = (count / len(keys)) * 100
+            print(f"  '{word}': {count}x ({pct:.1f}%)")
 
 
 def get_keys_to_remove(keys: list) -> list:
     """
     Interaktivně získá seznam KEYs k vymazání.
 
+    Podporuje rozšířené příkazy pro velké skupiny.
+
     Args:
         keys: Seznam všech KEYs
 
     Returns:
-        Seznam indexů KEYs k vymazání
+        Seznam indexů KEYs k vymazání nebo None (quit)
     """
     print("\n" + "-" * 80)
     print("Příkazy:")
-    print("  [číslo]       - Označit KEY k vymazání (např. '3' nebo '1,5,7')")
-    print("  'all'         - Vymazat všechny KEYs (celou VALUE)")
-    print("  'none' / ''   - Ponechat všechny KEYs (VALUE je OK)")
-    print("  'q'           - Ukončit kontrolu")
+    print("  [číslo]         - Označit KEY k vymazání (např. '3' nebo '1,5,7' nebo '1-5')")
+    print("  'all'           - Vymazat všechny KEYs (celou VALUE)")
+    print("  'none' / Enter  - Ponechat všechny KEYs (VALUE je OK)")
+    print("  'show all'      - Zobrazit všechny KEYs")
+    print("  'show page N'   - Zobrazit stránku N (50 KEYs/stránku)")
+    print("  'search TEXT'   - Vyhledat KEYs obsahující TEXT")
+    print("  'pattern TEXT'  - Označit všechny KEYs obsahující TEXT k vymazání")
+    print("  'stats'         - Zobrazit statistiky")
+    print("  'q'             - Ukončit kontrolu")
     print("-" * 80)
 
+    marked_for_removal = set()
+
     while True:
-        response = input("\nZadejte čísla KEYs k vymazání (nebo příkaz): ").strip()
+        if marked_for_removal:
+            print(f"\n[Označeno {len(marked_for_removal)} KEYs k vymazání]")
+
+        response = input("\nZadejte příkaz: ").strip()
 
         if response.lower() == 'q':
             return None  # Signal to quit
 
         if response.lower() in ['none', '']:
-            return []
+            return list(marked_for_removal)
 
         if response.lower() == 'all':
             return list(range(len(keys)))
+
+        # Show all
+        if response.lower() == 'show all':
+            print(f"\n--- Všechny KEYs ({len(keys)}) ---")
+            for i, key in enumerate(keys, 1):
+                mark = "✗" if (i-1) in marked_for_removal else " "
+                print(f" {mark} {i:4d}. {key}")
+            continue
+
+        # Show page
+        if response.lower().startswith('show page '):
+            try:
+                page = int(response.split()[-1])
+                show_keys_page(keys, page)
+            except ValueError:
+                print("❌ Chyba: Použijte 'show page N' kde N je číslo stránky")
+            continue
+
+        # Search
+        if response.lower().startswith('search '):
+            search_text = response[7:].strip()
+            if search_text:
+                search_keys(keys, search_text)
+            else:
+                print("❌ Chyba: Použijte 'search TEXT'")
+            continue
+
+        # Pattern removal
+        if response.lower().startswith('pattern '):
+            pattern_text = response[8:].strip()
+            if pattern_text:
+                pattern_lower = pattern_text.lower()
+                matches = [i for i, key in enumerate(keys) if pattern_lower in key.lower()]
+                if matches:
+                    marked_for_removal.update(matches)
+                    print(f"✓ Označeno {len(matches)} KEYs obsahujících '{pattern_text}'")
+                else:
+                    print(f"❌ Žádné KEYs neobsahují '{pattern_text}'")
+            else:
+                print("❌ Chyba: Použijte 'pattern TEXT'")
+            continue
+
+        # Stats
+        if response.lower() == 'stats':
+            show_stats(keys)
+            continue
 
         # Parse numbers
         try:
@@ -217,12 +353,13 @@ def get_keys_to_remove(keys: list) -> list:
 
             # Validate indices
             if all(0 <= i < len(keys) for i in indices):
-                return indices
+                marked_for_removal.update(indices)
+                print(f"✓ Přidáno {len(indices)} KEYs k označeným")
             else:
                 print(f"❌ Chyba: Některé číslo je mimo rozsah 1-{len(keys)}")
 
         except ValueError:
-            print("❌ Chyba: Neplatný formát. Použijte čísla oddělená čárkou (např. '1,3,5' nebo '1-5')")
+            print("❌ Neplatný příkaz. Zadejte 'help' pro nápovědu nebo čísla KEYs.")
 
 
 def save_memory_file(filepath: Path, data: dict):
