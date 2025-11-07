@@ -152,7 +152,7 @@ def find_similar_values(values: list, threshold: float = 0.85) -> list:
     return similar_groups
 
 
-def display_value_group(value: str, keys: list, index: int, total: int):
+def display_value_group(value: str, keys: list, index: int, total: int) -> int:
     """
     Zobrazí skupinu KEYs pro danou VALUE s optimalizací pro velké skupiny.
 
@@ -161,54 +161,76 @@ def display_value_group(value: str, keys: list, index: int, total: int):
         keys: Seznam KEYs
         index: Index aktuální VALUE
         total: Celkový počet VALUES
+
+    Returns:
+        Počáteční číslo stránky (1 pro malé skupiny, 1 pro první stránku velkých skupin)
     """
     print("\n" + "=" * 80)
     print(f"VALUE [{index}/{total}]: '{value}'")
     print(f"Počet KEYs: {len(keys)}")
     print("=" * 80)
 
-    # Pro velké skupiny zobrazit jen vzorky
+    # Pro velké skupiny zobrazit první stránku
     if len(keys) <= 30:
         # Malá skupina - zobrazit vše
         for i, key in enumerate(keys, 1):
             print(f"  {i:4d}. {key}")
+        return 1  # Single page
     else:
-        # Velká skupina - zobrazit vzorky
-        print(f"\n⚠️  Velká skupina ({len(keys)} KEYs) - zobrazuji jen vzorky:")
-        print("\n--- Prvních 15 KEYs ---")
-        for i in range(min(15, len(keys))):
-            print(f"  {i+1:4d}. {keys[i]}")
+        # Velká skupina - zobrazit první stránku
+        page_size = 50
+        total_pages = (len(keys) + page_size - 1) // page_size
 
-        if len(keys) > 30:
-            print(f"\n  ... {len(keys) - 30} KEYs vynecháno ...")
+        print(f"\n⚠️  Velká skupina ({len(keys)} KEYs, {total_pages} stránek)")
+        print("\n--- Stránka 1/{} (KEYs 1-{} z {}) ---".format(
+            total_pages, min(page_size, len(keys)), len(keys)
+        ))
 
-        print("\n--- Posledních 15 KEYs ---")
-        for i in range(max(0, len(keys) - 15), len(keys)):
+        for i in range(min(page_size, len(keys))):
             print(f"  {i+1:4d}. {keys[i]}")
 
         print("\n" + "-" * 80)
-        print("💡 Pro velké skupiny použijte rozšířené příkazy:")
+        print("💡 Navigace a příkazy:")
+        print("   'next' / 'n'      - Další stránka")
+        print("   'prev' / 'p'      - Předchozí stránka")
+        print("   'show page N'     - Přejít na stránku N")
+        print("   'first' / 'last'  - První/poslední stránka")
         print("   'show all'        - Zobrazit všechny KEYs")
-        print("   'show page N'     - Zobrazit stránku N (50 KEYs na stránku)")
         print("   'search TEXT'     - Vyhledat KEYs obsahující TEXT")
         print("   'pattern TEXT'    - Označit všechny KEYs obsahující TEXT k vymazání")
         print("   'stats'           - Zobrazit statistiky a podobnosti")
         print("-" * 80)
 
+        return 1  # Start at page 1
 
-def show_keys_page(keys: list, page: int, page_size: int = 50):
-    """Zobrazí stránku KEYs."""
+
+def show_keys_page(keys: list, page: int, marked_for_removal: set = None, page_size: int = 50):
+    """
+    Zobrazí stránku KEYs s označením vybraných k vymazání.
+
+    Args:
+        keys: Seznam všech KEYs
+        page: Číslo stránky (1-based)
+        marked_for_removal: Set indexů označených k vymazání
+        page_size: Počet KEYs na stránku
+    """
     start = (page - 1) * page_size
     end = min(start + page_size, len(keys))
     total_pages = (len(keys) + page_size - 1) // page_size
 
     if page < 1 or page > total_pages:
         print(f"❌ Stránka {page} neexistuje (celkem {total_pages} stránek)")
-        return
+        return False
+
+    if marked_for_removal is None:
+        marked_for_removal = set()
 
     print(f"\n--- Stránka {page}/{total_pages} (KEYs {start+1}-{end} z {len(keys)}) ---")
     for i in range(start, end):
-        print(f"  {i+1:4d}. {keys[i]}")
+        mark = "✗" if i in marked_for_removal else " "
+        print(f" {mark} {i+1:4d}. {keys[i]}")
+
+    return True
 
 
 def search_keys(keys: list, search_text: str):
@@ -249,36 +271,48 @@ def show_stats(keys: list):
             print(f"  '{word}': {count}x ({pct:.1f}%)")
 
 
-def get_keys_to_remove(keys: list) -> list:
+def get_keys_to_remove(keys: list, initial_page: int = 1) -> list:
     """
     Interaktivně získá seznam KEYs k vymazání.
 
-    Podporuje rozšířené příkazy pro velké skupiny.
+    Podporuje rozšířené příkazy pro velké skupiny a postupné procházení stránkami.
 
     Args:
         keys: Seznam všech KEYs
+        initial_page: Počáteční stránka (1-based)
 
     Returns:
         Seznam indexů KEYs k vymazání nebo None (quit)
     """
+    page_size = 50
+    total_pages = (len(keys) + page_size - 1) // page_size
+    current_page = initial_page
+    marked_for_removal = set()
+
     print("\n" + "-" * 80)
     print("Příkazy:")
     print("  [číslo]         - Označit KEY k vymazání (např. '3' nebo '1,5,7' nebo '1-5')")
     print("  'all'           - Vymazat všechny KEYs (celou VALUE)")
     print("  'none' / Enter  - Ponechat všechny KEYs (VALUE je OK)")
+    print("\nNavigace (pro velké skupiny):")
+    print("  'next' / 'n'    - Další stránka")
+    print("  'prev' / 'p'    - Předchozí stránka")
+    print("  'show page N'   - Přejít na stránku N")
+    print("  'first' / 'last' - První/poslední stránka")
+    print("\nRozšířené příkazy:")
     print("  'show all'      - Zobrazit všechny KEYs")
-    print("  'show page N'   - Zobrazit stránku N (50 KEYs/stránku)")
     print("  'search TEXT'   - Vyhledat KEYs obsahující TEXT")
     print("  'pattern TEXT'  - Označit všechny KEYs obsahující TEXT k vymazání")
     print("  'stats'         - Zobrazit statistiky")
     print("  'q'             - Ukončit kontrolu")
     print("-" * 80)
 
-    marked_for_removal = set()
-
     while True:
         if marked_for_removal:
             print(f"\n[Označeno {len(marked_for_removal)} KEYs k vymazání]")
+
+        if len(keys) > 30 and total_pages > 1:
+            print(f"[Aktuální stránka: {current_page}/{total_pages}]")
 
         response = input("\nZadejte příkaz: ").strip()
 
@@ -290,6 +324,33 @@ def get_keys_to_remove(keys: list) -> list:
 
         if response.lower() == 'all':
             return list(range(len(keys)))
+
+        # Navigation commands
+        if response.lower() in ['next', 'n']:
+            if current_page < total_pages:
+                current_page += 1
+                show_keys_page(keys, current_page, marked_for_removal, page_size)
+            else:
+                print(f"❌ Již jste na poslední stránce ({total_pages})")
+            continue
+
+        if response.lower() in ['prev', 'p']:
+            if current_page > 1:
+                current_page -= 1
+                show_keys_page(keys, current_page, marked_for_removal, page_size)
+            else:
+                print("❌ Již jste na první stránce")
+            continue
+
+        if response.lower() == 'first':
+            current_page = 1
+            show_keys_page(keys, current_page, marked_for_removal, page_size)
+            continue
+
+        if response.lower() == 'last':
+            current_page = total_pages
+            show_keys_page(keys, current_page, marked_for_removal, page_size)
+            continue
 
         # Show all
         if response.lower() == 'show all':
@@ -303,7 +364,8 @@ def get_keys_to_remove(keys: list) -> list:
         if response.lower().startswith('show page '):
             try:
                 page = int(response.split()[-1])
-                show_keys_page(keys, page)
+                if show_keys_page(keys, page, marked_for_removal, page_size):
+                    current_page = page
             except ValueError:
                 print("❌ Chyba: Použijte 'show page N' kde N je číslo stránky")
             continue
@@ -359,7 +421,7 @@ def get_keys_to_remove(keys: list) -> list:
                 print(f"❌ Chyba: Některé číslo je mimo rozsah 1-{len(keys)}")
 
         except ValueError:
-            print("❌ Neplatný příkaz. Zadejte 'help' pro nápovědu nebo čísla KEYs.")
+            print("❌ Neplatný příkaz. Zadejte čísla KEYs nebo příkaz (např. 'next', 'search', 'none')")
 
 
 def save_memory_file(filepath: Path, data: dict):
@@ -443,9 +505,9 @@ Dostupné aliasy souborů:
         values_list = sorted(inverted_data.items(), key=lambda x: (-len(x[1]), x[0]))
 
         for index, (value, keys) in enumerate(values_list, 1):
-            display_value_group(value, keys, index, len(values_list))
+            initial_page = display_value_group(value, keys, index, len(values_list))
 
-            indices = get_keys_to_remove(keys)
+            indices = get_keys_to_remove(keys, initial_page)
 
             if indices is None:
                 # Quit requested

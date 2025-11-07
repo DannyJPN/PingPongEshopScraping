@@ -80,17 +80,25 @@ python3 manual_memory_check.py --file type --threshold 0.9
 - `none` nebo `Enter` - Ponechat všechny KEYs (VALUE je OK)
 - `q` - Ukončit kontrolu
 
-**Rozšířené příkazy (pro velké skupiny s tisíci KEYs):**
-- `show all` - Zobrazit všechny KEYs (i u velkých skupin)
-- `show page N` - Zobrazit stránku N (50 KEYs na stránku)
+**Navigace (pro velké skupiny s více stránkami):**
+- `next` nebo `n` - Další stránka
+- `prev` nebo `p` - Předchozí stránka
+- `first` - První stránka
+- `last` - Poslední stránka
+- `show page N` - Přejít na stránku N
+
+**Rozšířené příkazy:**
+- `show all` - Zobrazit všechny KEYs najednou (i u velkých skupin)
 - `search TEXT` - Vyhledat KEYs obsahující TEXT
 - `pattern TEXT` - Označit všechny KEYs obsahující TEXT k vymazání
 - `stats` - Zobrazit statistiky a nejčastější slova v KEYs
 
 **Optimalizace pro velké skupiny:**
-- U VALUES s >30 KEYs se automaticky zobrazí pouze vzorky (prvních 15 + posledních 15)
-- Označené KEYs se kumulují - můžete postupně přidávat více KEYs
+- U VALUES s >30 KEYs se automaticky zobrazí první stránka (50 KEYs)
+- Procházejte stránky postupně pomocí `next` nebo skočte na konkrétní stránku
+- Označené KEYs se kumulují - můžete postupně procházet a označovat
 - `pattern` příkaz umožňuje hromadné označení podle vzoru
+- Označené KEYs jsou zobrazeny se symbolem ✗
 
 ### Příklad použití
 
@@ -120,52 +128,63 @@ VALUE [1/145]: 'Nittaku'
 Počet KEYs: 3542
 ================================================================================
 
-⚠️  Velká skupina (3542 KEYs) - zobrazuji jen vzorky:
+⚠️  Velká skupina (3542 KEYs, 71 stránek)
 
---- Prvních 15 KEYs ---
+--- Stránka 1/71 (KEYs 1-50 z 3542) ---
     1. Nittaku Belag Hurricane 3 rot 2,0
     2. Nittaku Belag Magic Carbon rot 1,5
+    3. Nittaku Belag Moristo DF rot 1,8
    ...
-   15. Nittaku Holz Acoustic FL
-
-  ... 3512 KEYs vynecháno ...
-
---- Posledních 15 KEYs ---
- 3528. Nittaku Ball Premium 40+ 3er Pack
-   ...
- 3542. Nittaku Tasche Crown Deluxe
+   50. Nittaku Holz Acoustic FL
 
 --------------------------------------------------------------------------------
-💡 Pro velké skupiny použijte rozšířené příkazy:
+💡 Navigace a příkazy:
+   'next' / 'n'      - Další stránka
+   'prev' / 'p'      - Předchozí stránka
+   'show page N'     - Přejít na stránku N
+   'first' / 'last'  - První/poslední stránka
    'show all'        - Zobrazit všechny KEYs
-   'show page N'     - Zobrazit stránku N (50 KEYs na stránku)
    'search TEXT'     - Vyhledat KEYs obsahující TEXT
    'pattern TEXT'    - Označit všechny KEYs obsahující TEXT k vymazání
    'stats'           - Zobrazit statistiky a podobnosti
 --------------------------------------------------------------------------------
 
+[Aktuální stránka: 1/71]
+
+Zadejte příkaz: next
+
+--- Stránka 2/71 (KEYs 51-100 z 3542) ---
+   51. Nittaku Belag Fastarc G-1 schwarz 2,0
+   52. Nittaku Belag Fastarc C-1 rot 2,0
+   ...
+  100. Nittaku Ball Premium 40+ 3er Pack
+
+[Aktuální stránka: 2/71]
+
 Zadejte příkaz: search "ASICS"
 ✓ Nalezeno 0 KEYs obsahujících 'ASICS'
 
-Zadejte příkaz: stats
-
-📊 STATISTIKY
-================================================================================
-Celkový počet KEYs: 3542
-
-Nejčastější slova v KEYs:
-  'Nittaku': 3542x (100.0%)
-  'Belag': 2145x (60.5%)
-  'Holz': 892x (25.2%)
-  ...
+[Aktuální stránka: 2/71]
 
 Zadejte příkaz: pattern "XXX"
 ✓ Označeno 15 KEYs obsahujících 'XXX'
 
 [Označeno 15 KEYs k vymazání]
+[Aktuální stránka: 2/71]
+
+Zadejte příkaz: last
+
+--- Stránka 71/71 (KEYs 3501-3542 z 3542) ---
+ ✗ 3515. Nittaku XXX Test Product 1
+    3516. Nittaku Ball 3-Star Premium
+   ...
+ ✗ 3542. Nittaku XXX Test Product 2
+
+[Označeno 15 KEYs k vymazání]
+[Aktuální stránka: 71/71]
 
 Zadejte příkaz: none
-✓ Vymazáno 15 KEYs
+✓ Označeno 15 KEYs k vymazání
 ```
 
 ## Architektura extraction metod
