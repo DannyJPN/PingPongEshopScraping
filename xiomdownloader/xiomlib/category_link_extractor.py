@@ -1,5 +1,7 @@
 """
 Extracts category links from Xiom main page.
+
+Xiom.tt uses Shopify platform with standard collection structure.
 """
 import logging
 from urllib.parse import urljoin
@@ -11,35 +13,65 @@ def extract_category_links(main_page_soup):
     """
     Extract all category links from the main page DOM.
 
+    Xiom uses Shopify - looks for /collections/ URLs in navigation.
+
     :param main_page_soup: BeautifulSoup object of the main page
     :return: Sorted list of unique absolute category URLs
     """
     try:
         category_links = set()
 
-        # Pattern 1: Navigation menu links
-        nav_links = main_page_soup.find_all('a', class_=lambda x: x and ('nav' in x.lower() or 'menu' in x.lower() or 'category' in x.lower()))
-        logging.debug(f"Found {len(nav_links)} navigation/menu links")
+        # Pattern 1: Shopify navigation - header menu
+        # Look for header navigation links
+        header_nav = main_page_soup.find('nav', class_=lambda x: x and ('site-nav' in x.lower() or 'main-nav' in x.lower() or 'header' in x.lower()))
+        if header_nav:
+            nav_links = header_nav.find_all('a')
+            logging.debug(f"Found {len(nav_links)} links in header navigation")
 
-        for link in tqdm(nav_links, desc="Extracting navigation links"):
+            for link in nav_links:
+                href = link.get('href')
+                if href and ('/collections/' in href or '/category/' in href):
+                    absolute_url = urljoin(MAIN_URL, href)
+                    category_links.add(absolute_url)
+
+        # Pattern 2: Shopify standard collection links
+        collection_links = main_page_soup.find_all('a', href=lambda x: x and '/collections/' in x)
+        logging.debug(f"Found {len(collection_links)} collection links")
+
+        for link in tqdm(collection_links, desc="Extracting collection links"):
             href = link.get('href')
             if href:
                 absolute_url = urljoin(MAIN_URL, href)
-                # Filter for category-like URLs
-                if '/products/' in absolute_url or '/collections/' in absolute_url or '/category/' in absolute_url:
+                # Exclude "all" collection and pagination
+                if '/collections/all' not in absolute_url and '?page=' not in absolute_url:
                     category_links.add(absolute_url)
 
-        # Pattern 2: Direct category links
-        category_elements = main_page_soup.select('a[href*="category"], a[href*="collection"], a[href*="products"]')
-        logging.debug(f"Found {len(category_elements)} category-like links")
+        # Pattern 3: Menu/dropdown categories
+        menu_items = main_page_soup.find_all(['li', 'div'], class_=lambda x: x and ('menu-item' in x.lower() or 'nav-item' in x.lower()))
+        for item in menu_items:
+            link = item.find('a')
+            if link:
+                href = link.get('href')
+                if href and ('/collections/' in href or '/category/' in href):
+                    absolute_url = urljoin(MAIN_URL, href)
+                    category_links.add(absolute_url)
 
-        for link in tqdm(category_elements, desc="Extracting category links"):
+        # Pattern 4: Category grid on homepage
+        category_grid = main_page_soup.find_all('a', class_=lambda x: x and ('category' in x.lower() or 'collection' in x.lower()))
+        for link in category_grid:
             href = link.get('href')
-            if href:
+            if href and ('/collections/' in href or '/category/' in href):
                 absolute_url = urljoin(MAIN_URL, href)
                 category_links.add(absolute_url)
 
-        sorted_links = sorted(category_links)
+        # Filter out unwanted URLs
+        filtered_links = set()
+        for url in category_links:
+            # Skip: blog, pages, cart, account, search
+            if not any(x in url.lower() for x in ['/blogs/', '/pages/', '/cart', '/account', '/search', '/contact']):
+                filtered_links.add(url)
+
+        sorted_links = sorted(filtered_links)
         logging.info(f"Found {len(sorted_links)} unique category links")
         return sorted_links
 
