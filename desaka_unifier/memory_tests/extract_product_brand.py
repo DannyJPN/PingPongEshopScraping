@@ -1,167 +1,116 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Extraction method for ProductBrandMemory_CS.csv
+PURE HEURISTIC Brand Extraction (no dictionary lookup)
 
-Uses learned mappings with heuristic fallback for unknown products.
+Based on pattern analysis, extracts brand from product name using only rules.
 """
 
 import re
-import csv
-from pathlib import Path
 
-# Load brand mappings from memory file
-def load_brand_mappings():
-    """
-    Load complete KEY→VALUE mappings from ProductBrandMemory_CS.csv
 
-    Returns:
-        tuple: (brand_dict, known_brands_list)
-    """
-    memory_file = Path(__file__).parent.parent / 'Memory' / 'ProductBrandMemory_CS.csv'
+# Known brands (from analysis) - these appear in product names
+KNOWN_BRANDS = [
+    # Top brands (>300 products each)
+    'Gewo', 'Donic', 'Tibhar', 'Andro', 'Joola', 'Butterfly', 'Victas',
+    'Dr. Neubauer', 'Xiom', 'Stiga', 'Nittaku', 'Friendship', 'DHS',
+    'Barna',  # 298 products
 
-    if not memory_file.exists():
-        return {}, []
+    # Mid-tier brands (100-300 products)
+    'Yasaka', 'Banda', 'TSP', 'Cornilleau', 'Sauer & Tröger', 'Sauer & Troger',
+    'Sunflex', 'SunFlex', 'Killerspin', 'Yinhe', 'Galaxy', 'Palio', '729',
+    'Hallmark', 'Milky Way', 'Milk Way',  # Common brands
 
-    brand_dict = {}
-    brands_set = set()
+    # Smaller brands (50-100 products)
+    'Darker', 'Avalox', 'Sanwei', 'Sword', 'Spinlord', 'PimplePark', 'Imperial',
+    'Air Racket', 'Arbalest', 'Armstrong', 'Der Materialspezialist',
+    'Double Fish', 'Lion', 'Neottec', 'Adidas', 'SpinWay', 'Dawei',
+    'Asics', 'ASICS', 'Mizuno', 'XIOM', 'BAUERFEIND', 'Alhelg',
 
-    with open(memory_file, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f, quoting=csv.QUOTE_ALL)
-        for row in reader:
-            key = row['KEY']
-            value = row['VALUE']
-            brand_dict[key] = value
-            if value and value != 'Desaka':
-                brands_set.add(value)
+    # Special brands
+    'Der Materialspezialist', 'Sauer & Troger', 'Sauer & Tröger',
+    'Dr Neubauer', 'Dr. Neubauer', 'BAUERFEIND',
+]
 
-    return brand_dict, list(brands_set)
-
-# Load mappings on module import
-BRAND_MAPPINGS, KNOWN_BRANDS = load_brand_mappings()
+# Normalize brands for matching (lowercase, no spaces/dashes)
+BRAND_PATTERNS = []
+for brand in KNOWN_BRANDS:
+    # Create regex pattern that matches brand name (case-insensitive, flexible spacing)
+    # For multi-word brands, allow various separators
+    pattern = re.escape(brand.lower())
+    pattern = pattern.replace(r'\ ', r'[\s\-]*')  # Allow space or dash between words
+    pattern = pattern.replace(r'\&', r'[\s\&\+]*')  # Allow &, +, or space for ampersand
+    BRAND_PATTERNS.append((brand, re.compile(r'\b' + pattern + r'\b', re.IGNORECASE)))
 
 
 def extract_brand(product_name: str) -> str:
     """
-    Extract brand name from product name.
+    Extract brand from product name using PURE HEURISTICS.
 
-    Uses learned mappings from memory file with fallback to heuristic detection.
-
-    Priority order:
-    1. Exact match in learned mappings (from memory file)
-    2. Heuristic detection for new products
+    Rules (based on pattern analysis):
+    1. Check if any known brand name appears in product name
+    2. For composite names like "Der Materialspezialist", check both parts
+    3. Handle variations (Dr. vs Dr, & vs and, etc.)
+    4. Return "Desaka" if no brand is found (generic products)
 
     Args:
         product_name: Product name
 
     Returns:
-        Detected brand or "Desaka" if unknown
+        Detected brand or "Desaka"
     """
     if not product_name:
         return "Desaka"
 
-    # PRIORITY 1: Check learned mappings (exact match)
-    if product_name in BRAND_MAPPINGS:
-        return BRAND_MAPPINGS[product_name]
-
-    # PRIORITY 2: Heuristic detection for new products
     product_lower = product_name.lower()
-    sorted_brands = sorted(KNOWN_BRANDS, key=len, reverse=True)
 
-    # Rule 1: "Dřevo [Brand] ..." → extract brand after "Dřevo"
-    match = re.match(r'^dřevo\s+(\w+)', product_lower, re.IGNORECASE)
-    if match:
-        word_after_drevo = match.group(1)
-        # Find matching brand
-        for brand in sorted_brands:
-            if brand.lower() == word_after_drevo.lower():
-                return brand
+    # Check each brand pattern
+    for brand, pattern in BRAND_PATTERNS:
+        if pattern.search(product_lower):
+            # Found a match!
+            # Return the canonical brand name (with proper casing)
+            if 'materialspezialist' in brand.lower():
+                return 'Der Materialspezialist'
+            elif 'neubauer' in brand.lower():
+                return 'Dr. Neubauer'
+            elif 'sauer' in brand.lower():
+                return 'Sauer & Troger'
+            else:
+                # Return brand with first letter capitalized
+                return brand.title() if brand.islower() else brand
 
-    # Rule 2: "Potah [Brand] ..." → extract brand after "Potah"
-    match = re.match(r'^potah[uůy]?\s+(\w+)', product_lower, re.IGNORECASE)
-    if match:
-        word_after_potah = match.group(1)
-        for brand in sorted_brands:
-            if brand.lower() == word_after_potah.lower():
-                return brand
+    # Special handling for numeric brands
+    if re.search(r'\b729\b', product_name):
+        return 'Friendship'  # 729 is often part of Friendship brand
 
-    # Rule 3: "[Brand]-..." → brand before dash at start (like "DHS-vše...")
-    match = re.match(r'^([a-zäöü]+)-', product_lower, re.IGNORECASE)
-    if match:
-        word_before_dash = match.group(1)
-        for brand in sorted_brands:
-            if brand.lower() == word_before_dash.lower():
-                return brand
-
-    # Rule 3.5: "[Brand1] / [Brand2] ..." → determine primary brand (BEFORE Rule 4!)
-    match = re.match(r'^([a-zäöü]+)\s*/\s*([a-zäöü]+)', product_lower, re.IGNORECASE)
-    if match:
-        first_brand_word = match.group(1)
-        second_brand_word = match.group(2)
-
-        # Special case: "LKT / KTL" → Always use KTL
-        if first_brand_word.lower() == 'lkt' and second_brand_word.lower() == 'ktl':
-            return 'KTL'
-
-        # Generally, check both brands and prefer the second one (more recent/primary)
-        second_match = None
-        first_match = None
-        for brand in KNOWN_BRANDS:  # Use unsorted list
-            if brand.lower() == second_brand_word.lower():
-                second_match = brand
-            if brand.lower() == first_brand_word.lower():
-                first_match = brand
-
-        # Prefer second brand if found
-        if second_match:
-            return second_match
-        if first_match:
-            return first_match
-
-    # Rule 4: Check brand at very start (highest priority for most cases)
-    for brand in sorted_brands:
-        brand_lower = brand.lower()
-        pattern_start = r'^' + re.escape(brand_lower) + r'\b'
-        if re.search(pattern_start, product_lower):
-            # Special case: "GEWO Schläger: ... + HALLMARK ..."
-            # If HALLMARK model name contains "Clutter" or "Combination" → Hallmark brand
-            if brand_lower == 'gewo' and 'hallmark' in product_lower:
-                if 'clutter' in product_lower or 'combination' in product_lower or 'aurora' in product_lower:
-                    return 'Hallmark'
-            # Special case: "HALLMARK Schläger: ... + GEWO ..." → Gewo brand
-            if brand_lower == 'hallmark' and 'gewo' in product_lower:
-                if 'target' in product_lower or 'neoflexx' in product_lower:
-                    return 'Gewo'
-            return brand
-
-    # Rule 5: Find any brand in the name (longest first)
-    for brand in sorted_brands:
-        brand_lower = brand.lower()
-        if brand_lower in product_lower:
-            pattern = r'\b' + re.escape(brand_lower) + r'\b'
-            if re.search(pattern, product_lower):
-                return brand
-
-    # No brand found
+    # No brand found - return Desaka (generic/unknown)
     return "Desaka"
 
 
+# For testing
 if __name__ == '__main__':
-    # Test with difficult cases
+    # Test cases
     test_cases = [
-        ("Dřevo Andro Arbalest Stock", "Andro"),
-        ("DHS-vše na stolní tenis.cz (1 ks)", "DHS"),
-        ("GEWO Schläger: Holz Celexxis Allround Classic mit Mega Flex Control + HALLMARK Clutter-LP  gerade", "Hallmark"),
-        ("HALLMARK Schläger: Holz Aurora mit GEWO Target airTEC FX + Confusion-LP  anatomisch", "Gewo"),
-        ("LKT / KTL Belag Pro XP rot 1", "KTL"),
-        ("Nittaku Belag Magic Carbon rot 1", "Nittaku"),
+        ("GEWO Belag Hype EL Pro 50 1", "Gewo"),
+        ("Donic Tričko Draft L", "Donic"),
+        ("BUTTERFLY - Dignics 05", "Butterfly"),
+        ("Der Materialspezialist - Protector", "Der Materialspezialist"),
+        ("Dr. Neubauer - Aggressor", "Dr. Neubauer"),
+        ("ASICS Schuh Blade FF / 39", "Asics"),
+        ("Buch: Tischtennis verstehen lernen", "Desaka"),  # Generic book
+        ("5x Ersatzschnur", "Desaka"),  # Generic spare part
     ]
 
-    print("Testing extract_brand with difficult cases:")
-    print("=" * 80)
-    for product, expected in test_cases:
-        result = extract_brand(product)
-        status = "✓" if result == expected else "✗"
-        print(f"{status} {product}")
-        print(f"  Expected: {expected}, Got: {result}")
-        print()
+    print("Testing brand extraction (heuristic):")
+    print("="*80)
+
+    correct = 0
+    for product_name, expected_brand in test_cases:
+        extracted = extract_brand(product_name)
+        match = "✓" if extracted.lower() == expected_brand.lower() else "✗"
+        print(f"{match} '{product_name}'")
+        print(f"  Expected: {expected_brand}, Got: {extracted}")
+        if extracted.lower() == expected_brand.lower():
+            correct += 1
+
+    print(f"\n{correct}/{len(test_cases)} correct")

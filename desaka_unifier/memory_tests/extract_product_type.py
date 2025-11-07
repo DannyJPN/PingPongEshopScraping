@@ -1,238 +1,228 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Heuristic extraction method for ProductTypeMemory_CS.csv
+PURE HEURISTIC Type Extraction (no dictionary lookup)
 
-Extracts product type (category) from product name using keyword matching.
-Returns Czech product type names.
+Based on pattern analysis, extracts product type using only rules.
 """
 
 import re
-import csv
-from pathlib import Path
 
 
-# Load product type mappings from memory file
-def load_type_mappings():
-    """
-    Load complete KEY→VALUE mappings from ProductTypeMemory_CS.csv
-
-    Returns:
-        dict: Mapping of product names to Czech type names
-    """
-    memory_file = Path(__file__).parent.parent / 'Memory' / 'ProductTypeMemory_CS.csv'
-
-    if not memory_file.exists():
-        return {}
-
-    type_dict = {}
-
-    with open(memory_file, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f, quoting=csv.QUOTE_ALL)
-        for row in reader:
-            type_dict[row['KEY']] = row['VALUE']
-
-    return type_dict
-
-
-# Load mappings on module import
-TYPE_MAPPINGS = load_type_mappings()
-
-# Product type mappings (keywords → Czech type)
+# Type indicators based on pattern analysis
 TYPE_PATTERNS = {
-    # Rubbers (Potah)
+    # Pořadí záleží! Kontrolujeme od nejspecifičtějších k nejobecnějším
+
+    # Rubber (Potah) - 68.5% has "belag", 26% has "potah"
     'Potah': [
-        r'\bbelag\b', r'\brubber\b', r'\bpotah', r'\bpotahu\b',
-        r'\brasanter\b', r'\btenergy\b', r'\brakza\b', r'\bhexer\b',
-        r'\bevo\b', r'\bacuda\b', r'\bvega\b', r'\bmagna\b',
+        (r'\bbelag\b', 100),  # Strong indicator
+        (r'\bpotah\b', 100),  # Strong indicator
+        (r'\b(ox|max)\b.*\d+[,.]?\d*\s*(mm)?', 50),  # Thickness (OX, MAX, 2.0mm)
+        (r'\d+[,.]?\d*\s*mm\b', 40),  # Thickness in mm
     ],
 
-    # Blades (Dřevo)
+    # Blade (Dřevo) - 47.8% has "holz", 38.5% has "dřevo"
     'Dřevo': [
-        r'\bholz\b', r'\bblade\b', r'\bdřevo\b', r'\bdřeva\b',
-        r'\bviscaria\b', r'\btimo\s+boll\b', r'\binner\s*force\b',
-        r'\bfortissimo\b', r'\bprimorac\b',
+        (r'\bholz\b', 100),  # Strong indicator
+        (r'\bdřevo\b', 100),  # Strong indicator
+        (r'\bdrevo\b', 100),  # Slovak variant
+        (r'\b(konkav|gerade|anatomisch)\b', 90),  # Handle shapes
+        (r'\b(off|all|def)[\+\-]?(\b|[\s/])', 70),  # Speed categories (at end or followed by space/slash)
+        (r'\bcarbon\b', 30),  # Often in blade names
+        (r'\bblade\b', 80),  # English name
     ],
 
-    # Shoes (Boty)
+    # Shoes (Boty) - top words: 'schuh', 'boty'
     'Boty': [
-        r'\bschuh\b', r'\bschuhe\b', r'\bshoe\b', r'\bshoes\b',
-        r'\bboty\b', r'\bbota\b', r'\btrainer\b',
+        (r'\b(schuh|schuhe)\b', 100),
+        (r'\bbot[ya]\b', 100),
+        (r'\bshoes?\b', 100),
+        (r'\b(39|40|41|42|43|44|45|46)\b', 50),  # Shoe sizes
+        (r'\bus\s+\d+', 40),  # US sizes
     ],
 
-    # Balls (Míčky)
-    'Míčky': [
-        r'\bball(?!box)\b', r'\bbälle\b', r'\bmíček\b', r'\bmíčky\b',
-        r'\b3[- ]?star\b.*\bball', r'\bnexcel\b', r'\bpremium\b.*\bball',
+    # T-shirt (Tričko) - top words: 'shirt', 'hemd', 't'
+    'Tričko': [
+        (r'\btričko\b', 100),
+        (r'\b(t-?shirt|shirt)\b', 90),
+        (r'\bhemd\b', 90),
+        (r'\bpolo\b', 60),  # Polo shirt
     ],
 
-    # Ball containers (Pouzdro)
-    'Pouzdro': [
-        r'\bballbox\b', r'\bball\s+box\b', r'\bball\s+case\b',
-        r'\bball\s+container\b', r'\bballeimer\b', r'\bpouzdro\b',
-    ],
-
-    # Tables (Stůl)
-    'Stůl': [
-        r'\btisch\b', r'\btable\b', r'\bstůl\b', r'\bstolu\b',
-    ],
-
-    # Nets (Síťka/Síť)
-    'Síťka': [
-        r'\bnetz\b', r'\bnet\b', r'\bsíť\b', r'\bsíťk', r'\bsíťov',
-    ],
-
-    # Clothing - Shirts (Triko)
-    'Triko': [
-        r'\bshirt\b', r'\btriko\b', r'\btričko\b', r'\bdres\b',
-        r'\bjersey\b', r'\btop\b',
-    ],
-
-    # Clothing - Shorts (Kraťasy)
-    'Kraťasy': [
-        r'\bshort\b', r'\bshorts\b', r'\bkraťasy\b', r'\bkraťas',
-    ],
-
-    # Clothing - Pants (Kalhoty)
-    'Kalhoty': [
-        r'\bhose\b', r'\bpants\b', r'\bkalhoty\b', r'\btrousers\b',
-    ],
-
-    # Clothing - Hoodie (Mikina)
-    'Mikina': [
-        r'\bhoodie\b', r'\bmikina\b', r'\bsweatshirt\b', r'\bsweater\b',
-    ],
-
-    # Clothing - Jacket (Bunda)
+    # Jacket (Bunda)
     'Bunda': [
-        r'\bjacke\b', r'\bjacket\b', r'\bbunda\b',
+        (r'\bbunda\b', 100),
+        (r'\bjacke\b', 100),
+        (r'\bjacket\b', 100),
     ],
 
-    # Clothing - Socks (Ponožky)
-    'Ponožky': [
-        r'\bsocken\b', r'\bsocks\b', r'\bponožky\b', r'\bponožek\b',
+    # Shorts (Kraťasy)
+    'Kraťasy': [
+        (r'\bkraťasy\b', 100),
+        (r'\b(short|shorts)\b', 90),
+        (r'\bhose\b', 50),  # German for pants
     ],
 
-    # Accessories - Bag (Taška)
-    'Taška': [
-        r'\btasche\b', r'\bbag\b', r'\btaška\b', r'\btašky\b',
+    # Pants (Kalhoty)
+    'Kalhoty': [
+        (r'\bkalhoty\b', 100),
+        (r'\bhose\b', 70),  # German for pants (careful - overlap with shorts)
+        (r'\bpants\b', 90),
+        (r'\btrousers\b', 90),
     ],
 
-    # Accessories - Edge tape (Ochranná páska)
-    'Ochranná páska': [
-        r'\bkantenband\b', r'\bkantenschutz\b', r'\bedge\s+tape\b',
-        r'\bpáska\b',
+    # Sweatshirt (Mikina) - common word: 'hoodie'
+    'Mikina': [
+        (r'\bmikina\b', 100),
+        (r'\bhoodie\b', 100),
+        (r'\bsweatshirt\b', 100),
     ],
 
-    # Accessories - Glue (Lepidlo)
+    # Balls (Míčky) - common words: 'míčky', '40', 'ks'
+    'Míčky': [
+        (r'\bmíčky\b', 100),
+        (r'\bmíček\b', 100),
+        (r'\b(ball|bälle)\b', 90),
+        (r'\b(40\+|3[\*]+)\b', 60),  # Ball quality (40+, 3***)
+        (r'\bks\b', 20),  # "kusy" (pieces) - weak indicator
+    ],
+
+    # Table (Stůl)
+    'Stůl': [
+        (r'\bstůl\b', 100),
+        (r'\btisch\b', 100),
+        (r'\btable\b', 90),
+        (r'\bvenkovní\b', 50),  # Outdoor table
+        (r'\boutdoor\b', 50),
+    ],
+
+    # Case/Cover (Pouzdro)
+    'Pouzdro': [
+        (r'\bpouzdro\b', 100),
+        (r'\bcase\b', 90),
+        (r'\bhülle\b', 90),
+        (r'\bobal\b', 80),
+    ],
+
+    # Bat/Racket (Pálka) - complete racket
+    'Pálka': [
+        (r'\bpálka\b', 100),
+        (r'\bschläger\b', 90),
+        (r'\bracket\b', 70),
+        (r'\b(mini|midi)\s+(pálka|schläger)', 100),
+    ],
+
+    # Glue (Lepidlo)
     'Lepidlo': [
-        r'\bkleber\b', r'\bglue\b', r'\blepidlo\b',
+        (r'\blepidlo\b', 100),
+        (r'\bkleber\b', 100),
+        (r'\bglue\b', 100),
     ],
 
-    # Accessories - Cleaner (Čistič)
-    'Čistič': [
-        r'\breiniger\b', r'\bcleaner\b', r'\bčistič\b',
+    # Protective tape (Ochranná páska) - common word: 'páska'
+    'Ochranná páska': [
+        (r'\bpáska\b', 90),
+        (r'\btape\b', 80),
+        (r'\b(edge|kant|edge)\s*(tape|páska)', 100),
     ],
 
-    # Accessories - Towel (Ručník)
-    'Ručník': [
-        r'\bhandtuch\b', r'\btowel\b', r'\bručník\b',
+    # Shirt with collar (Koš - actually means polo shirt based on 'polokošile')
+    'Koš': [
+        (r'\bpolokošile\b', 100),
+        (r'\bpolo\b.*\b(košile|shirt)\b', 90),
     ],
 
-    # Accessories - Headband (Čelenka)
-    'Čelenka': [
-        r'\bheadband\b', r'\bstirn\s*band\b', r'\bčelenka\b',
-    ],
-
-    # Accessories - Wristband (Potítko)
-    'Potítko': [
-        r'\bschweißband\b', r'\bwristband\b', r'\bpotítko\b',
-    ],
-
-    # Sets (Sada)
-    'Sada': [
-        r'^\d+er\s+set\b', r'^\d+x\s+set\b', r'\bset\b.*\bset\b',
-        r'\bsada\b', r'\bbalíček\b',
-    ],
-
-    # Trophy (Poháry)
-    'Poháry': [
-        r'\bpokal\b', r'\btrophy\b', r'\btrophies\b', r'\bpohár',
-    ],
-
-    # Chain (Řetízek)
-    'Řetízek': [
-        r'\bkettchen\b', r'\bchain\b', r'\břetízek\b', r'\břetíz',
-    ],
-
-    # Rope (Šňůra)
-    'Šňůra': [
-        r'\bschnur\b', r'\brope\b', r'\bšňůra\b',
+    # Net (Síť/Síťka)
+    'Síť': [
+        (r'\bsíť(ka)?\b', 100),
+        (r'\bnetz\b', 100),
+        (r'\bnet\b', 80),
     ],
 }
 
 
 def extract_type(product_name: str) -> str:
     """
-    Extract product type from product name using pattern matching.
+    Extract product type from product name using PURE HEURISTICS.
 
-    Uses learned mappings from memory file with fallback to heuristic detection.
+    Rules (based on pattern analysis):
+    1. Check specific keywords for each type (ordered by strength)
+    2. Use negative indicators to eliminate impossible types
+    3. Return type with highest score
+    4. Default to "Potah" if ambiguous (most common type)
 
     Args:
-        product_name: Full product name (KEY from memory file)
+        product_name: Product name
 
     Returns:
-        Czech product type name or empty string if not determined
+        Detected product type
     """
     if not product_name:
-        return ""
+        return "Potah"  # Default fallback
 
-    # Check learned mappings first (exact match)
-    if product_name in TYPE_MAPPINGS:
-        return TYPE_MAPPINGS[product_name]
-
-    # Fallback to heuristic pattern matching
     product_lower = product_name.lower()
 
-    # Special case: ASICS shoes
-    if 'asics' in product_lower and 'schuh' in product_lower:
-        return 'Boty'
+    # Calculate scores for each type
+    type_scores = {}
 
-    # Special case: Ball containers (before general ball detection)
-    if re.search(r'\bball\b', product_lower):
-        if re.search(r'\b(box|case|container|eimer)\b', product_lower):
-            return 'Pouzdro'
+    for product_type, patterns in TYPE_PATTERNS.items():
+        score = 0
+        for pattern, weight in patterns:
+            if re.search(pattern, product_lower):
+                score += weight
 
-    # Check each type pattern
-    for czech_type, patterns in TYPE_PATTERNS.items():
-        for pattern in patterns:
-            if re.search(pattern, product_lower, re.IGNORECASE):
-                # Special handling for "Belag" - always Potah, never Dřevo
-                if 'belag' in product_lower and czech_type == 'Dřevo':
-                    continue
-                return czech_type
+        if score > 0:
+            type_scores[product_type] = score
 
-    # No type found
-    return ""
+    # Return type with highest score
+    if type_scores:
+        best_type = max(type_scores, key=type_scores.get)
+        best_score = type_scores[best_type]
+
+        # Require minimum score threshold
+        if best_score >= 50:
+            return best_type
+
+    # Special case: if product has handle shape indicators but no "holz"/"dřevo"
+    # it's still likely a blade
+    if re.search(r'\b(konkav|gerade|anatomisch)\b', product_lower):
+        return "Dřevo"
+
+    # Special case: thickness in mm without other indicators → likely rubber
+    if re.search(r'\d+[,.]?\d*\s*mm\b', product_lower):
+        return "Potah"
+
+    # Default fallback: "Potah" is the most common type (6029 out of 17686 = 34%)
+    return "Potah"
 
 
+# For testing
 if __name__ == '__main__':
-    # Test with sample product names
+    # Test cases
     test_cases = [
-        ("Nittaku Belag Magic Carbon rot 1,5", "Potah"),
-        ("ASICS Schuh Blade FF 2 I grau 39", "Boty"),
-        ("Butterfly Viscaria FL", "Dřevo"),
-        ("Nittaku 3-Star Premium Ball", "Míčky"),
-        ("ANDRO Hoodie Doley grau L", "Mikina"),
-        ("GEWO Ballbox 144", "Pouzdro"),
+        ("GEWO Belag Hype EL Pro 50 1 2.0", "Potah"),
+        ("BUTTERFLY - Dignics 05", "Potah"),
+        ("ANDRO - Gauzy SL OFF", "Dřevo"),
+        ("Arbalest Holz Balsa V konkav", "Dřevo"),
+        ("ASICS Schuh Blade FF / 39", "Boty"),
+        ("Donic Tričko Draft L", "Tričko"),
+        ("BUTTERFLY-Míčky Classic (3 ks)", "Míčky"),
+        ("GEWO Tisch Europa 25", "Stůl"),
+        ("BUTTERFLY-Cell Case II", "Pouzdro"),
+        ("Der Materialspezialist - Spinfire", "Potah"),
+        ("Andro - Timber 5 ALL/S", "Dřevo"),
     ]
 
-    print("Testing extract_type function:")
-    print("=" * 80)
-    for product, expected in test_cases:
-        ptype = extract_type(product)
-        status = "✓" if ptype == expected else "✗"
-        print(f"{status} Product:  {product}")
-        print(f"  Expected: {expected}")
-        print(f"  Got:      {ptype if ptype else '(empty)'}")
-        print()
+    print("Testing type extraction (heuristic):")
+    print("="*80)
+
+    correct = 0
+    for product_name, expected_type in test_cases:
+        extracted = extract_type(product_name)
+        match = "✓" if extracted == expected_type else "✗"
+        print(f"{match} '{product_name}'")
+        print(f"  Expected: {expected_type}, Got: {extracted}")
+        if extracted == expected_type:
+            correct += 1
+
+    print(f"\n{correct}/{len(test_cases)} correct ({100*correct/len(test_cases):.1f}%)")
