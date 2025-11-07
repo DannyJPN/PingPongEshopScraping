@@ -9,12 +9,16 @@ Načte memory soubor obráceně (seskupeno podle VALUE) a umožní:
 - Vyřazení nesprávných KEYs z memory souboru
 """
 
-import csv
 import argparse
 import os
+import sys
 from pathlib import Path
 from collections import defaultdict
 from difflib import SequenceMatcher
+
+# Import existing file operations
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from shared.file_ops import load_csv_file, save_csv_file
 
 # Mapování aliasů na jména souborů
 FILE_ALIASES = {
@@ -59,17 +63,21 @@ def load_memory_file(filepath: Path) -> dict:
     """
     Načte memory soubor a vrátí slovník KEY→VALUE.
 
+    Uses existing load_csv_file from shared.file_ops.
+
     Args:
         filepath: Cesta k memory souboru
 
     Returns:
         Slovník {KEY: VALUE}
     """
+    # Use shared file operations
+    csv_data = load_csv_file(str(filepath))
+
+    # Convert list of dicts to KEY→VALUE dict
     data = {}
-    with open(filepath, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f, quoting=csv.QUOTE_ALL)
-        for row in reader:
-            data[row['KEY']] = row['VALUE']
+    for row in csv_data:
+        data[row['KEY']] = row['VALUE']
 
     return data
 
@@ -221,25 +229,20 @@ def save_memory_file(filepath: Path, data: dict):
     """
     Uloží vyčištěný memory soubor.
 
+    Uses existing save_csv_file from shared.file_ops (with automatic backup).
+
     Args:
         filepath: Cesta k memory souboru
         data: Slovník {KEY: VALUE}
     """
-    # Backup original file
-    backup_path = filepath.with_suffix('.csv.backup')
-    if filepath.exists():
-        import shutil
-        shutil.copy2(filepath, backup_path)
-        print(f"\n✓ Záloha vytvořena: {backup_path.name}")
+    # Convert dict to list of dicts for save_csv_file
+    csv_data = [{'KEY': key, 'VALUE': value} for key, value in sorted(data.items())]
 
-    # Save cleaned file
-    with open(filepath, 'w', encoding='utf-8', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=['KEY', 'VALUE'], quoting=csv.QUOTE_ALL)
-        writer.writeheader()
-        for key, value in sorted(data.items()):
-            writer.writerow({'KEY': key, 'VALUE': value})
+    # Use shared file operations (creates backup automatically)
+    save_csv_file(csv_data, str(filepath))
 
     print(f"✓ Soubor uložen: {filepath.name}")
+    print(f"✓ Záloha vytvořena automaticky")
 
 
 def main():
