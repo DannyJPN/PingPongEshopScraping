@@ -7,6 +7,35 @@ Translates German/English variant names to Czech.
 """
 
 import re
+import csv
+from pathlib import Path
+
+
+# Load variant name mappings from memory file
+def load_variant_mappings():
+    """
+    Load complete KEY→VALUE mappings from VariantNameMemory_CS.csv
+
+    Returns:
+        dict: Mapping of variant names to Czech translations
+    """
+    memory_file = Path(__file__).parent.parent / 'Memory' / 'VariantNameMemory_CS.csv'
+
+    if not memory_file.exists():
+        return {}
+
+    variant_dict = {}
+
+    with open(memory_file, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f, quoting=csv.QUOTE_ALL)
+        for row in reader:
+            variant_dict[row['KEY']] = row['VALUE']
+
+    return variant_dict
+
+
+# Load mappings on module import
+VARIANT_MAPPINGS = load_variant_mappings()
 
 # Variant name translations (German/English → Czech)
 VARIANT_TRANSLATIONS = {
@@ -69,6 +98,8 @@ def extract_variant_name(variant_name: str) -> str:
     """
     Translate variant name from German/English to Czech.
 
+    Uses learned mappings from memory file with fallback to heuristic translation.
+
     Args:
         variant_name: Variant name in any language (KEY from memory file)
 
@@ -78,6 +109,11 @@ def extract_variant_name(variant_name: str) -> str:
     if not variant_name:
         return variant_name
 
+    # Check learned mappings first (exact match)
+    if variant_name in VARIANT_MAPPINGS:
+        return VARIANT_MAPPINGS[variant_name]
+
+    # Fallback to heuristic translation
     variant_lower = variant_name.lower().strip()
 
     # Direct translation lookup

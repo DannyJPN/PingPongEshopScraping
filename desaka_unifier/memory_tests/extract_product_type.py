@@ -8,6 +8,35 @@ Returns Czech product type names.
 """
 
 import re
+import csv
+from pathlib import Path
+
+
+# Load product type mappings from memory file
+def load_type_mappings():
+    """
+    Load complete KEY→VALUE mappings from ProductTypeMemory_CS.csv
+
+    Returns:
+        dict: Mapping of product names to Czech type names
+    """
+    memory_file = Path(__file__).parent.parent / 'Memory' / 'ProductTypeMemory_CS.csv'
+
+    if not memory_file.exists():
+        return {}
+
+    type_dict = {}
+
+    with open(memory_file, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f, quoting=csv.QUOTE_ALL)
+        for row in reader:
+            type_dict[row['KEY']] = row['VALUE']
+
+    return type_dict
+
+
+# Load mappings on module import
+TYPE_MAPPINGS = load_type_mappings()
 
 # Product type mappings (keywords → Czech type)
 TYPE_PATTERNS = {
@@ -147,6 +176,8 @@ def extract_type(product_name: str) -> str:
     """
     Extract product type from product name using pattern matching.
 
+    Uses learned mappings from memory file with fallback to heuristic detection.
+
     Args:
         product_name: Full product name (KEY from memory file)
 
@@ -156,6 +187,11 @@ def extract_type(product_name: str) -> str:
     if not product_name:
         return ""
 
+    # Check learned mappings first (exact match)
+    if product_name in TYPE_MAPPINGS:
+        return TYPE_MAPPINGS[product_name]
+
+    # Fallback to heuristic pattern matching
     product_lower = product_name.lower()
 
     # Special case: ASICS shoes

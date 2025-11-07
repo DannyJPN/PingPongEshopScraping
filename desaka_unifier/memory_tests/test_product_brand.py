@@ -41,7 +41,7 @@ class TestProductBrandExtraction(unittest.TestCase):
         correct = 0
         total = len(self.memory_data)
 
-        for row in self.memory_data:
+        for index, row in enumerate(self.memory_data, start=2):  # start=2 because row 1 is header
             key = row['KEY']
             expected_value = row['VALUE']
 
@@ -53,6 +53,7 @@ class TestProductBrandExtraction(unittest.TestCase):
                 correct += 1
             else:
                 mismatches.append({
+                    'index': index,
                     'key': key,
                     'expected': expected_value,
                     'extracted': extracted_value
@@ -72,15 +73,15 @@ class TestProductBrandExtraction(unittest.TestCase):
         print(f"{'=' * 80}")
 
         if mismatches:
-            print(f"\nFirst 10 mismatches:")
-            for i, mismatch in enumerate(mismatches[:10], 1):
-                print(f"\n{i}. Key: {mismatch['key']}")
-                print(f"   Expected: '{mismatch['expected']}'")
+            print(f"\nFirst 20 mismatches:")
+            for i, mismatch in enumerate(mismatches[:20], 1):
+                print(f"\n{i}. Row #{mismatch['index']}: {mismatch['key']}")
+                print(f"   Expected:  '{mismatch['expected']}'")
                 print(f"   Extracted: '{mismatch['extracted']}'")
 
-        # Test passes if accuracy is above 95%
-        self.assertGreater(accuracy, 95.0,
-                          f"Brand extraction accuracy {accuracy:.2f}% is below 95%")
+        # Test passes only with 100% accuracy
+        self.assertEqual(accuracy, 100.0,
+                        f"Brand extraction accuracy {accuracy:.2f}% - must be 100%. {len(mismatches)} mismatches.")
 
 
 if __name__ == '__main__':

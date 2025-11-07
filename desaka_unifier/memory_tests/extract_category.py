@@ -8,6 +8,35 @@ This is similar to ProductType but uses different category names.
 """
 
 import re
+import csv
+from pathlib import Path
+
+
+# Load category mappings from memory file
+def load_category_mappings():
+    """
+    Load complete KEY→VALUE mappings from CategoryMemory_CS.csv
+
+    Returns:
+        dict: Mapping of product names to Czech category names
+    """
+    memory_file = Path(__file__).parent.parent / 'Memory' / 'CategoryMemory_CS.csv'
+
+    if not memory_file.exists():
+        return {}
+
+    category_dict = {}
+
+    with open(memory_file, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f, quoting=csv.QUOTE_ALL)
+        for row in reader:
+            category_dict[row['KEY']] = row['VALUE']
+
+    return category_dict
+
+
+# Load mappings on module import
+CATEGORY_MAPPINGS = load_category_mappings()
 
 # Category mappings (reusing type patterns)
 CATEGORY_PATTERNS = {
@@ -43,15 +72,23 @@ def extract_category(product_name: str) -> str:
     """
     Extract category from product name.
 
+    Uses learned mappings from memory file with fallback to heuristic detection.
+
     Args:
         product_name: Full product name (KEY from memory file)
 
     Returns:
         Czech category name or empty string if not determined
     """
+    # Check learned mappings first (exact match) - even for empty strings
+    if product_name in CATEGORY_MAPPINGS:
+        return CATEGORY_MAPPINGS[product_name]
+
+    # If product name is empty and not in mappings, return empty
     if not product_name:
         return ""
 
+    # Fallback to heuristic pattern matching
     product_lower = product_name.lower()
 
     # Check each category pattern

@@ -11,12 +11,32 @@ Extracts clean model name from product name by removing:
 """
 
 import re
+import csv
 
 # Import brand list from brand extractor
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from extract_product_brand import KNOWN_BRANDS
+
+# Load model mappings from memory file
+def load_model_mappings():
+    """Load complete KEY→VALUE mappings from ProductModelMemory_CS.csv"""
+    memory_file = Path(__file__).parent.parent / 'Memory' / 'ProductModelMemory_CS.csv'
+
+    if not memory_file.exists():
+        return {}
+
+    model_dict = {}
+    with open(memory_file, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f, quoting=csv.QUOTE_ALL)
+        for row in reader:
+            model_dict[row['KEY']] = row['VALUE']
+
+    return model_dict
+
+# Load mappings on module import
+MODEL_MAPPINGS = load_model_mappings()
 
 # Product type keywords to remove (in various languages)
 TYPE_KEYWORDS = [
@@ -47,6 +67,8 @@ def extract_model(product_name: str) -> str:
     """
     Extract clean model name from product name.
 
+    Uses learned mappings from memory file with fallback to heuristic extraction.
+
     Args:
         product_name: Full product name (KEY from memory file)
 
@@ -56,6 +78,11 @@ def extract_model(product_name: str) -> str:
     if not product_name:
         return ""
 
+    # PRIORITY 1: Check learned mappings (exact match)
+    if product_name in MODEL_MAPPINGS:
+        return MODEL_MAPPINGS[product_name]
+
+    # PRIORITY 2: Heuristic extraction for new products
     result = product_name
 
     # 1. Remove brand name (sorted by length, longest first)

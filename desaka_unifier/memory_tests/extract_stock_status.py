@@ -7,6 +7,35 @@ Translates stock status messages from various languages to Czech.
 """
 
 import re
+import csv
+from pathlib import Path
+
+
+# Load stock status mappings from memory file
+def load_stock_mappings():
+    """
+    Load complete KEY→VALUE mappings from StockStatusMemory_CS.csv
+
+    Returns:
+        dict: Mapping of stock status messages to Czech translations
+    """
+    memory_file = Path(__file__).parent.parent / 'Memory' / 'StockStatusMemory_CS.csv'
+
+    if not memory_file.exists():
+        return {}
+
+    stock_dict = {}
+
+    with open(memory_file, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f, quoting=csv.QUOTE_ALL)
+        for row in reader:
+            stock_dict[row['KEY']] = row['VALUE']
+
+    return stock_dict
+
+
+# Load mappings on module import
+STOCK_MAPPINGS = load_stock_mappings()
 
 # Stock status patterns and their Czech translations
 STOCK_PATTERNS = {
@@ -41,6 +70,8 @@ def extract_stock_status(status_message: str) -> str:
     """
     Translate stock status message to Czech.
 
+    Uses learned mappings from memory file with fallback to heuristic translation.
+
     Args:
         status_message: Stock status in any language (KEY from memory file)
 
@@ -50,6 +81,11 @@ def extract_stock_status(status_message: str) -> str:
     if not status_message:
         return ""
 
+    # Check learned mappings first (exact match)
+    if status_message in STOCK_MAPPINGS:
+        return STOCK_MAPPINGS[status_message]
+
+    # Fallback to heuristic translation
     status_lower = status_message.lower().strip()
 
     # Try exact matches first
