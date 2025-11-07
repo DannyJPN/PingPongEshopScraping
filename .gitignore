@@ -10,5 +10,7 @@ __pycache__/
 *.pyo
 
 # Temporary fix scripts
+fix_*.py
+populate_*.py
 desaka_unifier/fix_*.py
 desaka_unifier/populate_*.py
