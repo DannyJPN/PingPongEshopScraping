@@ -1,5 +1,7 @@
 # Backup files
 *.backup
+*.csv_old
+*-bckp.csv
 
 # Log files
 *.log
@@ -8,6 +10,16 @@
 __pycache__/
 *.pyc
 *.pyo
+
+# Temporary files
+*.tmp.*
+
+# IDE
+.idea/
+
+# Claude local settings
+.claude/settings.local.json
+.claude/*.tmp.*
 
 # Temporary fix scripts
 fix_*.py
