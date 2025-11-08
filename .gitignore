@@ -1,1 +1,28 @@
-﻿__pycache__/
+# Backup files
+*.backup
+*.csv_old
+*-bckp.csv
+
+# Log files
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Temporary files
+*.tmp.*
+
+# IDE
+.idea/
+
+# Claude local settings
+.claude/settings.local.json
+.claude/*.tmp.*
+
+# Temporary fix scripts
+fix_*.py
+populate_*.py
+desaka_unifier/fix_*.py
+desaka_unifier/populate_*.py
