@@ -272,3 +272,23 @@ When working on downloaders, note the shared pattern:
 - Memory files: `[Type]Memory_[Language].csv`
 - Export files: `[EshopName]Output.csv`
 - Logs: Timestamped in `H:/Logs/`
+
+## Git Operations and Dropbox
+
+**CRITICAL**: This repository is in a Dropbox folder. Dropbox locks files in `.git/` directory causing "Permission denied" errors during git operations.
+
+**ALWAYS follow this procedure before git commit/push:**
+
+1. **Stop Dropbox** (use command from `.claude/settings.json`):
+```powershell
+powershell.exe -NoProfile -Command "Stop-Process -Name 'Dropbox' -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2"
+```
+
+2. **Perform git operations** (add, commit, push)
+
+3. **Restart Dropbox** (optional, use command from `.claude/settings.json`):
+```powershell
+powershell.exe -NoProfile -Command "Start-Process -FilePath 'C:\Program Files (x86)\Dropbox\Client\Dropbox.exe'"
+```
+
+All Dropbox management commands are stored in `.claude/settings.json` under `dropboxManagement` section.
