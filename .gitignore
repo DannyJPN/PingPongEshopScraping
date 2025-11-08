@@ -26,3 +26,7 @@ fix_*.py
 populate_*.py
 desaka_unifier/fix_*.py
 desaka_unifier/populate_*.py
+
+# Project-specific temporary files
+MEMORY_COMPLETION_PROMPT.md
+MISSINGDETECTOR.ps1
