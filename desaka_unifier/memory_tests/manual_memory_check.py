@@ -165,6 +165,44 @@ def find_similar_values(values: list, threshold: float = 0.85) -> list:
     return similar_groups
 
 
+def find_similar_keys(deleted_keys: list, all_keys: list, threshold: float = 0.85) -> dict:
+    """
+    Najde podobné KEYs k mazaným KEYs pomocí fuzzy matchingu.
+
+    Args:
+        deleted_keys: Seznam mazaných KEYs
+        all_keys: Seznam všech zbývajících KEYs v memory
+        threshold: Práh podobnosti (0.0-1.0)
+
+    Returns:
+        Slovník {deleted_key: [similar_keys]}
+    """
+    similar_map = {}
+
+    # Progress bar pro mazané klíče
+    with tqdm(total=len(deleted_keys), desc="Hledání podobných KEYs", unit="key") as pbar:
+        for deleted_key in deleted_keys:
+            norm_deleted = normalize_value(deleted_key)
+            similar_keys = []
+
+            # Hledat podobné klíče mezi všemi zbývajícími
+            for key in all_keys:
+                norm_key = normalize_value(key)
+                similarity = SequenceMatcher(None, norm_deleted, norm_key).ratio()
+
+                if similarity >= threshold:
+                    similar_keys.append(key)
+
+            if similar_keys:
+                # Seřadit podobné klíče abecedně
+                similar_keys.sort(key=lambda x: x.lower())
+                similar_map[deleted_key] = similar_keys
+
+            pbar.update(1)
+
+    return similar_map
+
+
 def display_value_group(value: str, keys: list, index: int, total: int) -> int:
     """
     Zobrazí skupinu KEYs pro danou VALUE s optimalizací pro velké skupiny.
@@ -546,6 +584,45 @@ Dostupné aliasy souborů:
                     save_memory_file(filepath, original_data)
                     total_deleted += len(keys_to_remove)
                     print(f"✅ Smazáno {len(keys_to_remove)} KEYs (celkem: {total_deleted})")
+
+                    # Heuristic check for similar keys within the same VALUE
+                    print(f"\n🔍 Hledání podobných KEYs k mazaným klíčům v rámci VALUE '{value}' (práh: {args.threshold})...")
+                    # Only search among remaining keys in the SAME VALUE
+                    remaining_keys_in_value = [k for i, k in enumerate(keys) if i not in indices]
+                    similar_map = find_similar_keys(keys_to_remove, remaining_keys_in_value, args.threshold)
+                    print()  # Blank line after progress bar
+
+                    if similar_map:
+                        print(f"\n⚠️  Nalezeno {len(similar_map)} mazaných KEYs s podobnými klíči:")
+
+                        # Pro každý mazaný klíč zobrazit podobné klíče
+                        for deleted_key, similar_keys in similar_map.items():
+                            print(f"\n{'=' * 80}")
+                            print(f"Mazaný KEY: '{deleted_key}'")
+                            print(f"Podobné KEYs z téže VALUE ({len(similar_keys)}):")
+                            for i, sim_key in enumerate(similar_keys, 1):
+                                print(f"  {i:4d}. {sim_key}")
+
+                            # Zeptat se na smazání podobných klíčů
+                            confirm_similar = input("\n💾 Smazat i tyto podobné KEYs? (y/n, default: y): ").strip().lower()
+
+                            if confirm_similar in ['y', '']:
+                                # Smazat podobné klíče
+                                for sim_key in similar_keys:
+                                    if sim_key in original_data:
+                                        del original_data[sim_key]
+
+                                # Uložit soubor
+                                save_memory_file(filepath, original_data)
+                                total_deleted += len(similar_keys)
+                                print(f"✅ Smazáno {len(similar_keys)} podobných KEYs (celkem: {total_deleted})")
+
+                                # Aktualizovat seznam zbývajících klíčů pro další mazané klíče
+                                remaining_keys_in_value = [k for k in remaining_keys_in_value if k not in similar_keys]
+                            else:
+                                print("❌ Smazání podobných KEYs zrušeno")
+                    else:
+                        print("✓ Žádné podobné KEYs nenalezeny v rámci této VALUE")
                 else:
                     print("❌ Smazání zrušeno pro tuto VALUE")
             else:

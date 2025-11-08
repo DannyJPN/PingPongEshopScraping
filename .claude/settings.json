@@ -35,6 +35,10 @@
       "Bash(sort:*)",
       "Bash(gh issue create:*)",
 
+      "Bash(powershell.exe -NoProfile -Command \"Stop-Process -Name 'Dropbox'*:*)",
+      "Bash(powershell.exe -Command \"Get-Process -Name 'Dropbox'*:*)",
+      "Bash(powershell.exe -NoProfile -Command \"Start-Process -FilePath*Dropbox*:*)",
+
       "Read(//f/tmp/claude/**)",
 
       "WebSearch",
@@ -238,5 +242,12 @@
   "statusLine": {
     "type": "text",
     "text": "Desaka Project"
+  },
+
+  "dropboxManagement": {
+    "stopCommand": "powershell.exe -NoProfile -Command \"Stop-Process -Name 'Dropbox' -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2\"",
+    "startCommand": "powershell.exe -NoProfile -Command \"Start-Process -FilePath 'C:\\Program Files (x86)\\Dropbox\\Client\\Dropbox.exe'\"",
+    "checkCommand": "powershell.exe -Command \"Get-Process -Name 'Dropbox' -ErrorAction SilentlyContinue\"",
+    "note": "Always stop Dropbox BEFORE git operations (add/commit/push) to avoid permission denied errors in .git/objects/"
   }
 }
