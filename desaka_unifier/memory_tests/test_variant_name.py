@@ -68,8 +68,8 @@ class TestVariantNameExtraction(unittest.TestCase):
         print(f"{'=' * 80}")
 
         if mismatches:
-            print(f"\nFirst 20 mismatches:")
-            for i, mismatch in enumerate(mismatches[:20], 1):
+            print(f"\nAll {len(mismatches)} mismatches:")
+            for i, mismatch in enumerate(mismatches, 1):
                 print(f"\n{i}. Row #{mismatch['index']}: {mismatch['key']}")
                 print(f"   Expected:  '{mismatch['expected']}'")
                 print(f"   Extracted: '{mismatch['extracted']}'")

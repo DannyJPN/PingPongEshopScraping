@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 from collections import defaultdict
 from difflib import SequenceMatcher
+from tqdm import tqdm
 
 # Import existing file operations
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -34,6 +35,9 @@ FILE_ALIASES = {
     'desc': 'DescMemory',
     'shortdesc': 'ShortDescMemory',
 }
+
+# Velikost stránky pro zobrazení KEYs
+PAGE_SIZE = 40
 
 
 def get_memory_filepath(alias: str, language: str) -> Path:
@@ -90,11 +94,15 @@ def invert_memory_data(data: dict) -> dict:
         data: Slovník {KEY: VALUE}
 
     Returns:
-        Slovník {VALUE: [KEY1, KEY2, ...]}
+        Slovník {VALUE: [KEY1, KEY2, ...]} - KEYs jsou seřazeny abecedně
     """
     inverted = defaultdict(list)
     for key, value in data.items():
         inverted[value].append(key)
+
+    # Seřadit KEYs pro každou VALUE abecedně (case-insensitive)
+    for value in inverted:
+        inverted[value].sort(key=lambda x: x.lower())
 
     return dict(inverted)
 
@@ -126,28 +134,33 @@ def find_similar_values(values: list, threshold: float = 0.85) -> list:
     similar_groups = []
     processed = set()
 
-    for i, val1 in enumerate(values):
-        if val1 in processed:
-            continue
-
-        group = [val1]
-        norm1 = normalize_value(val1)
-
-        for val2 in values[i+1:]:
-            if val2 in processed:
+    # Progress bar pro vnější smyčku
+    with tqdm(total=len(values), desc="Hledání podobných VALUES", unit="value") as pbar:
+        for i, val1 in enumerate(values):
+            if val1 in processed:
+                pbar.update(1)
                 continue
 
-            norm2 = normalize_value(val2)
-            similarity = SequenceMatcher(None, norm1, norm2).ratio()
+            group = [val1]
+            norm1 = normalize_value(val1)
 
-            if similarity >= threshold:
-                group.append(val2)
-                processed.add(val2)
+            # Vnitřní smyčka bez progress baru (byla by příliš mnoho aktualizací)
+            for val2 in values[i+1:]:
+                if val2 in processed:
+                    continue
 
-        if len(group) > 1:
-            similar_groups.append(group)
+                norm2 = normalize_value(val2)
+                similarity = SequenceMatcher(None, norm1, norm2).ratio()
 
-        processed.add(val1)
+                if similarity >= threshold:
+                    group.append(val2)
+                    processed.add(val2)
+
+            if len(group) > 1:
+                similar_groups.append(group)
+
+            processed.add(val1)
+            pbar.update(1)
 
     return similar_groups
 
@@ -178,15 +191,14 @@ def display_value_group(value: str, keys: list, index: int, total: int) -> int:
         return 1  # Single page
     else:
         # Velká skupina - zobrazit první stránku
-        page_size = 50
-        total_pages = (len(keys) + page_size - 1) // page_size
+        total_pages = (len(keys) + PAGE_SIZE - 1) // PAGE_SIZE
 
         print(f"\n⚠️  Velká skupina ({len(keys)} KEYs, {total_pages} stránek)")
         print("\n--- Stránka 1/{} (KEYs 1-{} z {}) ---".format(
-            total_pages, min(page_size, len(keys)), len(keys)
+            total_pages, min(PAGE_SIZE, len(keys)), len(keys)
         ))
 
-        for i in range(min(page_size, len(keys))):
+        for i in range(min(PAGE_SIZE, len(keys))):
             print(f"  {i+1:4d}. {keys[i]}")
 
         print("\n" + "-" * 80)
@@ -204,7 +216,7 @@ def display_value_group(value: str, keys: list, index: int, total: int) -> int:
         return 1  # Start at page 1
 
 
-def show_keys_page(keys: list, page: int, marked_for_removal: set = None, page_size: int = 50):
+def show_keys_page(keys: list, page: int, marked_for_removal: set = None, page_size: int = PAGE_SIZE):
     """
     Zobrazí stránku KEYs s označením vybraných k vymazání.
 
@@ -212,7 +224,7 @@ def show_keys_page(keys: list, page: int, marked_for_removal: set = None, page_s
         keys: Seznam všech KEYs
         page: Číslo stránky (1-based)
         marked_for_removal: Set indexů označených k vymazání
-        page_size: Počet KEYs na stránku
+        page_size: Počet KEYs na stránku (default: PAGE_SIZE)
     """
     start = (page - 1) * page_size
     end = min(start + page_size, len(keys))
@@ -243,11 +255,11 @@ def search_keys(keys: list, search_text: str):
         return
 
     print(f"\n✓ Nalezeno {len(matches)} KEYs obsahujících '{search_text}':")
-    for i, (idx, key) in enumerate(matches[:50], 1):  # Show max 50
+    for i, (idx, key) in enumerate(matches[:PAGE_SIZE], 1):  # Show max PAGE_SIZE
         print(f"  {idx+1:4d}. {key}")
 
-    if len(matches) > 50:
-        print(f"\n  ... a dalších {len(matches) - 50} KEYs")
+    if len(matches) > PAGE_SIZE:
+        print(f"\n  ... a dalších {len(matches) - PAGE_SIZE} KEYs")
 
 
 def show_stats(keys: list):
@@ -284,8 +296,7 @@ def get_keys_to_remove(keys: list, initial_page: int = 1) -> list:
     Returns:
         Seznam indexů KEYs k vymazání nebo None (quit)
     """
-    page_size = 50
-    total_pages = (len(keys) + page_size - 1) // page_size
+    total_pages = (len(keys) + PAGE_SIZE - 1) // PAGE_SIZE
     current_page = initial_page
     marked_for_removal = set()
 
@@ -329,7 +340,7 @@ def get_keys_to_remove(keys: list, initial_page: int = 1) -> list:
         if response.lower() in ['next', 'n']:
             if current_page < total_pages:
                 current_page += 1
-                show_keys_page(keys, current_page, marked_for_removal, page_size)
+                show_keys_page(keys, current_page, marked_for_removal)
             else:
                 print(f"❌ Již jste na poslední stránce ({total_pages})")
             continue
@@ -337,19 +348,19 @@ def get_keys_to_remove(keys: list, initial_page: int = 1) -> list:
         if response.lower() in ['prev', 'p']:
             if current_page > 1:
                 current_page -= 1
-                show_keys_page(keys, current_page, marked_for_removal, page_size)
+                show_keys_page(keys, current_page, marked_for_removal)
             else:
                 print("❌ Již jste na první stránce")
             continue
 
         if response.lower() == 'first':
             current_page = 1
-            show_keys_page(keys, current_page, marked_for_removal, page_size)
+            show_keys_page(keys, current_page, marked_for_removal)
             continue
 
         if response.lower() == 'last':
             current_page = total_pages
-            show_keys_page(keys, current_page, marked_for_removal, page_size)
+            show_keys_page(keys, current_page, marked_for_removal)
             continue
 
         # Show all
@@ -364,7 +375,7 @@ def get_keys_to_remove(keys: list, initial_page: int = 1) -> list:
         if response.lower().startswith('show page '):
             try:
                 page = int(response.split()[-1])
-                if show_keys_page(keys, page, marked_for_removal, page_size):
+                if show_keys_page(keys, page, marked_for_removal):
                     current_page = page
             except ValueError:
                 print("❌ Chyba: Použijte 'show page N' kde N je číslo stránky")
@@ -483,8 +494,9 @@ Dostupné aliasy souborů:
         print(f"✓ Seskupeno do {len(inverted_data)} jedinečných VALUES")
 
         # Find similar values
-        print(f"\n🔍 Hledám podobné VALUES (práh: {args.threshold})...")
+        print(f"\n🔍 Hledání podobných VALUES (práh podobnosti: {args.threshold})...")
         similar_groups = find_similar_values(list(inverted_data.keys()), args.threshold)
+        print()  # Blank line after progress bar
 
         if similar_groups:
             print(f"\n⚠️  Nalezeno {len(similar_groups)} skupin podobných VALUES:")
@@ -501,8 +513,9 @@ Dostupné aliasy souborů:
         print("=" * 80)
         print("\nProcházejte VALUES a označte KEYs, které nepatří k dané VALUE.")
 
-        keys_to_delete = []
-        values_list = sorted(inverted_data.items(), key=lambda x: (-len(x[1]), x[0]))
+        total_deleted = 0
+        # Seřadit VALUES abecedně (case-insensitive)
+        values_list = sorted(inverted_data.items(), key=lambda x: x[0].lower())
 
         for index, (value, keys) in enumerate(values_list, 1):
             initial_page = display_value_group(value, keys, index, len(values_list))
@@ -512,37 +525,38 @@ Dostupné aliasy souborů:
             if indices is None:
                 # Quit requested
                 print("\n⚠️  Kontrola ukončena uživatelem")
+                print(f"Celkem smazáno: {total_deleted} KEYs")
                 break
 
             if indices:
-                # Mark keys for deletion
-                for i in indices:
-                    keys_to_delete.append(keys[i])
-                print(f"✓ Označeno {len(indices)} KEYs k vymazání")
+                # Show what will be deleted
+                print(f"\n{'=' * 80}")
+                print(f"Označeno {len(indices)} KEYs k vymazání pro VALUE: '{value}'")
 
-        # Apply deletions
-        if keys_to_delete:
-            print(f"\n" + "=" * 80)
-            print(f"SHRNUTÍ ZMĚN")
-            print("=" * 80)
-            print(f"Celkem KEYs k vymazání: {len(keys_to_delete)}")
-            print(f"Původní počet záznamů: {len(original_data)}")
-            print(f"Nový počet záznamů: {len(original_data) - len(keys_to_delete)}")
+                # Ask for confirmation
+                confirm = input("💾 Potvrdit a smazat? (y/n, default: y): ").strip().lower()
 
-            confirm = input("\n💾 Uložit změny? (y/n): ").strip().lower()
+                if confirm in ['y', '']:
+                    # Delete marked keys immediately
+                    keys_to_remove = [keys[i] for i in indices]
+                    for key in keys_to_remove:
+                        del original_data[key]
 
-            if confirm == 'y':
-                # Remove marked keys
-                for key in keys_to_delete:
-                    del original_data[key]
-
-                # Save cleaned file
-                save_memory_file(filepath, original_data)
-                print(f"\n✅ Hotovo! Vymazáno {len(keys_to_delete)} záznamů.")
+                    # Save file immediately
+                    save_memory_file(filepath, original_data)
+                    total_deleted += len(keys_to_remove)
+                    print(f"✅ Smazáno {len(keys_to_remove)} KEYs (celkem: {total_deleted})")
+                else:
+                    print("❌ Smazání zrušeno pro tuto VALUE")
             else:
-                print("\n❌ Změny nebyly uloženy")
-        else:
-            print("\n✓ Žádné změny k uložení")
+                print("✓ Žádné KEYs ke smazání pro tuto VALUE")
+
+        print(f"\n{'=' * 80}")
+        print(f"KONTROLA DOKONČENA")
+        print(f"{'=' * 80}")
+        print(f"Celkem smazáno KEYs: {total_deleted}")
+        print(f"Aktuální počet záznamů: {len(original_data)}")
+        print(f"{'=' * 80}")
 
     except Exception as e:
         print(f"\n❌ Chyba: {e}")
