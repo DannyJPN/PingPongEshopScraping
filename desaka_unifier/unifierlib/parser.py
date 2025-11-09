@@ -555,6 +555,98 @@ class ProductParser:
         else:
             return None, all_matches_list
 
+    def _find_similar_memory_keys(self, product_name: str, memory_dict: Dict[str, str], threshold: float = 0.8) -> List[tuple]:
+        """
+        Find similar keys in memory dictionary using fuzzy matching.
+        This is called when exact key match is not found in memory.
+
+        Args:
+            product_name (str): The product name to search for (KEY)
+            memory_dict (Dict[str, str]): Memory dictionary (KEY -> VALUE)
+            threshold (float): Minimum similarity threshold (0.0-1.0, default: 0.8)
+
+        Returns:
+            List[tuple]: List of (key, value, similarity) tuples sorted by similarity (highest first)
+        """
+        if not product_name or not memory_dict:
+            return []
+
+        def normalize_text(text: str) -> str:
+            """Normalize text for similarity comparison."""
+            return ' '.join(text.lower().split())
+
+        normalized_product_name = normalize_text(product_name)
+        similar_keys = []
+
+        # Search for similar keys in memory
+        for key, value in memory_dict.items():
+            normalized_key = normalize_text(key)
+
+            # Calculate similarity ratio
+            similarity = SequenceMatcher(None, normalized_product_name, normalized_key).ratio()
+
+            # Store if similarity meets threshold
+            if similarity >= threshold:
+                similar_keys.append((key, value, similarity))
+
+        # Sort by similarity (highest first)
+        similar_keys.sort(key=lambda x: x[2], reverse=True)
+
+        return similar_keys
+
+    def _ask_user_for_similar_key_selection(self, property_name: str, product_name: str, similar_keys: List[tuple]) -> Optional[str]:
+        """
+        Ask user to select a value from similar memory keys.
+
+        Args:
+            property_name (str): Name of the property (e.g., "Brand", "Product Type")
+            product_name (str): The product name being processed
+            similar_keys (List[tuple]): List of (key, value, similarity) tuples
+
+        Returns:
+            Optional[str]: Selected value or None if user rejects all options
+        """
+        if not similar_keys:
+            return None
+
+        print("\n" + "=" * 80)
+        print(f"🔍 SIMILAR MEMORY KEYS FOUND FOR {property_name.upper()}")
+        print("=" * 80)
+        print(f"Product: {product_name}")
+        print(f"\nFound {len(similar_keys)} similar key(s) in memory:")
+        print()
+
+        # Display options with numbering
+        for i, (key, value, similarity) in enumerate(similar_keys, 1):
+            similarity_pct = similarity * 100
+            print(f"  {i}. Key: {key}")
+            print(f"     Value: {value}")
+            print(f"     Similarity: {similarity_pct:.1f}%")
+            print()
+
+        print("=" * 80)
+        print("Options:")
+        print("  [1-N]  - Use value from selected key")
+        print("  'none' - Skip all options and continue to heuristic search")
+        print("=" * 80)
+
+        while True:
+            response = input(f"\nSelect option for {property_name}: ").strip()
+
+            if response.lower() == 'none':
+                return None
+
+            try:
+                selection = int(response)
+                if 1 <= selection <= len(similar_keys):
+                    selected_key, selected_value, similarity = similar_keys[selection - 1]
+                    print(f"\n✓ Selected: {selected_value} (from key: {selected_key})")
+                    return selected_value
+                else:
+                    print(f"❌ Invalid selection. Please enter a number between 1 and {len(similar_keys)} or 'none'")
+            except ValueError:
+                print(f"❌ Invalid input. Please enter a number between 1 and {len(similar_keys)} or 'none'")
+
     def _heuristic_extraction(self, downloaded: DownloadedProduct, values: List[str]) -> tuple:
         """
         Perform heuristic extraction on downloaded product.
@@ -624,6 +716,39 @@ class ProductParser:
                 # First standardize the category key, then translate
                 standardized_key = self._standardize_category_by_key(category_key)
                 return self._get_translated_category_name(standardized_key)
+
+        # Try to find similar keys in memory
+        if memory_key in self.memory:
+            category_memory = self.memory[memory_key]
+            similar_keys = self._find_similar_memory_keys(downloaded.name, category_memory, threshold=0.8)
+
+            if similar_keys:
+                # For categories, we need to convert keys to translated category names for display
+                similar_keys_with_translated_names = []
+                for key, category_key_value, similarity in similar_keys:
+                    standardized_key = self._standardize_category_by_key(category_key_value)
+                    translated_name = self._get_translated_category_name(standardized_key)
+                    # Store original category_key_value for saving later
+                    similar_keys_with_translated_names.append((key, translated_name, similarity, category_key_value))
+
+                # Show user the translated category names
+                display_keys = [(key, translated_name, sim) for key, translated_name, sim, _ in similar_keys_with_translated_names]
+                selected_category_name = self._ask_user_for_similar_key_selection("Category", downloaded.name, display_keys)
+
+                if selected_category_name:
+                    # Find the original category_key_value for saving
+                    selected_category_key_value = None
+                    for key, translated_name, similarity, category_key_value in similar_keys_with_translated_names:
+                        if translated_name == selected_category_name:
+                            selected_category_key_value = category_key_value
+                            break
+
+                    if selected_category_key_value:
+                        # Save to memory with current product name as key
+                        self.memory[memory_key][downloaded.name] = selected_category_key_value
+                        self._save_memory_file(memory_key)
+                        # Return the translated category name
+                        return selected_category_name
 
         # Get available category names (translated values from CategoryNameMemory)
         category_name_memory_key = MEMORY_KEY_CATEGORY_NAME_MEMORY.format(language=self.language)
@@ -717,6 +842,22 @@ class ProductParser:
                     return ""
                 return brand if not for_name_composition else self._format_brand_name(brand)
 
+        # Try to find similar keys in memory
+        if memory_key in self.memory:
+            brand_memory = self.memory[memory_key]
+            similar_keys = self._find_similar_memory_keys(downloaded.name, brand_memory, threshold=0.8)
+
+            if similar_keys:
+                selected_brand = self._ask_user_for_similar_key_selection("Brand", downloaded.name, similar_keys)
+                if selected_brand:
+                    # Save to memory with current product name as key
+                    self.memory[memory_key][downloaded.name] = selected_brand
+                    self._save_memory_file(memory_key)
+                    # Handle return based on for_name_composition
+                    if for_name_composition and self._is_desaka_brand(selected_brand):
+                        return ""
+                    return selected_brand if not for_name_composition else self._format_brand_name(selected_brand)
+
         # Try heuristic extraction
         brand_list = list(self.memory.get(MEMORY_KEY_BRAND_CODE_LIST, {}).keys())
 
@@ -785,6 +926,19 @@ class ProductParser:
             if downloaded.name in type_memory:
                 return type_memory[downloaded.name]
 
+        # Try to find similar keys in memory
+        if memory_key in self.memory:
+            type_memory = self.memory[memory_key]
+            similar_keys = self._find_similar_memory_keys(downloaded.name, type_memory, threshold=0.8)
+
+            if similar_keys:
+                selected_type = self._ask_user_for_similar_key_selection("Product Type", downloaded.name, similar_keys)
+                if selected_type:
+                    # Save to memory with current product name as key
+                    self.memory[memory_key][downloaded.name] = selected_type
+                    self._save_memory_file(memory_key)
+                    return selected_type
+
         # Try heuristic extraction
         # Get all existing product types from memory
         all_types = set()
@@ -845,6 +999,19 @@ class ProductParser:
             model_memory = self.memory[memory_key]
             if downloaded.name in model_memory:
                 return model_memory[downloaded.name]
+
+        # Try to find similar keys in memory
+        if memory_key in self.memory:
+            model_memory = self.memory[memory_key]
+            similar_keys = self._find_similar_memory_keys(downloaded.name, model_memory, threshold=0.8)
+
+            if similar_keys:
+                selected_model = self._ask_user_for_similar_key_selection("Product Model", downloaded.name, similar_keys)
+                if selected_model:
+                    # Save to memory with current product name as key
+                    self.memory[memory_key][downloaded.name] = selected_model
+                    self._save_memory_file(memory_key)
+                    return self._format_model_name(selected_model)
 
         # Try heuristic extraction
         # Get all existing product models from memory
