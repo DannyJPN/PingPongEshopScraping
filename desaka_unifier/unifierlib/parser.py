@@ -594,13 +594,13 @@ class ProductParser:
 
         return similar_keys
 
-    def _ask_user_for_similar_key_selection(self, property_name: str, product_name: str, similar_keys: List[tuple]) -> Optional[str]:
+    def _ask_user_for_similar_key_selection(self, property_name: str, search_key: str, similar_keys: List[tuple]) -> Optional[str]:
         """
         Ask user to select a value from similar memory keys.
 
         Args:
-            property_name (str): Name of the property (e.g., "Brand", "Product Type")
-            product_name (str): The product name being processed
+            property_name (str): Name of the property (e.g., "Brand", "Product Type", "Variant Name")
+            search_key (str): The key being searched for (product name, variant name, stock status, etc.)
             similar_keys (List[tuple]): List of (key, value, similarity) tuples
 
         Returns:
@@ -612,7 +612,7 @@ class ProductParser:
         print("\n" + "=" * 80)
         print(f"🔍 SIMILAR MEMORY KEYS FOUND FOR {property_name.upper()}")
         print("=" * 80)
-        print(f"Product: {product_name}")
+        print(f"Searching for: {search_key}")
         print(f"\nFound {len(similar_keys)} similar key(s) in memory:")
         print()
 
