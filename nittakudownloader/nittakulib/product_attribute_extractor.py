@@ -162,6 +162,10 @@ def extract_product_variants(dom_tree):
                 else:
                     option_name = option_name_raw
 
+                # Skip if option name is empty
+                if not option_name:
+                    continue
+
                 # Skip if this is a variant selector (the third selector with select dropdown)
                 select = selector.find('select')
                 if select:
@@ -175,9 +179,24 @@ def extract_product_variants(dom_tree):
                 options = selector.find_all('input', {'type': 'radio'})
                 if options:
                     for option in options:
-                        value = option.get('value')
-                        if value:
-                            variant_dimensions[option_name].append(value)
+                        # Get the option value from the label text, not from the input value attribute
+                        option_id = option.get('id')
+                        if option_id:
+                            # Find the label associated with this input
+                            label = selector.find('label', {'for': option_id})
+                            if label:
+                                # Try to get text from span.block-swatch__item-text first
+                                text_span = label.find('span', class_='block-swatch__item-text')
+                                if text_span:
+                                    value = text_span.get_text(strip=True)
+                                else:
+                                    # Fall back to title attribute or label text
+                                    value = label.get('title', '').strip()
+                                    if not value:
+                                        value = label.get_text(strip=True)
+
+                                if value:
+                                    variant_dimensions[option_name].append(value)
 
         # Get base price and stock information (these are typically the same for all variants)
         base_price = 0
