@@ -555,6 +555,32 @@ class ProductParser:
         else:
             return None, all_matches_list
 
+    def _find_normalized_exact_match(self, search_key: str, memory_dict: Dict[str, str]) -> Optional[str]:
+        """
+        Find exact match in memory after normalizing keys (whitespace normalization).
+        This handles cases where keys differ only in whitespace.
+
+        Args:
+            search_key (str): The key to search for
+            memory_dict (Dict[str, str]): Memory dictionary (KEY -> VALUE)
+
+        Returns:
+            Optional[str]: The value if exact match found after normalization, None otherwise
+        """
+        if not search_key or not memory_dict:
+            return None
+
+        # Normalize search key
+        normalized_search = ' '.join(search_key.lower().split())
+
+        # Search for normalized exact match
+        for key, value in memory_dict.items():
+            normalized_key = ' '.join(key.lower().split())
+            if normalized_search == normalized_key:
+                return value
+
+        return None
+
     def _find_similar_memory_keys(self, product_name: str, memory_dict: Dict[str, str], threshold: float = 0.8) -> List[tuple]:
         """
         Find similar keys in memory dictionary using fuzzy matching.
@@ -717,6 +743,16 @@ class ProductParser:
                 standardized_key = self._standardize_category_by_key(category_key)
                 return self._get_translated_category_name(standardized_key)
 
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_category_key = self._find_normalized_exact_match(downloaded.name, category_memory)
+            if normalized_category_key:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][downloaded.name] = normalized_category_key
+                self._save_memory_file(memory_key)
+                # First standardize the category key, then translate
+                standardized_key = self._standardize_category_by_key(normalized_category_key)
+                return self._get_translated_category_name(standardized_key)
+
         # Try to find similar keys in memory
         if memory_key in self.memory:
             category_memory = self.memory[memory_key]
@@ -835,12 +871,23 @@ class ProductParser:
         memory_key = MEMORY_KEY_PRODUCT_BRAND_MEMORY.format(language=self.language)
         if memory_key in self.memory:
             brand_memory = self.memory[memory_key]
+            # Try exact match first
             if downloaded.name in brand_memory:
                 brand = brand_memory[downloaded.name]
                 # Handle Desaka brand based on for_name_composition parameter
                 if for_name_composition and brand and self._is_desaka_brand(brand):
                     return ""
                 return brand if not for_name_composition else self._format_brand_name(brand)
+
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_brand = self._find_normalized_exact_match(downloaded.name, brand_memory)
+            if normalized_brand:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][downloaded.name] = normalized_brand
+                self._save_memory_file(memory_key)
+                if for_name_composition and normalized_brand and self._is_desaka_brand(normalized_brand):
+                    return ""
+                return normalized_brand if not for_name_composition else self._format_brand_name(normalized_brand)
 
         # Try to find similar keys in memory
         if memory_key in self.memory:
@@ -926,6 +973,14 @@ class ProductParser:
             if downloaded.name in type_memory:
                 return type_memory[downloaded.name]
 
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_type = self._find_normalized_exact_match(downloaded.name, type_memory)
+            if normalized_type:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][downloaded.name] = normalized_type
+                self._save_memory_file(memory_key)
+                return normalized_type
+
         # Try to find similar keys in memory
         if memory_key in self.memory:
             type_memory = self.memory[memory_key]
@@ -999,6 +1054,14 @@ class ProductParser:
             model_memory = self.memory[memory_key]
             if downloaded.name in model_memory:
                 return model_memory[downloaded.name]
+
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_model = self._find_normalized_exact_match(downloaded.name, model_memory)
+            if normalized_model:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][downloaded.name] = normalized_model
+                self._save_memory_file(memory_key)
+                return self._format_model_name(normalized_model)
 
         # Try to find similar keys in memory
         if memory_key in self.memory:
@@ -1456,6 +1519,14 @@ class ProductParser:
             if downloaded.name in desc_memory:
                 return desc_memory[downloaded.name]
 
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_desc = self._find_normalized_exact_match(downloaded.name, desc_memory)
+            if normalized_desc:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][downloaded.name] = normalized_desc
+                self._save_memory_file(memory_key)
+                return normalized_desc
+
         # Try to find similar keys in memory
         if memory_key in self.memory:
             desc_memory = self.memory[memory_key]
@@ -1543,6 +1614,14 @@ class ProductParser:
             if downloaded.name in keywords_memory:
                 return keywords_memory[downloaded.name]
 
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_keywords = self._find_normalized_exact_match(downloaded.name, keywords_memory)
+            if normalized_keywords:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][downloaded.name] = normalized_keywords
+                self._save_memory_file(memory_key)
+                return normalized_keywords
+
         # Try to find similar keys in memory
         if memory_key in self.memory:
             keywords_memory = self.memory[memory_key]
@@ -1593,6 +1672,14 @@ class ProductParser:
             name_memory = self.memory[memory_key]
             if downloaded.name in name_memory:
                 return name_memory[downloaded.name]
+
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_name = self._find_normalized_exact_match(downloaded.name, name_memory)
+            if normalized_name:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][downloaded.name] = normalized_name
+                self._save_memory_file(memory_key)
+                return normalized_name
 
         # Try to find similar keys in memory
         if memory_key in self.memory:
@@ -1707,6 +1794,14 @@ class ProductParser:
             shortdesc_memory = self.memory[memory_key]
             if downloaded.name in shortdesc_memory:
                 return shortdesc_memory[downloaded.name]
+
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_shortdesc = self._find_normalized_exact_match(downloaded.name, shortdesc_memory)
+            if normalized_shortdesc:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][downloaded.name] = normalized_shortdesc
+                self._save_memory_file(memory_key)
+                return normalized_shortdesc
 
         # Try to find similar keys in memory
         if memory_key in self.memory:
@@ -1898,6 +1993,14 @@ class ProductParser:
             if name in name_memory:
                 return name_memory[name]
 
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_variant_name = self._find_normalized_exact_match(name, name_memory)
+            if normalized_variant_name:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][name] = normalized_variant_name
+                self._save_memory_file(memory_key)
+                return normalized_variant_name
+
         # Try to find similar keys in memory
         if memory_key in self.memory:
             name_memory = self.memory[memory_key]
@@ -1949,6 +2052,14 @@ class ProductParser:
             if value in value_memory:
                 return value_memory[value]
 
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_variant_value = self._find_normalized_exact_match(value, value_memory)
+            if normalized_variant_value:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][value] = normalized_variant_value
+                self._save_memory_file(memory_key)
+                return normalized_variant_value
+
         # Try to find similar keys in memory
         if memory_key in self.memory:
             value_memory = self.memory[memory_key]
@@ -1999,6 +2110,14 @@ class ProductParser:
             keywords_memory = self.memory[memory_key]
             if downloaded.name in keywords_memory:
                 return keywords_memory[downloaded.name]
+
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_keywords = self._find_normalized_exact_match(downloaded.name, keywords_memory)
+            if normalized_keywords:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][downloaded.name] = normalized_keywords
+                self._save_memory_file(memory_key)
+                return normalized_keywords
 
         # Try to find similar keys in memory
         if memory_key in self.memory:
@@ -2586,6 +2705,14 @@ class ProductParser:
             stock_status_memory = self.memory[memory_key]
             if stock_status in stock_status_memory:
                 return stock_status_memory[stock_status]
+
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_stock_status = self._find_normalized_exact_match(stock_status, stock_status_memory)
+            if normalized_stock_status:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][stock_status] = normalized_stock_status
+                self._save_memory_file(memory_key)
+                return normalized_stock_status
 
         # Try to find similar keys in memory
         if memory_key in self.memory:
