@@ -10,6 +10,7 @@ import logging
 import os
 import re
 from datetime import datetime
+from difflib import SequenceMatcher
 from tqdm import tqdm
 from unifierlib.export_product import ExportProduct, ExportMainProduct, ExportProductVariant
 from unifierlib.downloaded_product import DownloadedProduct
@@ -471,6 +472,89 @@ class ProductParser:
 
         return matches
 
+    def _heuristic_similarity_search(self, downloaded: DownloadedProduct, values: List[str], threshold: float = 0.8) -> tuple:
+        """
+        Perform similarity-based heuristic search on downloaded product.
+        Uses fuzzy matching (SequenceMatcher) to find similar values.
+        This method is called when exact matching finds no results.
+
+        Args:
+            downloaded (DownloadedProduct): Product to extract from
+            values (List[str]): List of values to search for
+            threshold (float): Minimum similarity threshold (0.0-1.0, default: 0.8)
+
+        Returns:
+            tuple: (Single match if exactly one found or None, List of all matches)
+        """
+        if not values:
+            return None, []
+
+        # Collect all texts to search in (same as _heuristic_extraction)
+        texts = []
+
+        # Add original_name if available
+        if downloaded.name:
+            texts.append(downloaded.name)
+
+        # Add URL if available
+        if downloaded.url:
+            texts.append(downloaded.url)
+
+        # Add desc if available
+        if hasattr(downloaded, 'desc') and downloaded.desc:
+            texts.append(downloaded.desc)
+        elif hasattr(downloaded, 'description') and downloaded.description:
+            texts.append(downloaded.description)
+
+        # Add shortdesc if available
+        if hasattr(downloaded, 'shortdesc') and downloaded.shortdesc:
+            texts.append(downloaded.shortdesc)
+        elif hasattr(downloaded, 'short_description') and downloaded.short_description:
+            texts.append(downloaded.short_description)
+
+        # Normalize texts for comparison
+        def normalize_text(text: str) -> str:
+            """Normalize text for similarity comparison."""
+            return ' '.join(text.lower().split())
+
+        normalized_texts = [normalize_text(text) for text in texts if text]
+
+        # Find similar matches using fuzzy matching
+        similarity_scores = {}  # value -> max_similarity
+
+        for value in values:
+            if not value or not value.strip():
+                continue
+
+            normalized_value = normalize_text(value)
+            max_similarity = 0.0
+
+            # Check similarity against all product texts
+            for text in normalized_texts:
+                # Calculate similarity ratio
+                similarity = SequenceMatcher(None, normalized_value, text).ratio()
+                max_similarity = max(max_similarity, similarity)
+
+                # Also check if the value appears as a substring (partial match)
+                if normalized_value in text or text in normalized_value:
+                    # Boost similarity for substring matches
+                    substring_similarity = len(normalized_value) / max(len(text), len(normalized_value))
+                    max_similarity = max(max_similarity, substring_similarity)
+
+            # Store the maximum similarity for this value
+            if max_similarity >= threshold:
+                similarity_scores[value] = max_similarity
+
+        # Sort matches by similarity (highest first)
+        sorted_matches = sorted(similarity_scores.items(), key=lambda x: x[1], reverse=True)
+        all_matches_list = [match[0] for match in sorted_matches]
+
+        # Return single match if exactly one found, otherwise None and list of all matches
+        if len(all_matches_list) == 1:
+            return all_matches_list[0], all_matches_list
+        else:
+            return None, all_matches_list
+
     def _heuristic_extraction(self, downloaded: DownloadedProduct, values: List[str]) -> tuple:
         """
         Perform heuristic extraction on downloaded product.
@@ -519,6 +603,10 @@ class ProductParser:
 
         # Convert set back to list for consistent ordering
         all_matches_list = list(all_matches)
+
+        # If no exact matches found, try similarity-based search
+        if len(all_matches_list) == 0:
+            return self._heuristic_similarity_search(downloaded, values, threshold=0.8)
 
         # Return single match if exactly one found, otherwise None and list of all matches
         if len(all_matches_list) == 1:
