@@ -620,7 +620,7 @@ class ProductParser:
 
         return similar_keys
 
-    def _ask_user_for_similar_key_selection(self, property_name: str, search_key: str, similar_keys: List[tuple]) -> Optional[str]:
+    def _ask_user_for_similar_key_selection(self, property_name: str, search_key: str, similar_keys: List[tuple], product_url: str = "") -> Optional[str]:
         """
         Ask user to select a value from similar memory keys.
 
@@ -628,6 +628,7 @@ class ProductParser:
             property_name (str): Name of the property (e.g., "Brand", "Product Type", "Variant Name")
             search_key (str): The key being searched for (product name, variant name, stock status, etc.)
             similar_keys (List[tuple]): List of (key, value, similarity) tuples
+            product_url (str): Optional URL of the product being processed
 
         Returns:
             Optional[str]: Selected value or None if user rejects all options
@@ -639,6 +640,8 @@ class ProductParser:
         print(f"🔍 SIMILAR MEMORY KEYS FOUND FOR {property_name.upper()}")
         print("=" * 80)
         print(f"Searching for: {search_key}")
+        if product_url:
+            print(f"Product URL: {product_url}")
         print(f"\nFound {len(similar_keys)} similar key(s) in memory:")
         print()
 
@@ -769,7 +772,7 @@ class ProductParser:
 
                 # Show user the translated category names
                 display_keys = [(key, translated_name, sim) for key, translated_name, sim, _ in similar_keys_with_translated_names]
-                selected_category_name = self._ask_user_for_similar_key_selection("Category", downloaded.name, display_keys)
+                selected_category_name = self._ask_user_for_similar_key_selection("Category", downloaded.name, display_keys, downloaded.url)
 
                 if selected_category_name:
                     # Find the original category_key_value for saving
@@ -895,7 +898,7 @@ class ProductParser:
             similar_keys = self._find_similar_memory_keys(downloaded.name, brand_memory, threshold=0.8)
 
             if similar_keys:
-                selected_brand = self._ask_user_for_similar_key_selection("Brand", downloaded.name, similar_keys)
+                selected_brand = self._ask_user_for_similar_key_selection("Brand", downloaded.name, similar_keys, downloaded.url)
                 if selected_brand:
                     # Save to memory with current product name as key
                     self.memory[memory_key][downloaded.name] = selected_brand
@@ -987,7 +990,7 @@ class ProductParser:
             similar_keys = self._find_similar_memory_keys(downloaded.name, type_memory, threshold=0.8)
 
             if similar_keys:
-                selected_type = self._ask_user_for_similar_key_selection("Product Type", downloaded.name, similar_keys)
+                selected_type = self._ask_user_for_similar_key_selection("Product Type", downloaded.name, similar_keys, downloaded.url)
                 if selected_type:
                     # Save to memory with current product name as key
                     self.memory[memory_key][downloaded.name] = selected_type
@@ -1069,7 +1072,7 @@ class ProductParser:
             similar_keys = self._find_similar_memory_keys(downloaded.name, model_memory, threshold=0.8)
 
             if similar_keys:
-                selected_model = self._ask_user_for_similar_key_selection("Product Model", downloaded.name, similar_keys)
+                selected_model = self._ask_user_for_similar_key_selection("Product Model", downloaded.name, similar_keys, downloaded.url)
                 if selected_model:
                     # Save to memory with current product name as key
                     self.memory[memory_key][downloaded.name] = selected_model
@@ -1533,7 +1536,7 @@ class ProductParser:
             similar_keys = self._find_similar_memory_keys(downloaded.name, desc_memory, threshold=0.8)
 
             if similar_keys:
-                selected_desc = self._ask_user_for_similar_key_selection("Description", downloaded.name, similar_keys)
+                selected_desc = self._ask_user_for_similar_key_selection("Description", downloaded.name, similar_keys, downloaded.url)
                 if selected_desc:
                     # Save to memory with current product name as key
                     self.memory[memory_key][downloaded.name] = selected_desc
@@ -1628,7 +1631,7 @@ class ProductParser:
             similar_keys = self._find_similar_memory_keys(downloaded.name, keywords_memory, threshold=0.8)
 
             if similar_keys:
-                selected_keywords = self._ask_user_for_similar_key_selection("Google Keywords", downloaded.name, similar_keys)
+                selected_keywords = self._ask_user_for_similar_key_selection("Google Keywords", downloaded.name, similar_keys, downloaded.url)
                 if selected_keywords:
                     # Save to memory with current product name as key
                     self.memory[memory_key][downloaded.name] = selected_keywords
@@ -1687,7 +1690,7 @@ class ProductParser:
             similar_keys = self._find_similar_memory_keys(downloaded.name, name_memory, threshold=0.8)
 
             if similar_keys:
-                selected_name = self._ask_user_for_similar_key_selection("Product Name", downloaded.name, similar_keys)
+                selected_name = self._ask_user_for_similar_key_selection("Product Name", downloaded.name, similar_keys, downloaded.url)
                 if selected_name:
                     # Save to memory with current product name as key
                     self.memory[memory_key][downloaded.name] = selected_name
@@ -1809,7 +1812,7 @@ class ProductParser:
             similar_keys = self._find_similar_memory_keys(downloaded.name, shortdesc_memory, threshold=0.8)
 
             if similar_keys:
-                selected_shortdesc = self._ask_user_for_similar_key_selection("Short Description", downloaded.name, similar_keys)
+                selected_shortdesc = self._ask_user_for_similar_key_selection("Short Description", downloaded.name, similar_keys, downloaded.url)
                 if selected_shortdesc:
                     # Save to memory with current product name as key
                     self.memory[memory_key][downloaded.name] = selected_shortdesc
@@ -2007,7 +2010,7 @@ class ProductParser:
             similar_keys = self._find_similar_memory_keys(name, name_memory, threshold=0.8)
 
             if similar_keys:
-                selected_variant_name = self._ask_user_for_similar_key_selection("Variant Name", name, similar_keys)
+                selected_variant_name = self._ask_user_for_similar_key_selection("Variant Name", name, similar_keys, downloaded.url)
                 if selected_variant_name:
                     # Save to memory with current variant name as key
                     self.memory[memory_key][name] = selected_variant_name
@@ -2066,7 +2069,7 @@ class ProductParser:
             similar_keys = self._find_similar_memory_keys(value, value_memory, threshold=0.8)
 
             if similar_keys:
-                selected_variant_value = self._ask_user_for_similar_key_selection("Variant Value", value, similar_keys)
+                selected_variant_value = self._ask_user_for_similar_key_selection("Variant Value", value, similar_keys, downloaded.url)
                 if selected_variant_value:
                     # Save to memory with current variant value as key
                     self.memory[memory_key][value] = selected_variant_value
@@ -2125,7 +2128,7 @@ class ProductParser:
             similar_keys = self._find_similar_memory_keys(downloaded.name, keywords_memory, threshold=0.8)
 
             if similar_keys:
-                selected_keywords = self._ask_user_for_similar_key_selection("Zbozi Keywords", downloaded.name, similar_keys)
+                selected_keywords = self._ask_user_for_similar_key_selection("Zbozi Keywords", downloaded.name, similar_keys, downloaded.url)
                 if selected_keywords:
                     # Save to memory with current product name as key
                     self.memory[memory_key][downloaded.name] = selected_keywords
