@@ -1844,8 +1844,8 @@ class ProductParser:
         price_value = float(repaired.price) if repaired.price else 0.0
         main_product.zobrazit = "1" if price_value > 0 else "0"
 
-        # 10. archiv - fixed "0"
-        main_product.archiv = "0"
+        # 10. archiv - uses default value (0 from ExportMainProduct.__init__)
+        # main_product.archiv = "0"  # Removed: uses default value instead
 
         # 11. kod - from RepairedProduct.code
         main_product.kod = repaired.code
@@ -2063,8 +2063,8 @@ class ProductParser:
         # 9. zobrazit - fixed "#"
         variant_product.zobrazit = "#"
 
-        # 10. archiv - fixed "0"
-        variant_product.archiv = "0"
+        # 10. archiv - uses default value ("#" from ExportProductVariant.__init__)
+        # variant_product.archiv = "0"  # Removed: uses default value instead
 
         # 11. kod - from Variant.variantcode
         if hasattr(variant, 'variantcode') and variant.variantcode:
