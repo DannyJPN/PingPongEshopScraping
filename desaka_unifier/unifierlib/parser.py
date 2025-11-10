@@ -2154,6 +2154,7 @@ class ProductParser:
         variant_product.home = "#"
 
         # 30. dostupnost - fixed "-"
+        # TOCHECK: Verify if "-" is correct value for variant dostupnost
         variant_product.dostupnost = "-"
 
         # 31. doprava_zdarma - fixed "0"
