@@ -30,53 +30,64 @@ class ProductFilter:
     def filter_by_category_and_item_filter(self, repaired_products: List[RepairedProduct]) -> Tuple[List[RepairedProduct], List[RepairedProduct]]:
         """
         Filter products by category "Vyřadit" and ItemFilter rules.
-        
+
         Args:
             repaired_products (List[RepairedProduct]): List of repaired products
-            
+
         Returns:
             Tuple[List[RepairedProduct], List[RepairedProduct]]: (filtered_products, rejected_products)
         """
         filtered_products = []
         rejected_products = []
-        
+
         # Load ItemFilter data
         item_filter_data = self.memory.get('ItemFilter', [])
-        
+
+        # Load EshopList to map URLs to eshop names
+        eshop_list = self.memory.get('EshopList', [])
+        eshop_mapping = {}
+        for row in eshop_list:
+            if isinstance(row, dict) and 'Name' in row and 'URL' in row:
+                eshop_mapping[row['URL'].strip().lower()] = row['Name'].strip()
+
         # Convert to list of allowed combinations
         allowed_combinations = []
         for row in item_filter_data:
-            if isinstance(row, dict) and 'typ_produktu' in row and 'znacka' in row and 'eshop_url' in row:
+            if isinstance(row, dict) and 'typ_produktu' in row and 'znacka' in row and 'eshop_name' in row:
                 allowed_combinations.append({
                     'typ': row['typ_produktu'].strip().lower(),
                     'znacka': row['znacka'].strip().lower(),
-                    'url': row['eshop_url'].strip().lower()
+                    'eshop': row['eshop_name'].strip().lower()
                 })
-        
+
         for product in repaired_products:
             # Check if category is "Vyřadit"
             if product.category and product.category.strip().lower() == "vyřadit":
                 rejected_products.append(product)
                 continue
-                
+
             # Check ItemFilter if we have filter data
             if allowed_combinations:
-                # Extract product type from category (first part before >)
-                product_type = ""
-                if product.category:
-                    category_parts = product.category.split('>')
-                    if category_parts:
-                        product_type = category_parts[0].strip().lower()
-                
+                # Use product.type directly (from ProductTypeMemory)
+                product_type = product.type.strip().lower() if product.type else ""
+
+                # Extract eshop name from product URL using EshopList mapping
+                product_eshop = ""
+                product_url_lower = product.url.strip().lower()
+                for eshop_url, eshop_name in eshop_mapping.items():
+                    if eshop_url in product_url_lower:
+                        product_eshop = eshop_name.strip().lower()
+                        break
+
                 # Check if combination is allowed
                 is_allowed = False
                 for combo in allowed_combinations:
-                    if (combo['typ'] == product_type and 
+                    if (combo['typ'] == product_type and
                         combo['znacka'] == product.brand.strip().lower() and
-                        combo['url'] in product.url.strip().lower()):
+                        combo['eshop'] == product_eshop):
                         is_allowed = True
                         break
-                
+
                 if is_allowed:
                     filtered_products.append(product)
                 else:
@@ -84,7 +95,7 @@ class ProductFilter:
             else:
                 # No filter data, allow all products that are not "Vyřadit"
                 filtered_products.append(product)
-        
+
         return filtered_products, rejected_products
     
     def save_rejected_products_to_wrongs(self, rejected_products: List[RepairedProduct], wrongs_file_path: str = None):
