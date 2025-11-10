@@ -2200,12 +2200,12 @@ class ProductParser:
         # 47. cena_dodavatel - empty
         variant_product.cena_dodavatel = ""
 
-        # 48-52. flags
-        variant_product.eroticke = "0"
-        variant_product.pro_dospele = "0"
-        variant_product.slevovy_kupon = "1"
-        variant_product.darek_objednavka = "1"
-        variant_product.priorita = "0"
+        # 48-52. flags - uses default value "#" (inherited from main product)
+        # variant_product.eroticke = "0"  # Removed: uses default "#"
+        # variant_product.pro_dospele = "0"  # Removed: uses default "#"
+        # variant_product.slevovy_kupon = "1"  # Removed: uses default "#"
+        # variant_product.darek_objednavka = "1"  # Removed: uses default "#"
+        # variant_product.priorita = "0"  # Removed: uses default "#"
 
         # 53-55. poznamka, dodavatel fields - empty
         variant_product.poznamka = ""
