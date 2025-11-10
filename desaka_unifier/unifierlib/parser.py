@@ -400,7 +400,7 @@ class ProductParser:
         # name = from NameMemory or OpenAI
         #repaired.name = self._get_product_name(downloaded)
         # category = from CategoryMemory or OpenAI (needed for code generation)
-       # repaired.category = self._get_category(downloaded)
+        repaired.category = self._get_category(downloaded)
 
         # brand = from ProductBrandMemory or OpenAI (needed for code generation)
         repaired.brand = self._get_brand(downloaded)
@@ -836,7 +836,7 @@ class ProductParser:
         else:
             print("  No matches found in product text")
 
-        user_category = self._ask_user_for_value(f"Enter category for product '{downloaded.name}'")
+        user_category = self._ask_user_for_product_value("category", downloaded)
         if user_category:
             # Find the key for this category value
             category_key = self._find_category_key_by_value(user_category)
