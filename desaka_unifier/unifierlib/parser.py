@@ -1946,9 +1946,9 @@ class ProductParser:
         # 43. zaruka - empty
         main_product.zaruka = ""
 
-        # 44-45. seo fields - empty
-        main_product.seo_titulek = ""
-        main_product.seo_popis = ""
+        # 44-45. seo fields - from RepairedProduct
+        main_product.seo_titulek = repaired.name
+        main_product.seo_popis = repaired.desc
 
         # 46-47. marze_dodavatel, cena_dodavatel - empty
         main_product.marze_dodavatel = ""
@@ -2190,9 +2190,9 @@ class ProductParser:
         # 43. zaruka - empty
         variant_product.zaruka = ""
 
-        # 44-45. seo fields - empty
-        variant_product.seo_titulek = ""
-        variant_product.seo_popis = ""
+        # 44-45. seo fields - uses default value "#" (inherited from main product)
+        # variant_product.seo_titulek = ""  # Removed: uses default "#"
+        # variant_product.seo_popis = ""  # Removed: uses default "#"
 
         # 46-47. marze_dodavatel, cena_dodavatel - empty
         variant_product.marze_dodavatel = ""
