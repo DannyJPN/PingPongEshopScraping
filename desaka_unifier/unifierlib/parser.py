@@ -2092,6 +2092,7 @@ class ProductParser:
         variant_product.vyrobce = "" if repaired.brand and self._is_desaka_brand(repaired.brand) else repaired.brand
 
         # 18-19. cena, cena_bezna - from Variant
+        # TOCHECK: Verify if variant should have price set - might need to inherit from main product instead
         if hasattr(variant, 'current_price'):
             variant_product.cena = float(variant.current_price) if variant.current_price else 0.0
         else:
