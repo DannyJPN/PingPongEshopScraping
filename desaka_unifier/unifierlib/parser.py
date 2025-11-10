@@ -2157,8 +2157,8 @@ class ProductParser:
         # TOCHECK: Verify if "-" is correct value for variant dostupnost
         variant_product.dostupnost = "-"
 
-        # 31. doprava_zdarma - fixed "0"
-        variant_product.doprava_zdarma = "0"
+        # 31. doprava_zdarma - uses default value "#" (not applicable for variants)
+        # variant_product.doprava_zdarma = "0"  # Removed: uses default "#"
 
         # 32-33. dodaci_doba, dodaci_doba_auto
         variant_product.dodaci_doba = " "  # space character
