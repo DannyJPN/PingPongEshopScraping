@@ -1922,9 +1922,11 @@ class ProductParser:
         # 31. doprava_zdarma - "0"
         main_product.doprava_zdarma = "0"
 
-        # 32-33. dodaci_doba, dodaci_doba_auto
+        # 32. dodaci_doba - uses default value "#"
         main_product.dodaci_doba = "#"
-        main_product.dodaci_doba_auto = "1"
+
+        # 33. dodaci_doba_auto - uses default value "1"
+        # main_product.dodaci_doba_auto = "1"  # Removed: uses default "1"
 
         # 34-35. sklad, na_sklade - same as dostupnost
         main_product.sklad = "#" if repaired.Variants else "0"

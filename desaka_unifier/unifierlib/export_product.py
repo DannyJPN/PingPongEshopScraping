@@ -174,7 +174,7 @@ class ExportMainProduct(ExportProduct):
         self.dostupnost = "#"
         self.doprava_zdarma = 0
         self.dodaci_doba = "#"
-        self.dodaci_doba_auto = "#"
+        self.dodaci_doba_auto = "1"
         self.sklad = "#"
         self.na_sklade = "#"
         self.jednotka = "ks"
