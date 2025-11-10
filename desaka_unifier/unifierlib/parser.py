@@ -1875,8 +1875,8 @@ class ProductParser:
         main_product.cena_nakupni = ""
         main_product.recyklacni_poplatek = ""
 
-        # 22. dph - fixed "21"
-        main_product.dph = "21"
+        # 22. dph - based on language (CS=21%, SK=23%)
+        main_product.dph = "23" if self.language == "SK" else "21"
 
         # 23-25. sleva fields - empty
         main_product.sleva = ""
@@ -2108,8 +2108,8 @@ class ProductParser:
         variant_product.cena_nakupni = ""
         variant_product.recyklacni_poplatek = ""
 
-        # 22. dph - fixed "21"
-        variant_product.dph = "21"
+        # 22. dph - based on language (CS=21%, SK=23%)
+        variant_product.dph = "23" if self.language == "SK" else "21"
 
         # 23-25. sleva fields - empty
         variant_product.sleva = ""
