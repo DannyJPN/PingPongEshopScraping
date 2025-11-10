@@ -398,7 +398,7 @@ class ProductParser:
         #repaired.shortdesc = self._get_short_description(downloaded)
 
         # name = from NameMemory or OpenAI
-        #repaired.name = self._get_product_name(downloaded)
+        repaired.name = self._get_product_name(downloaded)
         # category = from CategoryMemory or OpenAI (needed for code generation)
         repaired.category = self._get_category(downloaded)
 

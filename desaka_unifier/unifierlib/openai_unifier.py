@@ -730,6 +730,7 @@ I respectfully ask you to:
 4. Keep it concise and general (not specific model)
 5. Use {target_language} language for the type
 6. Return the result as JSON with the property "type"
+7. Always begin the response with capital letter 
 
 Please return your response as valid JSON only."""
 
