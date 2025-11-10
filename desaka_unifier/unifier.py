@@ -338,13 +338,13 @@ def main():
         product_filter = ProductFilter(memory_data)
         filtered_products, rejected_products = product_filter.process_products_with_filtering(merged_products)
 
-        logging.debug(f"Product filtering completed:")
-        logging.debug(f"  - Merged products: {len(merged_products)}")
-        logging.debug(f"  - Filtered products: {len(filtered_products)}")
-        logging.debug(f"  - Rejected products: {len(rejected_products)}")
+        logging.info(f"Product filtering completed:")
+        logging.info(f"  - Input products: {len(merged_products)}")
+        logging.info(f"  - Filtered (accepted) products: {len(filtered_products)}")
+        logging.info(f"  - Rejected products: {len(rejected_products)}")
 
         if rejected_products:
-            logging.debug(f"Rejected products saved to {WRONGS_FILE}")
+            logging.info(f"Rejected products saved to {WRONGS_FILE}")
 
         # Step 7: Convert filtered RepairedProducts to ExportProducts
         logging.info("Converting filtered RepairedProducts to ExportProducts...")

@@ -9,6 +9,7 @@ import os
 import logging
 from typing import List, Tuple, Dict, Any
 from datetime import datetime
+from tqdm import tqdm
 from .repaired_product import RepairedProduct
 from .constants import WRONGS_FILE
 
@@ -60,7 +61,7 @@ class ProductFilter:
                     'eshop': row['eshop'].strip().lower()
                 })
 
-        for product in repaired_products:
+        for product in tqdm(repaired_products, desc="Filtering products", unit="product"):
             # Check if category is "Vyřadit"
             if product.category and product.category.strip().lower() == "vyřadit":
                 rejected_products.append(product)
