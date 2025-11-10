@@ -2168,8 +2168,12 @@ class ProductParser:
         # 33. dodaci_doba_auto - uses default value "#" (not applicable for variants)
         # variant_product.dodaci_doba_auto = "0"  # Removed: uses default "#"
 
-        # 34-35. sklad, na_sklade - fixed "0"
+        # 34. sklad - fixed "0"
+        # TOCHECK: Verify if variant should have sklad set to "0" or use default "#"
         variant_product.sklad = "0"
+
+        # 35. na_sklade - fixed "0"
+        # TOCHECK: Verify if variant should have na_sklade set to "0" or use default "#"
         variant_product.na_sklade = "0"
 
         # 36-37. hmotnost, delka - empty (not in input)
