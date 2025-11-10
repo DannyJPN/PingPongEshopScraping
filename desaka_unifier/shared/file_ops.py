@@ -1,10 +1,24 @@
 import os
 import logging
 import json
+import time
+import threading
 from datetime import datetime
 from unifierlib.constants import SUPPORTED_LANGUAGES_FILE
 import pandas as pd
 from typing import Optional, List, Dict, Any
+
+# Thread-safe file operation lock
+_file_lock = threading.RLock()
+_file_locks: Dict[str, threading.RLock] = {}
+
+
+def _get_file_lock(file_path: str) -> threading.RLock:
+    """Get or create a lock for a specific file."""
+    with _file_lock:
+        if file_path not in _file_locks:
+            _file_locks[file_path] = threading.RLock()
+        return _file_locks[file_path]
 
 
 def ensure_directory_exists(directory_path: str) -> bool:
@@ -32,6 +46,7 @@ def ensure_directory_exists(directory_path: str) -> bool:
 def load_txt_file(file_path: str) -> List[str]:
     """
     Load a text file and return its content as a list of lines.
+    Thread-safe with file locking.
 
     Args:
         file_path (str): Path to the text file
@@ -39,39 +54,41 @@ def load_txt_file(file_path: str) -> List[str]:
     Returns:
         List[str]: List of lines from the file (stripped of whitespace)
     """
-    try:
-        if not os.path.exists(file_path):
-            error_msg = f"Text file not found: {file_path}"
+    lock = _get_file_lock(file_path)
+    with lock:
+        try:
+            if not os.path.exists(file_path):
+                error_msg = f"Text file not found: {file_path}"
+                logging.error(error_msg)
+                raise FileNotFoundError(error_msg)
+
+            logging.debug(f"Loading text file: {file_path}")
+
+            # Try different encodings
+            encodings_to_try = ['utf-8', 'utf-8-sig', 'utf-16', 'utf-16-le', 'utf-16-be', 'cp1252', 'iso-8859-1', 'windows-1252']
+
+            for encoding in encodings_to_try:
+                try:
+                    logging.debug(f"Trying {encoding} encoding for reading: {file_path}")
+                    with open(file_path, 'r', encoding=encoding) as f:
+                        lines = [line.strip() for line in f.readlines() if line.strip()]
+
+                    logging.info(f"Successfully loaded text file: {file_path} ({len(lines)} lines) using {encoding} encoding")
+                    return lines
+
+                except UnicodeDecodeError:
+                    logging.debug(f"Failed to read with {encoding} encoding, trying next...")
+                    continue
+
+            # If all encodings failed
+            error_msg = f"Failed to read {file_path} with any supported encoding"
             logging.error(error_msg)
-            raise FileNotFoundError(error_msg)
+            raise UnicodeDecodeError(error_msg)
 
-        logging.debug(f"Loading text file: {file_path}")
-
-        # Try different encodings
-        encodings_to_try = ['utf-8', 'utf-8-sig', 'utf-16', 'utf-16-le', 'utf-16-be', 'cp1252', 'iso-8859-1', 'windows-1252']
-
-        for encoding in encodings_to_try:
-            try:
-                logging.debug(f"Trying {encoding} encoding for reading: {file_path}")
-                with open(file_path, 'r', encoding=encoding) as f:
-                    lines = [line.strip() for line in f.readlines() if line.strip()]
-
-                logging.info(f"Successfully loaded text file: {file_path} ({len(lines)} lines) using {encoding} encoding")
-                return lines
-
-            except UnicodeDecodeError:
-                logging.debug(f"Failed to read with {encoding} encoding, trying next...")
-                continue
-
-        # If all encodings failed
-        error_msg = f"Failed to read {file_path} with any supported encoding"
-        logging.error(error_msg)
-        raise UnicodeDecodeError(error_msg)
-
-    except Exception as e:
-        error_msg = f"Error loading text file {file_path}: {str(e)}"
-        logging.error(error_msg, exc_info=True)
-        raise
+        except Exception as e:
+            error_msg = f"Error loading text file {file_path}: {str(e)}"
+            logging.error(error_msg, exc_info=True)
+            raise
 
 
 
@@ -119,75 +136,85 @@ def load_json_file(file_path: str) -> Dict[str, Any]:
 
 
 def load_csv_file(filepath):
-    """Load a CSV file and return its content as a list of dictionaries."""
-    try:
-        # Log the file being loaded
-        logging.debug(f"Attempting to load CSV file: {filepath}")
-        logging.debug(f"Using UTF-8 encoding for reading: {filepath}")
+    """
+    Load a CSV file and return its content as a list of dictionaries.
+    Thread-safe with file locking.
+    """
+    lock = _get_file_lock(filepath)
+    with lock:
+        try:
+            # Log the file being loaded
+            logging.debug(f"Attempting to load CSV file: {filepath}")
+            logging.debug(f"Using UTF-8 encoding for reading: {filepath}")
 
-        # Try different encodings
-        encodings_to_try = ['utf-8', 'utf-8-sig', 'utf-16', 'utf-16-le', 'utf-16-be', 'cp1252', 'iso-8859-1', 'windows-1252']
+            # Try different encodings
+            encodings_to_try = ['utf-8', 'utf-8-sig', 'utf-16', 'utf-16-le', 'utf-16-be', 'cp1252', 'iso-8859-1', 'windows-1252']
 
-        for encoding in encodings_to_try:
-            try:
-                logging.debug(f"Trying {encoding} encoding for reading: {filepath}")
-                df = pd.read_csv(filepath, na_filter=False, encoding=encoding)
+            for encoding in encodings_to_try:
+                try:
+                    logging.debug(f"Trying {encoding} encoding for reading: {filepath}")
+                    df = pd.read_csv(filepath, na_filter=False, encoding=encoding)
 
-                data = df.to_dict(orient='records')
-                logging.debug(f"CSV file loaded successfully: {filepath} ({len(data)} records) using {encoding} encoding")
-                logging.debug(f"First few records: {data[:5]}")
-                return data
+                    data = df.to_dict(orient='records')
+                    logging.debug(f"CSV file loaded successfully: {filepath} ({len(data)} records) using {encoding} encoding")
+                    logging.debug(f"First few records: {data[:5]}")
+                    return data
 
-            except UnicodeDecodeError:
-                logging.debug(f"Failed to read with {encoding} encoding, trying next...")
-                continue
+                except UnicodeDecodeError:
+                    logging.debug(f"Failed to read with {encoding} encoding, trying next...")
+                    continue
 
-        # If all encodings failed
-        logging.error(f"Failed to read {filepath} with any supported encoding")
-        raise UnicodeDecodeError("Failed to decode file with any supported encoding")
+            # If all encodings failed
+            logging.error(f"Failed to read {filepath} with any supported encoding")
+            raise UnicodeDecodeError("Failed to decode file with any supported encoding")
 
-    except pd.errors.EmptyDataError:
-        logging.error(f"CSV file is empty or missing headers: {filepath}")
-        raise
+        except pd.errors.EmptyDataError:
+            logging.error(f"CSV file is empty or missing headers: {filepath}")
+            raise
 
-    except Exception as e:
-        logging.error(f"Error loading CSV file: {filepath}. Error: {str(e)}", exc_info=True)
-        raise
+        except Exception as e:
+            logging.error(f"Error loading CSV file: {filepath}. Error: {str(e)}", exc_info=True)
+            raise
 
 
 def save_csv_file(csv_data, filepath):
-    """Save data to a CSV file in UTF-8 format with backup creation."""
-    try:
-        # Create backup of existing file
-        if os.path.exists(filepath):
-            backup_filepath = f"{filepath}.{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv_old"
-            import shutil
-            shutil.copy(filepath, backup_filepath)
-            logging.debug(f"Backup of the original file created: {backup_filepath}")
+    """
+    Save data to a CSV file in UTF-8 format with backup creation.
+    Thread-safe with file locking.
+    """
+    lock = _get_file_lock(filepath)
+    with lock:
+        try:
+            # Create backup of existing file
+            if os.path.exists(filepath):
+                backup_filepath = f"{filepath}.{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv_old"
+                import shutil
+                shutil.copy(filepath, backup_filepath)
+                logging.debug(f"Backup of the original file created: {backup_filepath}")
 
-        df = pd.DataFrame(csv_data)
+            df = pd.DataFrame(csv_data)
 
-        # Log the first few rows of the DataFrame to verify data integrity
-        logging.debug(f"Data being saved: {df.head()}")
-        logging.debug(f"Saving CSV with UTF-8 encoding to: {filepath}")
+            # Log the first few rows of the DataFrame to verify data integrity
+            logging.debug(f"Data being saved: {df.head()}")
+            logging.debug(f"Saving CSV with UTF-8 encoding to: {filepath}")
 
-        # Save with UTF-8 encoding
-        import csv
-        df.to_csv(filepath, index=False, quotechar='"', quoting=csv.QUOTE_ALL, encoding='utf-8')
-        logging.debug(f"CSV file saved successfully in UTF-8 format: {filepath}")
+            # Save with UTF-8 encoding
+            import csv
+            df.to_csv(filepath, index=False, quotechar='"', quoting=csv.QUOTE_ALL, encoding='utf-8')
+            logging.debug(f"CSV file saved successfully in UTF-8 format: {filepath}")
 
-    except PermissionError as e:
-        logging.error(f"Permission denied while saving file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
-    except OSError as e:
-        logging.error(f"OS error while saving file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
-    except Exception as e:
-        logging.error(f"Error saving CSV file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        except PermissionError as e:
+            logging.error(f"Permission denied while saving file {filepath}. Error: {str(e)}", exc_info=True)
+            import sys
+            sys.exit(1)
+        except OSError as e:
+            logging.error(f"OS error while saving file {filepath}. Error: {str(e)}", exc_info=True)
+            import sys
+            sys.exit(1)
+        except Exception as e:
+            logging.error(f"Error saving CSV file {filepath}. Error: {str(e)}", exc_info=True)
+            import sys
+            sys.exit(1)
 
 
 def save_json_file(data: Dict[str, Any], filepath: str) -> None:
