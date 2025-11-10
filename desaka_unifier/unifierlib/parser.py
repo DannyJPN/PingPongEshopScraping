@@ -1864,6 +1864,7 @@ class ProductParser:
         main_product.privlastek = ""
 
         # 17. vyrobce - from RepairedProduct.brand (empty if Desaka)
+        # TOCHECK: Verify logic for filtering out "Desaka" brand - is this correct behavior?
         main_product.vyrobce = "" if repaired.brand and self._is_desaka_brand(repaired.brand) else repaired.brand
 
         # 18-19. cena, cena_bezna - from RepairedProduct
@@ -2087,6 +2088,7 @@ class ProductParser:
         variant_product.privlastek = ""
 
         # 17. vyrobce - inherited from main product (empty if Desaka)
+        # TOCHECK: Verify logic for filtering out "Desaka" brand - is this correct behavior?
         variant_product.vyrobce = "" if repaired.brand and self._is_desaka_brand(repaired.brand) else repaired.brand
 
         # 18-19. cena, cena_bezna - from Variant
