@@ -1373,6 +1373,31 @@ class ProductParser:
 
         return normalized_brand in desaka_patterns
 
+    def _get_vat_rate(self) -> str:
+        """
+        Get VAT rate based on language/country from VATRateList memory.
+
+        Returns:
+            str: VAT rate as string (e.g., "21", "23"), defaults to "21"
+        """
+        # Get country code from language using supported_languages_data
+        country_code = None
+        if self.supported_languages_data:
+            for lang_entry in self.supported_languages_data:
+                if lang_entry.get('language_code', '').upper() == self.language.upper():
+                    country_code = lang_entry.get('country_code', '').upper()
+                    break
+
+        # If no country code found, use language code as fallback
+        if not country_code:
+            country_code = self.language.upper()
+
+        # Get VAT rate from memory
+        vat_rate_list = self.memory.get('VATRateList', {})
+        vat_rate = vat_rate_list.get(country_code, "21")  # Default to 21%
+
+        return vat_rate
+
     def _get_prices(self, downloaded: DownloadedProduct) -> tuple:
         """Get price and price_standard from variants."""
         if not downloaded.variants:
@@ -1875,8 +1900,8 @@ class ProductParser:
         main_product.cena_nakupni = ""
         main_product.recyklacni_poplatek = ""
 
-        # 22. dph - based on language (CS=21%, SK=23%)
-        main_product.dph = "23" if self.language == "SK" else "21"
+        # 22. dph - from VATRateList memory (based on country)
+        main_product.dph = self._get_vat_rate()
 
         # 23-25. sleva fields - empty
         main_product.sleva = ""
@@ -2108,8 +2133,8 @@ class ProductParser:
         variant_product.cena_nakupni = ""
         variant_product.recyklacni_poplatek = ""
 
-        # 22. dph - based on language (CS=21%, SK=23%)
-        variant_product.dph = "23" if self.language == "SK" else "21"
+        # 22. dph - from VATRateList memory (based on country)
+        variant_product.dph = self._get_vat_rate()
 
         # 23-25. sleva fields - empty
         variant_product.sleva = ""
