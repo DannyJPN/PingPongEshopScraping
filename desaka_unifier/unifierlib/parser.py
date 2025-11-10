@@ -2207,13 +2207,13 @@ class ProductParser:
         # variant_product.darek_objednavka = "1"  # Removed: uses default "#"
         # variant_product.priorita = "0"  # Removed: uses default "#"
 
-        # 53-55. poznamka, dodavatel fields - empty
-        variant_product.poznamka = ""
-        variant_product.dodavatel_id = ""
-        variant_product.dodavatel_kod = ""
+        # 53-55. poznamka, dodavatel fields - uses default value "#" (inherited from main product)
+        # variant_product.poznamka = ""  # Removed: uses default "#"
+        # variant_product.dodavatel_id = ""  # Removed: uses default "#"
+        # variant_product.dodavatel_kod = ""  # Removed: uses default "#"
 
-        # 56. stitky - fixed "#"
-        variant_product.stitky = "#"
+        # 56. stitky - uses default value "#" (inherited from main product)
+        # variant_product.stitky = "#"  # Removed: uses default "#"
 
         # 57. kategorie_id - fixed "#"
         variant_product.kategorie_id = "#"
