@@ -2098,6 +2098,7 @@ class ProductParser:
         else:
             variant_product.cena = 0.0
 
+        # TOCHECK: Verify if variant should have price set - might need to inherit from main product instead
         if hasattr(variant, 'basic_price'):
             variant_product.cena_bezna = float(variant.basic_price) if variant.basic_price else variant_product.cena
         else:
