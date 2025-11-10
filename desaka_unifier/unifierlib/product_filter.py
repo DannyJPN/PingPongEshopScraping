@@ -53,11 +53,11 @@ class ProductFilter:
         # Convert to list of allowed combinations
         allowed_combinations = []
         for row in item_filter_data:
-            if isinstance(row, dict) and 'typ_produktu' in row and 'znacka' in row and 'eshop_name' in row:
+            if isinstance(row, dict) and 'type' in row and 'brand' in row and 'eshop' in row:
                 allowed_combinations.append({
-                    'typ': row['typ_produktu'].strip().lower(),
-                    'znacka': row['znacka'].strip().lower(),
-                    'eshop': row['eshop_name'].strip().lower()
+                    'type': row['type'].strip().lower(),
+                    'brand': row['brand'].strip().lower(),
+                    'eshop': row['eshop'].strip().lower()
                 })
 
         for product in repaired_products:
@@ -82,8 +82,8 @@ class ProductFilter:
                 # Check if combination is allowed
                 is_allowed = False
                 for combo in allowed_combinations:
-                    if (combo['typ'] == product_type and
-                        combo['znacka'] == product.brand.strip().lower() and
+                    if (combo['type'] == product_type and
+                        combo['brand'] == product.brand.strip().lower() and
                         combo['eshop'] == product_eshop):
                         is_allowed = True
                         break
