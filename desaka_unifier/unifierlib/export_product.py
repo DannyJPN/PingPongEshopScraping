@@ -234,7 +234,7 @@ class ExportProductVariant(ExportProduct):
         self.home = "#"
         self.dostupnost = ""
         self.doprava_zdarma = "#"
-        self.dodaci_doba = "#"
+        self.dodaci_doba = ""
         self.dodaci_doba_auto = "#"
         self.sklad = "#"
         self.na_sklade = "#"

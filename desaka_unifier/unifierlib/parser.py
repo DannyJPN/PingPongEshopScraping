@@ -2160,9 +2160,11 @@ class ProductParser:
         # 31. doprava_zdarma - uses default value "#" (not applicable for variants)
         # variant_product.doprava_zdarma = "0"  # Removed: uses default "#"
 
-        # 32-33. dodaci_doba, dodaci_doba_auto
-        variant_product.dodaci_doba = " "  # space character
-        variant_product.dodaci_doba_auto = "0"
+        # 32. dodaci_doba - uses default value "" (empty string for variants)
+        # variant_product.dodaci_doba = " "  # Removed: uses default ""
+
+        # 33. dodaci_doba_auto - uses default value "#" (not applicable for variants)
+        # variant_product.dodaci_doba_auto = "0"  # Removed: uses default "#"
 
         # 34-35. sklad, na_sklade - fixed "0"
         variant_product.sklad = "0"
