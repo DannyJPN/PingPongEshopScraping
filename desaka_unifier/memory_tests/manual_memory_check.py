@@ -120,7 +120,7 @@ def normalize_value(value: str) -> str:
     return ' '.join(value.lower().split())
 
 
-def find_similar_values(values: list, threshold: float = 0.85) -> list:
+def find_similar_values(values: list, threshold: float = 0.8) -> list:
     """
     Najde podobné VALUES pomocí fuzzy matchingu.
 
@@ -165,7 +165,7 @@ def find_similar_values(values: list, threshold: float = 0.85) -> list:
     return similar_groups
 
 
-def find_similar_keys(deleted_keys: list, all_keys: list, threshold: float = 0.85) -> dict:
+def find_similar_keys(deleted_keys: list, all_keys: list, threshold: float = 0.8) -> dict:
     """
     Najde podobné KEYs k mazaným KEYs pomocí fuzzy matchingu.
 
@@ -514,8 +514,8 @@ Dostupné aliasy souborů:
                        help='Alias memory souboru (např. brand, model, type)')
     parser.add_argument('-l', '--language', default='CS',
                        help='Jazyk (CS nebo SK, default: CS)')
-    parser.add_argument('--threshold', type=float, default=0.85,
-                       help='Práh podobnosti pro detekci duplicit (0.0-1.0, default: 0.85)')
+    parser.add_argument('--threshold', type=float, default=0.8,
+                       help='Práh podobnosti pro detekci duplicit (0.0-1.0, default: 0.8)')
 
     args = parser.parse_args()
 
