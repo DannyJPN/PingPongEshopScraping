@@ -2102,19 +2102,21 @@ class ProductParser:
         # 12. kod_vyrobku - empty
         variant_product.kod_vyrobku = ""
 
-        # 13-14. ean, isbn - empty
+        # 13. ean - empty (variant has "" as default, so OK to keep)
         variant_product.ean = ""
-        variant_product.isbn = ""
 
-        # 15. nazev - inherited from main product
-        variant_product.nazev = repaired.name
+        # 14. isbn - uses default value "#" (not applicable for variants)
+        # variant_product.isbn = ""  # Removed: uses default "#"
 
-        # 16. privlastek - empty
-        variant_product.privlastek = ""
+        # 15. nazev - uses default value "#" (not applicable for variants)
+        # variant_product.nazev = repaired.name  # Removed: uses default "#"
 
-        # 17. vyrobce - inherited from main product (empty if Desaka)
+        # 16. privlastek - uses default value "#" (not applicable for variants)
+        # variant_product.privlastek = ""  # Removed: uses default "#"
+
+        # 17. vyrobce - uses default value "#" (not applicable for variants)
         # TOCHECK: Verify logic for filtering out "Desaka" brand - is this correct behavior?
-        variant_product.vyrobce = "" if repaired.brand and self._is_desaka_brand(repaired.brand) else repaired.brand
+        # variant_product.vyrobce = "" if repaired.brand and self._is_desaka_brand(repaired.brand) else repaired.brand  # Removed: uses default "#"
 
         # 18-19. cena, cena_bezna - from Variant
         # TOCHECK: Verify if variant should have price set - might need to inherit from main product instead
@@ -2129,21 +2131,23 @@ class ProductParser:
         else:
             variant_product.cena_bezna = variant_product.cena
 
-        # 20-21. cena_nakupni, recyklacni_poplatek - empty
+        # 20. cena_nakupni - empty (variant has "" as default, so OK to keep)
         variant_product.cena_nakupni = ""
-        variant_product.recyklacni_poplatek = ""
+
+        # 21. recyklacni_poplatek - uses default value "#" (not applicable for variants)
+        # variant_product.recyklacni_poplatek = ""  # Removed: uses default "#"
 
         # 22. dph - from VATRateList memory (based on country)
         variant_product.dph = self._get_vat_rate()
 
-        # 23-25. sleva fields - empty
-        variant_product.sleva = ""
-        variant_product.sleva_od = ""
-        variant_product.sleva_do = ""
+        # 23-25. sleva fields - use default value "#" (not applicable for variants)
+        # variant_product.sleva = ""  # Removed: uses default "#"
+        # variant_product.sleva_od = ""  # Removed: uses default "#"
+        # variant_product.sleva_do = ""  # Removed: uses default "#"
 
-        # 26-27. popis, popis_strucny - inherited from main product
-        variant_product.popis = repaired.desc
-        variant_product.popis_strucny = repaired.shortdesc
+        # 26-27. popis, popis_strucny - uses default value "#" (not applicable for variants)
+        # variant_product.popis = repaired.desc  # Removed: uses default "#"
+        # variant_product.popis_strucny = repaired.shortdesc  # Removed: uses default "#"
 
         # 28-29. kosik, home - fixed "#"
         variant_product.kosik = "#"
