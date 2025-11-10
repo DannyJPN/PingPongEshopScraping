@@ -2194,8 +2194,10 @@ class ProductParser:
         # variant_product.seo_titulek = ""  # Removed: uses default "#"
         # variant_product.seo_popis = ""  # Removed: uses default "#"
 
-        # 46-47. marze_dodavatel, cena_dodavatel - empty
-        variant_product.marze_dodavatel = ""
+        # 46. marze_dodavatel - uses default value "#" (inherited from main product)
+        # variant_product.marze_dodavatel = ""  # Removed: uses default "#"
+
+        # 47. cena_dodavatel - empty
         variant_product.cena_dodavatel = ""
 
         # 48-52. flags
