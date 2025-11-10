@@ -98,7 +98,54 @@ class ProductFilter:
                 filtered_products.append(product)
 
         return filtered_products, rejected_products
-    
+
+    def filter_by_wrongs(self, repaired_products: List[RepairedProduct], wrongs_file_path: str = None) -> Tuple[List[RepairedProduct], List[RepairedProduct]]:
+        """
+        Filter products by checking against Wrongs.txt file.
+        Products with names matching entries in Wrongs.txt will be rejected.
+
+        Args:
+            repaired_products (List[RepairedProduct]): List of repaired products
+            wrongs_file_path (str): Path to Wrongs.txt file (default: Memory/Wrongs.txt)
+
+        Returns:
+            Tuple[List[RepairedProduct], List[RepairedProduct]]: (filtered_products, rejected_products)
+        """
+        filtered_products = []
+        rejected_products = []
+
+        # Determine Wrongs.txt path
+        if wrongs_file_path is None:
+            script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            wrongs_file_path = os.path.join(script_dir, "Memory", WRONGS_FILE)
+
+        # Load wrongs list (lowercase product names to reject)
+        wrongs_set = set()
+        try:
+            if os.path.exists(wrongs_file_path):
+                with open(wrongs_file_path, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        # Strip whitespace and get lowercase name
+                        wrong_name = line.strip().lower()
+                        if wrong_name:
+                            wrongs_set.add(wrong_name)
+                logging.debug(f"Loaded {len(wrongs_set)} entries from {WRONGS_FILE}")
+            else:
+                logging.warning(f"{WRONGS_FILE} not found at {wrongs_file_path}, skipping Wrongs filter")
+        except Exception as e:
+            logging.error(f"Error loading {WRONGS_FILE}: {str(e)}")
+
+        # Filter products against wrongs list
+        for product in tqdm(repaired_products, desc="Filtering by Wrongs", unit="product"):
+            product_name_lower = product.name.strip().lower() if product.name else ""
+
+            if product_name_lower in wrongs_set:
+                rejected_products.append(product)
+            else:
+                filtered_products.append(product)
+
+        return filtered_products, rejected_products
+
     def save_rejected_products_to_wrongs(self, rejected_products: List[RepairedProduct], wrongs_file_path: str = None):
         """
         Save rejected products to Wrongs.txt file.
