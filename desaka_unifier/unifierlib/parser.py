@@ -1684,6 +1684,38 @@ class ProductParser:
                 self._save_memory_file(memory_key)
                 return normalized_name
 
+        # Check if Type+Brand+Model exist in their respective memory files
+        type_memory_key = MEMORY_KEY_PRODUCT_TYPE_MEMORY.format(language=self.language)
+        brand_memory_key = MEMORY_KEY_PRODUCT_BRAND_MEMORY.format(language=self.language)
+        model_memory_key = MEMORY_KEY_PRODUCT_MODEL_MEMORY.format(language=self.language)
+
+        has_type = (type_memory_key in self.memory and
+                   downloaded.name in self.memory[type_memory_key])
+        has_brand = (brand_memory_key in self.memory and
+                    downloaded.name in self.memory[brand_memory_key])
+        has_model = (model_memory_key in self.memory and
+                    downloaded.name in self.memory[model_memory_key])
+
+        # If all three exist, compose name from them directly (skip heuristic similarity search)
+        if has_type and has_brand and has_model:
+            product_type = self.memory[type_memory_key][downloaded.name]
+            product_brand = self._format_brand_name(self.memory[brand_memory_key][downloaded.name])
+            product_model = self._format_model_name(self.memory[model_memory_key][downloaded.name])
+
+            # Format: type brand model (skip brand if empty)
+            if product_brand and product_brand.strip():
+                formatted_name = f"{product_type} {product_brand} {product_model}".strip()
+            else:
+                formatted_name = f"{product_type} {product_model}".strip()
+
+            # Save to memory
+            if memory_key not in self.memory:
+                self.memory[memory_key] = {}
+            self.memory[memory_key][downloaded.name] = formatted_name
+            self._save_memory_file(memory_key)
+
+            return formatted_name
+
         # Try to find similar keys in memory
         if memory_key in self.memory:
             name_memory = self.memory[memory_key]
