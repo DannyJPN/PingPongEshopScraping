@@ -187,6 +187,108 @@ Zadejte příkaz: none
 ✓ Označeno 15 KEYs k vymazání
 ```
 
+## Automatické filtrování memory souborů
+
+Skript `filter_memory.py` provádí automatické kaskádové čištění memory souborů podle definovaných pravidel:
+
+### Funkce
+
+Skript postupně aplikuje následující filtry:
+
+1. **Hierarchicky neúplné kategorie** - odstraní kategorie, které jsou podstringem jiných (např. "Potahy" pokud existuje "Potahy>Softy")
+2. **CategoryMemory čištění** - vyřadí záznamy s neúplnými kategoriemi
+3. **Neznámé značky** - odstraní z ProductBrandMemory značky, které nejsou v BrandCodeList
+4. **Značky v typech a modelech** - vyřadí záznamy obsahující názvy značek
+5. **Modely v typech** - odstraní typy obsahující celou hodnotu nějakého modelu
+6. **Slova typů v modelech** - vyřadí modely obsahující slova z typů (děleno mezerou a pomlčkou)
+7. **Variantní hodnoty v modelech** - odstraní modely obsahující VariantValue delší než 2 znaky
+8. **Nepovolené znaky** - vyřadí záznamy s nepoužívanými znaky (ü, ß, ľ, atd.)
+9. **NameMemory čištění** - odstraní záznamy, které nemají klíč ve všech třech souborech (Type, Brand, Model)
+
+### Použití
+
+```bash
+cd desaka_unifier/memory_tests
+
+# Suchý běh - pouze zobrazí statistiky, neuloží změny
+python3 filter_memory.py --language CS --dry-run
+
+# Živý běh - aplikuje změny a uloží soubory
+python3 filter_memory.py --language CS
+
+# Pro slovenštinu
+python3 filter_memory.py --language SK
+```
+
+### Příklad výstupu
+
+```bash
+$ python3 filter_memory.py --language CS --dry-run
+
+⚠️  SUCHÝ BĚH - změny nebudou uloženy
+
+================================================================================
+FILTROVÁNÍ MEMORY SOUBORŮ - CS
+================================================================================
+
+================================================================================
+KROK 1: Načítání CategoryNameMemory
+================================================================================
+✓ Načteno 58 záznamů z CategoryNameMemory
+
+🔍 Hledání hierarchicky neúplných kategorií...
+Kontrola kategorií: 100%|██████████| 58/58 [00:00<00:00]
+
+📊 Nalezeno 9 hierarchicky neúplných kategorií
+
+================================================================================
+KROK 2: Čištění CategoryMemory
+================================================================================
+✓ Načteno 9431 záznamů z CategoryMemory
+
+🧹 Čištění CategoryMemory od neúplných kategorií...
+Filtrování CategoryMemory: 100%|██████████| 9431/9431 [00:00<00:00]
+   ❌ Odstraněno: 4 záznamů
+   ✓ Zbývá: 9427 záznamů
+
+[... další kroky ...]
+
+================================================================================
+SHRNUTÍ FILTROVÁNÍ
+================================================================================
+
+Jazyk: CS
+Režim: SUCHÝ BĚH (změny neuloženy)
+
+Výsledný počet záznamů:
+  • CategoryMemory:          9,427 záznamů
+  • ProductBrandMemory:     22,201 záznamů
+  • ProductTypeMemory:      13,754 záznamů
+  • ProductModelMemory:     19,681 záznamů
+  • VariantNameMemory:          73 záznamů
+  • VariantValueMemory:      3,208 záznamů
+  • NameMemory:                 50 záznamů
+
+⚠️  Suchý běh dokončen - žádné změny nebyly provedeny
+💡 Spusťte bez --dry-run pro aplikování změn
+================================================================================
+```
+
+### Bezpečnostní funkce
+
+- **Dry-run režim** - testovací běh bez uložení změn
+- **Automatické zálohy** - před každým uložením se vytvoří záloha (`.csv_old` s timestampem)
+- **Progress bary** - vizuální indikace průběhu pro každý krok
+- **Detailní reporty** - počet odstraněných a zbývajících záznamů pro každý filtr
+- **Kaskádové filtrování** - každý filtr pracuje s výsledky předchozích filtrů
+
+### Kdy použít
+
+- **Po bulk importu** - vyčistit nově importovaná data
+- **Pravidelná údržba** - odstranit nahromadděné nekvalitní záznamy
+- **Před exportem** - zajistit konzistenci dat
+- **Po změnách BrandCodeList** - synchronizovat memory soubory se seznamem značek
+
 ## Architektura extraction metod
 
 Všechny extraction metody používají stejný vzor:
@@ -226,11 +328,12 @@ Všechny unit testy vyžadují:
 ## Workflow pro údržbu memory souborů
 
 1. **Automatická populace**: Použít populate scripts pro načtení nových produktů
-2. **Unit testy**: Spustit testy pro ověření 100% přesnosti
-3. **Manuální kontrola**: Použít `manual_memory_check.py` pro kontrolu kvality
-4. **Čištění**: Vyřadit nesprávné KEYs identifikované během kontroly
-5. **Re-test**: Znovu spustit testy pro ověření
-6. **Commit**: Commitnout vyčištěné memory soubory
+2. **Automatické filtrování**: Spustit `filter_memory.py --dry-run` pro zjištění rozsahu čištění, pak `filter_memory.py` pro aplikaci
+3. **Unit testy**: Spustit testy pro ověření 100% přesnosti
+4. **Manuální kontrola**: Použít `manual_memory_check.py` pro kontrolu kvality a detekci duplicit
+5. **Čištění**: Vyřadit nesprávné KEYs identifikované během manuální kontroly
+6. **Re-test**: Znovu spustit testy pro ověření
+7. **Commit**: Commitnout vyčištěné memory soubory
 
 ## Zbývající implementace
 
