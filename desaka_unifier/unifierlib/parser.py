@@ -1853,7 +1853,30 @@ class ProductParser:
 
         # Use OpenAI for translation and validation (or generation from description)
         if self.openai:
-            shortdesc = self.openai.translate_and_validate_short_description(downloaded.short_description, self.language, downloaded.description)
+            # Try to get product context from memory (if already determined)
+            product_type = None
+            product_brand = None
+            product_model = None
+
+            type_memory_key = MEMORY_KEY_PRODUCT_TYPE_MEMORY.format(language=self.language)
+            brand_memory_key = MEMORY_KEY_PRODUCT_BRAND_MEMORY.format(language=self.language)
+            model_memory_key = MEMORY_KEY_PRODUCT_MODEL_MEMORY.format(language=self.language)
+
+            if type_memory_key in self.memory and downloaded.name in self.memory[type_memory_key]:
+                product_type = self.memory[type_memory_key][downloaded.name]
+            if brand_memory_key in self.memory and downloaded.name in self.memory[brand_memory_key]:
+                product_brand = self.memory[brand_memory_key][downloaded.name]
+            if model_memory_key in self.memory and downloaded.name in self.memory[model_memory_key]:
+                product_model = self.memory[model_memory_key][downloaded.name]
+
+            shortdesc = self.openai.translate_and_validate_short_description(
+                downloaded.short_description,
+                self.language,
+                downloaded.description,
+                product_type,
+                product_brand,
+                product_model
+            )
             if shortdesc:
                 # Determine current value for confirmation display
                 current_value = downloaded.short_description if downloaded.short_description else "(generated from description)"
