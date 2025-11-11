@@ -7,10 +7,12 @@ including category rules and ItemFilter configurations.
 
 import os
 import logging
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Optional
 from datetime import datetime
+from tqdm import tqdm
 from .repaired_product import RepairedProduct
 from .constants import WRONGS_FILE
+from shared.file_ops import load_txt_file
 
 
 class ProductFilter:
@@ -30,53 +32,84 @@ class ProductFilter:
     def filter_by_category_and_item_filter(self, repaired_products: List[RepairedProduct]) -> Tuple[List[RepairedProduct], List[RepairedProduct]]:
         """
         Filter products by category "Vyřadit" and ItemFilter rules.
-        
+
         Args:
             repaired_products (List[RepairedProduct]): List of repaired products
-            
+
         Returns:
             Tuple[List[RepairedProduct], List[RepairedProduct]]: (filtered_products, rejected_products)
         """
         filtered_products = []
         rejected_products = []
-        
+
         # Load ItemFilter data
         item_filter_data = self.memory.get('ItemFilter', [])
-        
+
+        # Load EshopList to map URLs to eshop names
+        eshop_list = self.memory.get('EshopList', [])
+        eshop_mapping = {}
+        for row in eshop_list:
+            if isinstance(row, dict) and 'Name' in row and 'URL' in row:
+                eshop_mapping[row['URL'].strip().lower()] = row['Name'].strip()
+
         # Convert to list of allowed combinations
         allowed_combinations = []
         for row in item_filter_data:
-            if isinstance(row, dict) and 'typ_produktu' in row and 'znacka' in row and 'eshop_url' in row:
+            if isinstance(row, dict) and 'type' in row and 'brand' in row and 'eshop' in row:
                 allowed_combinations.append({
-                    'typ': row['typ_produktu'].strip().lower(),
-                    'znacka': row['znacka'].strip().lower(),
-                    'url': row['eshop_url'].strip().lower()
+                    'type': row['type'].strip().lower(),
+                    'brand': row['brand'].strip().lower(),
+                    'eshop': row['eshop'].strip().lower()
                 })
-        
-        for product in repaired_products:
+
+        for product in tqdm(repaired_products, desc="Filtering products", unit="product"):
+            # Validate product has required attributes
+            if not product or not hasattr(product, 'name'):
+                logging.warning(f"Skipping invalid product object: {product}")
+                rejected_products.append(product)
+                continue
+
             # Check if category is "Vyřadit"
             if product.category and product.category.strip().lower() == "vyřadit":
                 rejected_products.append(product)
                 continue
-                
+
             # Check ItemFilter if we have filter data
             if allowed_combinations:
-                # Extract product type from category (first part before >)
-                product_type = ""
-                if product.category:
-                    category_parts = product.category.split('>')
-                    if category_parts:
-                        product_type = category_parts[0].strip().lower()
-                
+                # Use product.type directly (from ProductTypeMemory)
+                product_type = product.type.strip().lower() if product.type else ""
+
+                # Validate required fields
+                if not product.brand or not product.url:
+                    logging.warning(f"Product missing required fields (brand/url): {product.name}")
+                    rejected_products.append(product)
+                    continue
+
+                # Extract eshop name from product URL using EshopList mapping
+                product_eshop = ""
+                product_url_lower = product.url.strip().lower() if product.url else ""
+                product_brand_lower = product.brand.strip().lower() if product.brand else ""
+
+                for eshop_url, eshop_name in eshop_mapping.items():
+                    if eshop_url and eshop_url in product_url_lower:
+                        product_eshop = eshop_name.strip().lower() if eshop_name else ""
+                        break
+
+                # Validate we found an eshop
+                if not product_eshop:
+                    logging.warning(f"Could not determine eshop for product: {product.name} (URL: {product.url})")
+                    rejected_products.append(product)
+                    continue
+
                 # Check if combination is allowed
                 is_allowed = False
                 for combo in allowed_combinations:
-                    if (combo['typ'] == product_type and 
-                        combo['znacka'] == product.brand.strip().lower() and
-                        combo['url'] in product.url.strip().lower()):
+                    if (combo.get('type') == product_type and
+                        combo.get('brand') == product_brand_lower and
+                        combo.get('eshop') == product_eshop):
                         is_allowed = True
                         break
-                
+
                 if is_allowed:
                     filtered_products.append(product)
                 else:
@@ -84,20 +117,102 @@ class ProductFilter:
             else:
                 # No filter data, allow all products that are not "Vyřadit"
                 filtered_products.append(product)
-        
+
         return filtered_products, rejected_products
-    
-    def save_rejected_products_to_wrongs(self, rejected_products: List[RepairedProduct], wrongs_file_path: str = None):
+
+    def filter_by_wrongs(self, repaired_products: List[RepairedProduct], wrongs_file_path: Optional[str] = None) -> Tuple[List[RepairedProduct], List[RepairedProduct]]:
+        """
+        Filter products by checking against Wrongs.txt file.
+        Products with names matching entries in Wrongs.txt will be rejected.
+
+        Args:
+            repaired_products (List[RepairedProduct]): List of repaired products
+            wrongs_file_path (Optional[str]): Path to Wrongs.txt file (default: Memory/Wrongs.txt)
+
+        Returns:
+            Tuple[List[RepairedProduct], List[RepairedProduct]]: (filtered_products, rejected_products)
+        """
+        filtered_products = []
+        rejected_products = []
+
+        # Determine Wrongs.txt path using proper path construction
+        if wrongs_file_path is None:
+            # Get the unifier directory (parent of unifierlib)
+            unifierlib_dir = os.path.dirname(os.path.abspath(__file__))
+            unifier_dir = os.path.dirname(unifierlib_dir)
+            memory_dir = os.path.join(unifier_dir, "Memory")
+            wrongs_file_path = os.path.join(memory_dir, WRONGS_FILE)
+
+        # Validate path
+        if not wrongs_file_path or not isinstance(wrongs_file_path, str):
+            logging.error(f"Invalid Wrongs file path: {wrongs_file_path}")
+            return repaired_products, []
+
+        # Load wrongs list (lowercase product names to reject)
+        wrongs_set = set()
+        try:
+            if os.path.exists(wrongs_file_path):
+                # Use centralized file_ops for thread-safe reading
+                wrongs_lines = load_txt_file(wrongs_file_path)
+                for line in wrongs_lines:
+                    # Lines are already stripped by load_txt_file
+                    wrong_name = line.lower()
+                    if wrong_name:
+                        wrongs_set.add(wrong_name)
+                logging.debug(f"Loaded {len(wrongs_set)} entries from {WRONGS_FILE}")
+            else:
+                logging.warning(f"{WRONGS_FILE} not found at {wrongs_file_path}, skipping Wrongs filter")
+                return repaired_products, []
+        except FileNotFoundError:
+            logging.warning(f"{WRONGS_FILE} not found at {wrongs_file_path}, skipping Wrongs filter")
+            return repaired_products, []
+        except Exception as e:
+            logging.error(f"Error loading {WRONGS_FILE}: {str(e)}", exc_info=True)
+            # Return original list on error to avoid data loss
+            return repaired_products, []
+
+        # Filter products against wrongs list
+        for product in tqdm(repaired_products, desc="Filtering by Wrongs", unit="product"):
+            # Validate product
+            if not product or not hasattr(product, 'name'):
+                logging.warning(f"Skipping invalid product in Wrongs filter: {product}")
+                rejected_products.append(product)
+                continue
+
+            # Get lowercase product name with null safety
+            product_name_lower = product.name.strip().lower() if product.name else ""
+
+            if not product_name_lower:
+                logging.warning(f"Product has no name, rejecting: {product}")
+                rejected_products.append(product)
+                continue
+
+            if product_name_lower in wrongs_set:
+                rejected_products.append(product)
+            else:
+                filtered_products.append(product)
+
+        return filtered_products, rejected_products
+
+    def save_rejected_products_to_wrongs(self, rejected_products: List[RepairedProduct], wrongs_file_path: Optional[str] = None):
         """
         Save rejected products to Wrongs.txt file.
-        
+
         Args:
             rejected_products (List[RepairedProduct]): List of rejected products
-            wrongs_file_path (str): Path to Wrongs.txt file (default: Memory/Wrongs.txt)
+            wrongs_file_path (Optional[str]): Path to Wrongs.txt file (default: Memory/Wrongs.txt)
         """
         if wrongs_file_path is None:
-            script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            wrongs_file_path = os.path.join(script_dir, "Memory", WRONGS_FILE)
+            # Get the unifier directory (parent of unifierlib)
+            unifierlib_dir = os.path.dirname(os.path.abspath(__file__))
+            unifier_dir = os.path.dirname(unifierlib_dir)
+            memory_dir = os.path.join(unifier_dir, "Memory")
+            wrongs_file_path = os.path.join(memory_dir, WRONGS_FILE)
+
+        # Validate path
+        if not wrongs_file_path or not isinstance(wrongs_file_path, str):
+            logging.error(f"Invalid Wrongs file path: {wrongs_file_path}")
+            return
         
         try:
             with open(wrongs_file_path, 'a', encoding='utf-8') as f:

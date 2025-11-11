@@ -331,20 +331,33 @@ def main():
         # Update results with merged products
         results['repaired_products'] = merged_products
 
-        # Step 6: Filter products using ProductFilter
-        logging.info("Filtering products...")
+        # Step 6: Filter products by category and ItemFilter
+        logging.info("Filtering products by category and ItemFilter...")
         from unifierlib.product_filter import ProductFilter
 
         product_filter = ProductFilter(memory_data)
-        filtered_products, rejected_products = product_filter.process_products_with_filtering(merged_products)
+        filtered_products, rejected_by_itemfilter = product_filter.filter_by_category_and_item_filter(merged_products)
 
-        logging.debug(f"Product filtering completed:")
-        logging.debug(f"  - Merged products: {len(merged_products)}")
-        logging.debug(f"  - Filtered products: {len(filtered_products)}")
-        logging.debug(f"  - Rejected products: {len(rejected_products)}")
+        logging.info(f"ItemFilter completed:")
+        logging.info(f"  - Input products: {len(merged_products)}")
+        logging.info(f"  - Filtered (accepted) products: {len(filtered_products)}")
+        logging.info(f"  - Rejected by ItemFilter: {len(rejected_by_itemfilter)}")
 
-        if rejected_products:
-            logging.debug(f"Rejected products saved to {WRONGS_FILE}")
+        # Step 6.5: Filter products by Wrongs.txt
+        logging.info("Filtering products by Wrongs.txt...")
+        filtered_products, rejected_by_wrongs = product_filter.filter_by_wrongs(filtered_products)
+
+        logging.info(f"Wrongs filter completed:")
+        logging.info(f"  - Input products: {len(filtered_products) + len(rejected_by_wrongs)}")
+        logging.info(f"  - Filtered (accepted) products: {len(filtered_products)}")
+        logging.info(f"  - Rejected by Wrongs: {len(rejected_by_wrongs)}")
+
+        # Combined statistics
+        total_rejected = len(rejected_by_itemfilter) + len(rejected_by_wrongs)
+        logging.info(f"Total filtering results:")
+        logging.info(f"  - Original products (after merge): {len(merged_products)}")
+        logging.info(f"  - Final filtered products: {len(filtered_products)}")
+        logging.info(f"  - Total rejected: {total_rejected} (ItemFilter: {len(rejected_by_itemfilter)}, Wrongs: {len(rejected_by_wrongs)})")
 
         # Step 7: Convert filtered RepairedProducts to ExportProducts
         logging.info("Converting filtered RepairedProducts to ExportProducts...")
