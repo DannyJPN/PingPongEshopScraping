@@ -4,9 +4,9 @@
 Filtrování memory souborů - automatické čištění podle pravidel
 
 Skript provádí kaskádové filtrování memory souborů:
-1. Filtruje hierarchicky neúplné kategorie
+1. Načte CategoryNameMemory a identifikuje hierarchicky neúplné kategorie (pouze detekce, soubor se nemodifikuje)
 2. Čistí CategoryMemory od neúplných kategorií
-3. Čistí ProductBrandMemory od neznámých značek
+3. Čistí ProductBrandMemory od neznámých značek (načte seznam z BrandCodeList)
 4. Odstraní značky z ProductType a ProductModel Memory
 5. Odstraní modely z typů a slova typů z modelů
 6. Odstraní variantní hodnoty z modelů
@@ -464,14 +464,17 @@ Příklady použití:
   python filter_memory.py -l CS
 
 Skript provádí kaskádové filtrování:
-1. Filtruje hierarchicky neúplné kategorie
+1. Načte CategoryNameMemory a najde neúplné kategorie (pouze zdrojový soubor, nemodifikuje se)
 2. Čistí CategoryMemory od neúplných kategorií
-3. Čistí ProductBrandMemory od neznámých značek
+3. Načte BrandCodeList a čistí ProductBrandMemory od neznámých značek
 4. Odstraní značky z ProductType a ProductModel Memory
 5. Odstraní modely z typů a slova typů z modelů
 6. Odstraní variantní hodnoty z modelů
 7. Odstraní nepovolené znaky
 8. Čistí NameMemory od záznamů bez klíčů
+
+Poznámka: CategoryNameMemory a BrandCodeList jsou pouze zdrojové soubory
+          pro detekci pravidel - nejsou modifikovány ani ukládány.
         """
     )
 
@@ -493,9 +496,9 @@ Skript provádí kaskádové filtrování:
         print(f"FILTROVÁNÍ MEMORY SOUBORŮ - {language}")
         print(f"{'='*80}")
 
-        # ===== 1. CategoryNameMemory - najít neúplné kategorie =====
+        # ===== 1. CategoryNameMemory - najít neúplné kategorie (pouze zdrojový soubor) =====
         print("\n" + "="*80)
-        print("KROK 1: Načítání CategoryNameMemory")
+        print("KROK 1: Načítání CategoryNameMemory (zdrojový soubor - nebude modifikován)")
         print("="*80)
 
         category_name_filepath = get_memory_filepath('CategoryNameMemory', language)
@@ -504,6 +507,7 @@ Skript provádí kaskádové filtrování:
 
         incomplete_categories = filter_incomplete_categories(category_name_memory)
         print(f"\n📊 Nalezeno {len(incomplete_categories)} hierarchicky neúplných kategorií")
+        print(f"ℹ️  CategoryNameMemory zůstává beze změny - použije se jen pro filtrování CategoryMemory")
 
         # ===== 2. CategoryMemory - vyčistit neúplné kategorie =====
         print("\n" + "="*80)

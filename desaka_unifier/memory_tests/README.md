@@ -195,15 +195,17 @@ Skript `filter_memory.py` provádí automatické kaskádové čištění memory 
 
 Skript postupně aplikuje následující filtry:
 
-1. **Hierarchicky neúplné kategorie** - odstraní kategorie, které jsou podstringem jiných (např. "Potahy" pokud existuje "Potahy>Softy")
-2. **CategoryMemory čištění** - vyřadí záznamy s neúplnými kategoriemi
-3. **Neznámé značky** - odstraní z ProductBrandMemory značky, které nejsou v BrandCodeList
+1. **Detekce neúplných kategorií** - načte CategoryNameMemory a identifikuje kategorie, které jsou podstringem jiných (např. "Potahy" pokud existuje "Potahy>Softy"). CategoryNameMemory zůstává beze změny - je pouze zdrojový soubor pro detekci.
+2. **CategoryMemory čištění** - vyřadí záznamy s neúplnými kategoriemi zjištěnými v kroku 1
+3. **Neznámé značky** - načte BrandCodeList (zůstává beze změny) a odstraní z ProductBrandMemory značky, které v něm nejsou
 4. **Značky v typech a modelech** - vyřadí záznamy obsahující názvy značek
 5. **Modely v typech** - odstraní typy obsahující celou hodnotu nějakého modelu
 6. **Slova typů v modelech** - vyřadí modely obsahující slova z typů (děleno mezerou a pomlčkou)
 7. **Variantní hodnoty v modelech** - odstraní modely obsahující VariantValue delší než 2 znaky
 8. **Nepovolené znaky** - vyřadí záznamy s nepoužívanými znaky (ü, ß, ľ, atd.)
 9. **NameMemory čištění** - odstraní záznamy, které nemají klíč ve všech třech souborech (Type, Brand, Model)
+
+**Důležité**: CategoryNameMemory a BrandCodeList jsou pouze zdrojové soubory pro definici pravidel - skript je nikdy nemodifikuje ani neuloží.
 
 ### Použití
 
@@ -232,7 +234,7 @@ FILTROVÁNÍ MEMORY SOUBORŮ - CS
 ================================================================================
 
 ================================================================================
-KROK 1: Načítání CategoryNameMemory
+KROK 1: Načítání CategoryNameMemory (zdrojový soubor - nebude modifikován)
 ================================================================================
 ✓ Načteno 58 záznamů z CategoryNameMemory
 
@@ -240,6 +242,7 @@ KROK 1: Načítání CategoryNameMemory
 Kontrola kategorií: 100%|██████████| 58/58 [00:00<00:00]
 
 📊 Nalezeno 9 hierarchicky neúplných kategorií
+ℹ️  CategoryNameMemory zůstává beze změny - použije se jen pro filtrování CategoryMemory
 
 ================================================================================
 KROK 2: Čištění CategoryMemory
