@@ -2165,8 +2165,8 @@ class ProductParser:
         # 32. dodaci_doba - uses default value "" (empty string for variants)
         # variant_product.dodaci_doba = " "  # Removed: uses default ""
 
-        # 33. dodaci_doba_auto - uses default value "#" (not applicable for variants)
-        # variant_product.dodaci_doba_auto = "0"  # Removed: uses default "#"
+        # 33. dodaci_doba_auto - fixed "1" for variants
+        variant_product.dodaci_doba_auto = "1"
 
         # 34. sklad - fixed "0"
         # TOCHECK: Verify if variant should have sklad set to "0" or use default "#"
@@ -2187,8 +2187,8 @@ class ProductParser:
         variant_product.odber_max = ""
         variant_product.pocet = "#"
 
-        # 43. zaruka - empty
-        variant_product.zaruka = ""
+        # 43. zaruka - uses default value "#" (inherited from main product)
+        # variant_product.zaruka = ""  # Removed: uses default "#"
 
         # 44-45. seo fields - uses default value "#" (inherited from main product)
         # variant_product.seo_titulek = ""  # Removed: uses default "#"
@@ -2215,59 +2215,59 @@ class ProductParser:
         # 56. stitky - uses default value "#" (inherited from main product)
         # variant_product.stitky = "#"  # Removed: uses default "#"
 
-        # 57. kategorie_id - fixed "#"
-        variant_product.kategorie_id = "#"
+        # 57. kategorie_id - uses default value "#" (inherited from main product)
+        # variant_product.kategorie_id = "#"  # Removed: uses default "#"
 
-        # 58-60. related product fields - empty or "#"
-        variant_product.podobne = ""
-        variant_product.prislusenstvi = ""
-        variant_product.variantove = "#"
+        # 58-60. related product fields - uses default value "#" (inherited from main product)
+        # variant_product.podobne = ""  # Removed: uses default "#"
+        # variant_product.prislusenstvi = ""  # Removed: uses default "#"
+        # variant_product.variantove = "#"  # Removed: uses default "#"
 
-        # 61-63. zdarma, sluzby, rozsirujici_obsah - empty
-        variant_product.zdarma = ""
-        variant_product.sluzby = ""
-        variant_product.rozsirujici_obsah = ""
+        # 61-63. zdarma, sluzby, rozsirujici_obsah - uses default value "#" (inherited from main product)
+        # variant_product.zdarma = ""  # Removed: uses default "#"
+        # variant_product.sluzby = ""  # Removed: uses default "#"
+        # variant_product.rozsirujici_obsah = ""  # Removed: uses default "#"
 
-        # 64-72. zbozicz fields - fixed "#" for variants
-        variant_product.zbozicz_skryt = "0"
-        variant_product.zbozicz_productname = "#"
-        variant_product.zbozicz_product = "#"
-        variant_product.zbozicz_cpc = "5"
-        variant_product.zbozicz_cpc_search = "5"
-        variant_product.zbozicz_kategorie = "#"
-        variant_product.zbozicz_stitek_0 = "#"
-        variant_product.zbozicz_stitek_1 = "#"
+        # 64-75. zbozicz fields - uses default value "#" (inherited from main product)
+        # variant_product.zbozicz_skryt = "0"  # Removed: uses default "#"
+        # variant_product.zbozicz_productname = "#"  # Removed: uses default "#"
+        # variant_product.zbozicz_product = "#"  # Removed: uses default "#"
+        # variant_product.zbozicz_cpc = "5"  # Removed: uses default "#"
+        # variant_product.zbozicz_cpc_search = "5"  # Removed: uses default "#"
+        # variant_product.zbozicz_kategorie = "#"  # Removed: uses default "#"
+        # variant_product.zbozicz_stitek_0 = "#"  # Removed: uses default "#"
+        # variant_product.zbozicz_stitek_1 = "#"  # Removed: uses default "#"
         variant_product.zbozicz_extra = ""
 
-        # 73-77. heurekacz fields - fixed "#" for variants
-        variant_product.heurekacz_skryt = "0"
-        variant_product.heurekacz_productname = "#"
-        variant_product.heurekacz_product = "#"
-        variant_product.heurekacz_cpc = "1"
-        variant_product.heurekacz_kategorie = "#"
+        # 76-80. heurekacz fields - uses default value "#" (inherited from main product)
+        # variant_product.heurekacz_skryt = "0"  # Removed: uses default "#"
+        # variant_product.heurekacz_productname = "#"  # Removed: uses default "#"
+        # variant_product.heurekacz_product = "#"  # Removed: uses default "#"
+        # variant_product.heurekacz_cpc = "1"  # Removed: uses default "#"
+        # variant_product.heurekacz_kategorie = "#"  # Removed: uses default "#"
 
-        # 78-84. google fields - fixed "#" for variants
-        variant_product.google_skryt = "0"
-        variant_product.google_kategorie = "#"
-        variant_product.google_stitek_0 = "#"
-        variant_product.google_stitek_1 = "#"
-        variant_product.google_stitek_2 = "#"
-        variant_product.google_stitek_3 = "#"
-        variant_product.google_stitek_4 = "#"
+        # 81-87. google fields - uses default value "#" (inherited from main product)
+        # variant_product.google_skryt = "0"  # Removed: uses default "#"
+        # variant_product.google_kategorie = "#"  # Removed: uses default "#"
+        # variant_product.google_stitek_0 = "#"  # Removed: uses default "#"
+        # variant_product.google_stitek_1 = "#"  # Removed: uses default "#"
+        # variant_product.google_stitek_2 = "#"  # Removed: uses default "#"
+        # variant_product.google_stitek_3 = "#"  # Removed: uses default "#"
+        # variant_product.google_stitek_4 = "#"  # Removed: uses default "#"
 
-        # 85-90. glami fields - fixed "#" for variants
-        variant_product.glami_skryt = "0"
-        variant_product.glami_kategorie = "#"
-        variant_product.glami_cpc = "1"
+        # 88-93. glami fields - empty for variants (not in main product)
+        # variant_product.glami_skryt = "0"  # Removed: uses default "#"
+        # variant_product.glami_kategorie = "#"  # Removed: uses default "#"
+        # variant_product.glami_cpc = "1"  # Removed: uses default "#"
         variant_product.glami_voucher = ""
         variant_product.glami_material = ""
         variant_product.glamisk_material = ""
 
-        # 91-94. sklad fields - fixed "#"
-        variant_product.sklad_umisteni = "#"
-        variant_product.sklad_minimalni = "#"
-        variant_product.sklad_optimalni = "#"
-        variant_product.sklad_maximalni = "#"
+        # 94-97. sklad fields - empty for variants (not in defaults, stay empty)
+        variant_product.sklad_umisteni = ""
+        variant_product.sklad_minimalni = ""
+        variant_product.sklad_optimalni = ""
+        variant_product.sklad_maximalni = ""
 
         return variant_product
 
