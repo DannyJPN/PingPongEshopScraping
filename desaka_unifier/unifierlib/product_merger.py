@@ -73,90 +73,167 @@ class ProductMerger:
     def _merge_product_group(self, products: List[RepairedProduct]) -> RepairedProduct:
         """
         Merge a group of products with the same name.
-        
+
         Args:
             products: List of products to merge (all have same name)
-            
+
         Returns:
             Single merged RepairedProduct
+
+        Raises:
+            ValueError: If string properties have conflicting values that cannot be merged
         """
         if not products:
             raise ValueError("Cannot merge empty product list")
-        
+
         if len(products) == 1:
             return products[0]
-        
+
+        # Log products being merged for debugging
+        logging.info(f"Merging {len(products)} products with name: {products[0].name}")
+        for i, product in enumerate(products):
+            logging.debug(f"  Product {i+1}: original_name='{product.original_name}', "
+                         f"brand='{product.brand}', price='{product.price}'")
+
         # Use first product as base
         base_product = products[0]
-        
+
         # Merge all string properties
+        # Note: If any property has conflicting values, an exception will be raised
+        # User must resolve conflicts manually in the source data
         merged_data = {
-            'original_name': self._merge_string_values([p.original_name for p in products]),
+            'original_name': self._merge_string_values([p.original_name for p in products],
+                                                       'original_name', products, allow_multiple=True),
             'name': base_product.name,  # Name should be the same for all
-            'category': self._merge_string_values([p.category for p in products]),
-            'brand': self._merge_string_values([p.brand for p in products]),
-            'category_ids': self._merge_string_values([p.category_ids for p in products]),
-            'code': self._merge_string_values([p.code for p in products]),
-            'desc': self._merge_string_values([p.desc for p in products]),
-            'glami_category': self._merge_string_values([p.glami_category for p in products]),
-            'google_category': self._merge_string_values([p.google_category for p in products]),
-            'google_keywords': self._merge_string_values([p.google_keywords for p in products]),
-            'heureka_category': self._merge_string_values([p.heureka_category for p in products]),
-            'price': self._merge_string_values([p.price for p in products]),
-            'price_standard': self._merge_string_values([p.price_standard for p in products]),
-            'shortdesc': self._merge_string_values([p.shortdesc for p in products]),
-            'variantcode': self._merge_string_values([p.variantcode for p in products]),
-            'zbozi_category': self._merge_string_values([p.zbozi_category for p in products]),
-            'zbozi_keywords': self._merge_string_values([p.zbozi_keywords for p in products]),
-            'URL': self._merge_string_values([p.URL for p in products])
+            'type': self._merge_string_values([p.type for p in products],
+                                              'type', products),
+            'model': self._merge_string_values([p.model for p in products],
+                                               'model', products),
+            'category': self._merge_string_values([p.category for p in products],
+                                                  'category', products),
+            'brand': self._merge_string_values([p.brand for p in products],
+                                               'brand', products),
+            'category_ids': self._merge_string_values([p.category_ids for p in products],
+                                                      'category_ids', products),
+            'code': self._merge_string_values([p.code for p in products],
+                                              'code', products),
+            'desc': self._merge_string_values([p.desc for p in products],
+                                              'desc', products),
+            'glami_category': self._merge_string_values([p.glami_category for p in products],
+                                                        'glami_category', products),
+            'google_category': self._merge_string_values([p.google_category for p in products],
+                                                         'google_category', products),
+            'google_keywords': self._merge_string_values([p.google_keywords for p in products],
+                                                         'google_keywords', products),
+            'heureka_category': self._merge_string_values([p.heureka_category for p in products],
+                                                          'heureka_category', products),
+            'price': self._merge_prices([p.price for p in products]),
+            'price_standard': self._merge_prices([p.price_standard for p in products]),
+            'shortdesc': self._merge_string_values([p.shortdesc for p in products],
+                                                   'shortdesc', products),
+            'variantcode': self._merge_string_values([p.variantcode for p in products],
+                                                     'variantcode', products),
+            'zbozi_category': self._merge_string_values([p.zbozi_category for p in products],
+                                                        'zbozi_category', products),
+            'zbozi_keywords': self._merge_string_values([p.zbozi_keywords for p in products],
+                                                        'zbozi_keywords', products),
+            'url': self._merge_string_values([p.url for p in products],
+                                             'url', products)
         }
-        
+
         # Merge variants
         all_variants = []
         for product in products:
             if product.Variants:
                 all_variants.extend(product.Variants)
-        
+
         merged_variants = self._merge_variants(all_variants)
         merged_data['Variants'] = merged_variants
-        
+
         # Create merged product
-        merged_product = RepairedProduct(**merged_data)
-        
-        logging.debug(f"Merged {len(products)} products into one: {merged_product.name}")
+        merged_product = RepairedProduct()
+        for key, value in merged_data.items():
+            setattr(merged_product, key, value)
+
+        logging.debug(f"Successfully merged {len(products)} products into one: {merged_product.name}")
         return merged_product
     
-    def _merge_string_values(self, values: List[str]) -> str:
+    def _merge_string_values(self, values: List[str], field_name: str,
+                             products: List[RepairedProduct], allow_multiple: bool = False) -> str:
         """
-        Merge string values by combining with '|' separator and removing duplicates.
-        
+        Merge string values - raises exception if multiple different values exist.
+
         Args:
             values: List of string values to merge
-            
+            field_name: Name of the field being merged (for error messages)
+            products: Original products (for detailed error reporting)
+            allow_multiple: If True, allows multiple values (for original_name field only)
+
         Returns:
-            Merged string with unique values separated by '|'
+            Single merged value (or combined with '|' if allow_multiple=True)
+
+        Raises:
+            ValueError: If multiple conflicting values exist and allow_multiple=False
         """
         # Filter out None and empty values
         valid_values = [v.strip() for v in values if v and v.strip()]
-        
+
         if not valid_values:
             return ""
-        
-        # Split by '|' and collect all parts
-        all_parts = []
-        for value in valid_values:
-            parts = [part.strip() for part in value.split('|') if part.strip()]
-            all_parts.extend(parts)
-        
-        # Remove duplicates while preserving order
-        unique_parts = []
-        seen = set()
-        for part in all_parts:
-            if part.lower() not in seen:
-                unique_parts.append(part)
-                seen.add(part.lower())
-        
-        return '|'.join(unique_parts)
+
+        if len(valid_values) == 1:
+            return valid_values[0]
+
+        # Check if all values are the same
+        unique_values = list(set(v.lower() for v in valid_values))
+
+        if len(unique_values) == 1:
+            # All values are the same (case-insensitive), return the first one
+            return valid_values[0]
+
+        # Multiple different values exist
+        if allow_multiple:
+            # For original_name, combine all unique values
+            return '|'.join(sorted(set(valid_values)))
+
+        # For all other fields, this is an error that must be resolved manually
+        # TODO: Implement user interface to resolve conflicts
+        # For now, raise an exception to force manual resolution
+        error_msg = f"\nMERGE CONFLICT: Field '{field_name}' has multiple different values:\n"
+        for i, product in enumerate(products):
+            value = getattr(product, field_name, '')
+            error_msg += f"  Product {i+1} (original_name='{product.original_name}'): {field_name}='{value}'\n"
+        error_msg += "\nUser must resolve this conflict in the source data before merging can proceed."
+
+        logging.error(error_msg)
+        raise ValueError(error_msg)
+
+    def _merge_prices(self, prices: List[str]) -> str:
+        """
+        Merge price values by selecting the highest price.
+
+        Args:
+            prices: List of price strings to merge
+
+        Returns:
+            String representation of the highest price
+        """
+        # Filter out None, empty values, and convert to float
+        valid_prices = []
+        for price in prices:
+            if price and price.strip():
+                try:
+                    valid_prices.append(float(price))
+                except (ValueError, TypeError):
+                    logging.warning(f"Invalid price value: {price}")
+                    continue
+
+        if not valid_prices:
+            return ""
+
+        # Return the highest price
+        max_price = max(valid_prices)
+        return str(max_price)
     
     def _merge_variants(self, variants: List[Variant]) -> List[Variant]:
         """
