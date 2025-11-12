@@ -67,6 +67,7 @@ def parse_arguments():
 
     parser.add_argument(
         "--Language",
+        dest="Language",
         type=validate_language,
         default=DEFAULT_LANGUAGE,
         help=f"ISO 639-1 language code (2 characters). Default: {DEFAULT_LANGUAGE}"
@@ -74,6 +75,7 @@ def parse_arguments():
 
     parser.add_argument(
         "--ResultDir",
+        dest="ResultDir",
         type=str,
         default=DEFAULT_RESULT_DIR,
         help=f"Directory for results. Default: {DEFAULT_RESULT_DIR}"
@@ -83,6 +85,7 @@ def parse_arguments():
     default_memory_dir = os.path.join(script_dir, DEFAULT_MEMORY_DIR.lstrip("./"))
     parser.add_argument(
         "--MemoryDir",
+        dest="MemoryDir",
         type=str,
         default=default_memory_dir,
         help=f"Directory for memory files. Default: {DEFAULT_MEMORY_DIR}"
@@ -90,6 +93,7 @@ def parse_arguments():
 
     parser.add_argument(
         "--ExportDir",
+        dest="ExportDir",
         type=str,
         default=DEFAULT_EXPORT_DIR,
         help=f"Directory for exports. Default: {DEFAULT_EXPORT_DIR}"
@@ -97,30 +101,35 @@ def parse_arguments():
 
     parser.add_argument(
         "--ConfirmAIResults",
+        dest="ConfirmAIResults",
         action="store_true",
         help="Automatically confirm AI results without user prompts (default: False)"
     )
 
     parser.add_argument(
         "--Debug",
+        dest="Debug",
         action="store_true",
         help="Enable debug logging"
     )
 
     parser.add_argument(
         "--Overwrite",
+        dest="Overwrite",
         action="store_true",
         help="Overwrite existing files"
     )
 
     parser.add_argument(
         "--SkipScripts",
+        dest="SkipScripts",
         action="store_true",
         help="Skip running eshop scripts and only perform unification"
     )
 
     parser.add_argument(
         "--EnableFineTuning",
+        dest="EnableFineTuning",
         action="store_true",
         default=DEFAULT_ENABLE_FINE_TUNING,
         help="Enable fine-tuning of OpenAI models (default: False)"
@@ -128,6 +137,7 @@ def parse_arguments():
 
     parser.add_argument(
         "--UseFineTunedModels",
+        dest="UseFineTunedModels",
         action="store_true",
         default=DEFAULT_USE_FINE_TUNED_MODELS,
         help="Use fine-tuned models instead of generic ones when available (default: False)"
@@ -135,6 +145,7 @@ def parse_arguments():
 
     parser.add_argument(
         "--MaxParallel",
+        dest="MaxParallel",
         type=int,
         default=3,
         help="Maximum number of eshop scripts to run in parallel (default: 3)"
@@ -142,6 +153,7 @@ def parse_arguments():
 
     parser.add_argument(
         "--SkipAI",
+        dest="SkipAI",
         action="store_true",
         help="Skip using AI for property evaluation"
     )

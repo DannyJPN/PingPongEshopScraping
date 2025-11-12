@@ -1,0 +1,10 @@
+# Requirements for Gewo Downloader
+# Web scraping and HTML parsing
+beautifulsoup4>=4.11.0
+lxml>=4.9.0
+
+# HTTP requests
+requests>=2.28.0
+
+# Progress bars
+tqdm>=4.64.0
