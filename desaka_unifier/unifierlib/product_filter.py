@@ -9,6 +9,7 @@ import os
 import logging
 from typing import List, Tuple, Dict, Any
 from datetime import datetime
+from tqdm import tqdm
 from .repaired_product import RepairedProduct
 from .constants import WRONGS_FILE
 
@@ -53,37 +54,40 @@ class ProductFilter:
                     'url': row['eshop_url'].strip().lower()
                 })
         
-        for product in repaired_products:
-            # Check if category is "Vyřadit"
-            if product.category and product.category.strip().lower() == "vyřadit":
-                rejected_products.append(product)
-                continue
-                
-            # Check ItemFilter if we have filter data
-            if allowed_combinations:
-                # Extract product type from category (first part before >)
-                product_type = ""
-                if product.category:
-                    category_parts = product.category.split('>')
-                    if category_parts:
-                        product_type = category_parts[0].strip().lower()
-                
-                # Check if combination is allowed
-                is_allowed = False
-                for combo in allowed_combinations:
-                    if (combo['typ'] == product_type and 
-                        combo['znacka'] == product.brand.strip().lower() and
-                        combo['url'] in product.url.strip().lower()):
-                        is_allowed = True
-                        break
-                
-                if is_allowed:
-                    filtered_products.append(product)
-                else:
+        with tqdm(total=len(repaired_products), desc="Filtering products", unit="product", miniters=1, mininterval=0.01) as pbar:
+            for product in repaired_products:
+                # Check if category is "Vyřadit"
+                if product.category and product.category.strip().lower() == "vyřadit":
                     rejected_products.append(product)
-            else:
-                # No filter data, allow all products that are not "Vyřadit"
-                filtered_products.append(product)
+                    pbar.update(1)
+                    continue
+
+                # Check ItemFilter if we have filter data
+                if allowed_combinations:
+                    # Extract product type from category (first part before >)
+                    product_type = ""
+                    if product.category:
+                        category_parts = product.category.split('>')
+                        if category_parts:
+                            product_type = category_parts[0].strip().lower()
+
+                    # Check if combination is allowed
+                    is_allowed = False
+                    for combo in allowed_combinations:
+                        if (combo['typ'] == product_type and
+                            combo['znacka'] == product.brand.strip().lower() and
+                            combo['url'] in product.url.strip().lower()):
+                            is_allowed = True
+                            break
+
+                    if is_allowed:
+                        filtered_products.append(product)
+                    else:
+                        rejected_products.append(product)
+                else:
+                    # No filter data, allow all products that are not "Vyřadit"
+                    filtered_products.append(product)
+                pbar.update(1)
         
         return filtered_products, rejected_products
     

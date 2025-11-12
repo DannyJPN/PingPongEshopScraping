@@ -16,6 +16,7 @@ import logging
 from typing import List, Dict, Any
 from collections import defaultdict
 import json
+from tqdm import tqdm
 from .repaired_product import RepairedProduct
 from .variant import Variant
 
@@ -53,17 +54,19 @@ class ProductMerger:
                 products_by_name[f"__unnamed_{id(product)}"].append(product)
         
         merged_products = []
-        
-        for name, products in products_by_name.items():
-            if len(products) == 1:
-                # No duplicates, keep as-is
-                merged_products.append(products[0])
-            else:
-                # Merge duplicates
-                logging.debug(f"Merging {len(products)} products with name: {name}")
-                merged_product = self._merge_product_group(products)
-                merged_products.append(merged_product)
-        
+
+        with tqdm(total=len(products_by_name), desc="Merging products", unit="product", miniters=1, mininterval=0.01) as pbar:
+            for name, products in products_by_name.items():
+                if len(products) == 1:
+                    # No duplicates, keep as-is
+                    merged_products.append(products[0])
+                else:
+                    # Merge duplicates
+                    logging.debug(f"Merging {len(products)} products with name: {name}")
+                    merged_product = self._merge_product_group(products)
+                    merged_products.append(merged_product)
+                pbar.update(1)
+
         logging.info(f"Product merging completed. {len(repaired_products)} -> {len(merged_products)} products")
         return merged_products
     
