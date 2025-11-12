@@ -676,24 +676,19 @@ class ProductParser:
             except ValueError:
                 print(f"❌ Invalid input. Please enter a number between 1 and {len(similar_keys)} or 'none'")
 
-    def _heuristic_extraction(self, downloaded: DownloadedProduct, values: List[str], skip_direct_match: bool = False) -> tuple:
+    def _heuristic_extraction(self, downloaded: DownloadedProduct, values: List[str]) -> tuple:
         """
         Perform heuristic extraction on downloaded product.
 
         Args:
             downloaded (DownloadedProduct): Product to extract from
             values (List[str]): List of values to search for
-            skip_direct_match (bool): If True, skip direct text matching and only use similarity-based search
 
         Returns:
             tuple: (Single match if exactly one found or None, List of all matches)
         """
         if not values:
             return None, []
-
-        # If skip_direct_match is True, go directly to similarity-based search
-        if skip_direct_match:
-            return self._heuristic_similarity_search(downloaded, values, threshold=0.8)
 
         # Collect all texts to search in
         texts = []
@@ -799,20 +794,14 @@ class ProductParser:
         category_name_memory = self.memory.get(category_name_memory_key, {})
         available_categories = list(category_name_memory.values()) if category_name_memory else []
 
-        # Try heuristic extraction (skip direct matching for categories, only use similarity-based search)
+        # Heuristic extraction disabled for categories (low hit rate due to strict category format)
         single_match = None
         all_matches = []
-        if available_categories:
-            single_match, all_matches = self._heuristic_extraction(downloaded, available_categories, skip_direct_match=True)
 
-            # Use OpenAI with CategoryNameMemory (translated category names) even if memory is empty
+        # Use OpenAI with CategoryNameMemory (translated category names) even if memory is empty
         if not single_match and self.openai:
-            # Include information about heuristic matches in the AI prompt if any were found
+            # Heuristic analysis is disabled for categories, so no heuristic info to provide
             heuristic_info = ""
-            if all_matches:
-                heuristic_info = f"Heuristic analysis found these potential categories in the text: {', '.join(all_matches)}. Please evaluate these candidates in your decision."
-            else:
-                heuristic_info = "Heuristic analysis did not find any matching categories in the text."
 
             category = self.openai.find_category(downloaded, available_categories, self.language, heuristic_info)
             if category:
@@ -835,11 +824,8 @@ class ProductParser:
                         return self._get_translated_category_name(standardized_key)
 
         # Ask user directly if AI not available or failed
-        print("\n🔍 HEURISTIC ANALYSIS RESULTS FOR CATEGORY:")
-        if all_matches:
-            print(f"  Found potential matches: {', '.join(all_matches)}")
-        else:
-            print("  No matches found in product text")
+        print("\n🔍 CATEGORY DETECTION:")
+        print("  (Heuristic analysis disabled for categories)")
 
         user_category = self._ask_user_for_product_value("category", downloaded, heuristic_match=single_match)
         if user_category:
