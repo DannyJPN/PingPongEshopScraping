@@ -851,15 +851,14 @@ class ProductParser:
                 # Return the translated category name for this language
                 return self._get_translated_category_name(standardized_key)
             else:
-                # If category key not found, try old standardization for backward compatibility
-                standardized_category = self._standardize_category(user_category)
-                if standardized_category:
-                    # Save to memory
-                    if memory_key not in self.memory:
-                        self.memory[memory_key] = {}
-                    self.memory[memory_key][downloaded.name] = standardized_category
-                    self._save_memory_file(memory_key)
-                    return standardized_category
+                # If category key not found, use user input as-is for backward compatibility
+                # This handles old categories that might not have keys in the new system
+                logging.debug(f"Category key not found for '{user_category}', saving user input as-is")
+                if memory_key not in self.memory:
+                    self.memory[memory_key] = {}
+                self.memory[memory_key][downloaded.name] = user_category
+                self._save_memory_file(memory_key)
+                return user_category
 
         return ""
 
@@ -1197,9 +1196,10 @@ class ProductParser:
         if category_key in category_list:
             return category_key
 
-        # If not found, try to find a match using the old standardization logic
-        # This is for backward compatibility
-        return self._standardize_category(category_key)
+        # If not found in CategoryList, return as-is for backward compatibility
+        # (old categories might not be in the new CategoryList yet)
+        logging.debug(f"Category key '{category_key}' not found in CategoryList, returning as-is")
+        return category_key
 
     def _get_category_ids(self, category: str, downloaded: DownloadedProduct) -> str:
         """Get category IDs from category path using the new key-based system."""
