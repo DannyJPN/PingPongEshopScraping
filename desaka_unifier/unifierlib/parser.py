@@ -726,8 +726,9 @@ class ProductParser:
         all_matches_list = list(all_matches)
 
         # If no exact matches found, try similarity-based search
-        if len(all_matches_list) == 0:
-            return self._heuristic_similarity_search(downloaded, values, threshold=0.9)
+        # DISABLED: Heuristic similarity search not working as expected
+        # if len(all_matches_list) == 0:
+        #     return self._heuristic_similarity_search(downloaded, values, threshold=0.9)
 
         # Return single match if exactly one found, otherwise None and list of all matches
         if len(all_matches_list) == 1:
@@ -756,38 +757,38 @@ class ProductParser:
                 standardized_key = self._standardize_category_by_key(normalized_category_key)
                 return self._get_translated_category_name(standardized_key)
 
-        # Try to find similar keys in memory
-        if memory_key in self.memory:
-            category_memory = self.memory[memory_key]
-            similar_keys = self._find_similar_memory_keys(downloaded.name, category_memory, threshold=0.9)
-
-            if similar_keys:
-                # For categories, we need to convert keys to translated category names for display
-                similar_keys_with_translated_names = []
-                for key, category_key_value, similarity in similar_keys:
-                    standardized_key = self._standardize_category_by_key(category_key_value)
-                    translated_name = self._get_translated_category_name(standardized_key)
-                    # Store original category_key_value for saving later
-                    similar_keys_with_translated_names.append((key, translated_name, similarity, category_key_value))
-
-                # Show user the translated category names
-                display_keys = [(key, translated_name, sim) for key, translated_name, sim, _ in similar_keys_with_translated_names]
-                selected_category_name = self._ask_user_for_similar_key_selection("Category", downloaded.name, display_keys, downloaded.url)
-
-                if selected_category_name:
-                    # Find the original category_key_value for saving
-                    selected_category_key_value = None
-                    for key, translated_name, similarity, category_key_value in similar_keys_with_translated_names:
-                        if translated_name == selected_category_name:
-                            selected_category_key_value = category_key_value
-                            break
-
-                    if selected_category_key_value:
-                        # Save to memory with current product name as key
-                        self.memory[memory_key][downloaded.name] = selected_category_key_value
-                        self._save_memory_file(memory_key)
-                        # Return the translated category name
-                        return selected_category_name
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     category_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(downloaded.name, category_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         # For categories, we need to convert keys to translated category names for display
+        #         similar_keys_with_translated_names = []
+        #         for key, category_key_value, similarity in similar_keys:
+        #             standardized_key = self._standardize_category_by_key(category_key_value)
+        #             translated_name = self._get_translated_category_name(standardized_key)
+        #             # Store original category_key_value for saving later
+        #             similar_keys_with_translated_names.append((key, translated_name, similarity, category_key_value))
+        #
+        #         # Show user the translated category names
+        #         display_keys = [(key, translated_name, sim) for key, translated_name, sim, _ in similar_keys_with_translated_names]
+        #         selected_category_name = self._ask_user_for_similar_key_selection("Category", downloaded.name, display_keys, downloaded.url)
+        #
+        #         if selected_category_name:
+        #             # Find the original category_key_value for saving
+        #             selected_category_key_value = None
+        #             for key, translated_name, similarity, category_key_value in similar_keys_with_translated_names:
+        #                 if translated_name == selected_category_name:
+        #                     selected_category_key_value = category_key_value
+        #                     break
+        #
+        #             if selected_category_key_value:
+        #                 # Save to memory with current product name as key
+        #                 self.memory[memory_key][downloaded.name] = selected_category_key_value
+        #                 self._save_memory_file(memory_key)
+        #                 # Return the translated category name
+        #                 return selected_category_name
 
         # Get available category names (translated values from CategoryNameMemory)
         category_name_memory_key = MEMORY_KEY_CATEGORY_NAME_MEMORY.format(language=self.language)
@@ -882,21 +883,21 @@ class ProductParser:
                     return ""
                 return normalized_brand if not for_name_composition else self._format_brand_name(normalized_brand)
 
-        # Try to find similar keys in memory
-        if memory_key in self.memory:
-            brand_memory = self.memory[memory_key]
-            similar_keys = self._find_similar_memory_keys(downloaded.name, brand_memory, threshold=0.9)
-
-            if similar_keys:
-                selected_brand = self._ask_user_for_similar_key_selection("Brand", downloaded.name, similar_keys, downloaded.url)
-                if selected_brand:
-                    # Save to memory with current product name as key
-                    self.memory[memory_key][downloaded.name] = selected_brand
-                    self._save_memory_file(memory_key)
-                    # Handle return based on for_name_composition
-                    if for_name_composition and self._is_desaka_brand(selected_brand):
-                        return ""
-                    return selected_brand if not for_name_composition else self._format_brand_name(selected_brand)
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     brand_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(downloaded.name, brand_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         selected_brand = self._ask_user_for_similar_key_selection("Brand", downloaded.name, similar_keys, downloaded.url)
+        #         if selected_brand:
+        #             # Save to memory with current product name as key
+        #             self.memory[memory_key][downloaded.name] = selected_brand
+        #             self._save_memory_file(memory_key)
+        #             # Handle return based on for_name_composition
+        #             if for_name_composition and self._is_desaka_brand(selected_brand):
+        #                 return ""
+        #             return selected_brand if not for_name_composition else self._format_brand_name(selected_brand)
 
         # Try heuristic extraction
         brand_list = list(self.memory.get(MEMORY_KEY_BRAND_CODE_LIST, {}).keys())
@@ -974,18 +975,18 @@ class ProductParser:
                 self._save_memory_file(memory_key)
                 return normalized_type
 
-        # Try to find similar keys in memory
-        if memory_key in self.memory:
-            type_memory = self.memory[memory_key]
-            similar_keys = self._find_similar_memory_keys(downloaded.name, type_memory, threshold=0.9)
-
-            if similar_keys:
-                selected_type = self._ask_user_for_similar_key_selection("Product Type", downloaded.name, similar_keys, downloaded.url)
-                if selected_type:
-                    # Save to memory with current product name as key
-                    self.memory[memory_key][downloaded.name] = selected_type
-                    self._save_memory_file(memory_key)
-                    return selected_type
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     type_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(downloaded.name, type_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         selected_type = self._ask_user_for_similar_key_selection("Product Type", downloaded.name, similar_keys, downloaded.url)
+        #         if selected_type:
+        #             # Save to memory with current product name as key
+        #             self.memory[memory_key][downloaded.name] = selected_type
+        #             self._save_memory_file(memory_key)
+        #             return selected_type
 
         # Try heuristic extraction
         # Get all existing product types from memory
@@ -1056,18 +1057,18 @@ class ProductParser:
                 self._save_memory_file(memory_key)
                 return self._format_model_name(normalized_model)
 
-        # Try to find similar keys in memory
-        if memory_key in self.memory:
-            model_memory = self.memory[memory_key]
-            similar_keys = self._find_similar_memory_keys(downloaded.name, model_memory, threshold=0.9)
-
-            if similar_keys:
-                selected_model = self._ask_user_for_similar_key_selection("Product Model", downloaded.name, similar_keys, downloaded.url)
-                if selected_model:
-                    # Save to memory with current product name as key
-                    self.memory[memory_key][downloaded.name] = selected_model
-                    self._save_memory_file(memory_key)
-                    return self._format_model_name(selected_model)
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     model_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(downloaded.name, model_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         selected_model = self._ask_user_for_similar_key_selection("Product Model", downloaded.name, similar_keys, downloaded.url)
+        #         if selected_model:
+        #             # Save to memory with current product name as key
+        #             self.memory[memory_key][downloaded.name] = selected_model
+        #             self._save_memory_file(memory_key)
+        #             return self._format_model_name(selected_model)
 
         # Try heuristic extraction
         # Get all existing product models from memory
@@ -1532,18 +1533,18 @@ class ProductParser:
                 self._save_memory_file(memory_key)
                 return normalized_desc
 
-        # Try to find similar keys in memory
-        if memory_key in self.memory:
-            desc_memory = self.memory[memory_key]
-            similar_keys = self._find_similar_memory_keys(downloaded.name, desc_memory, threshold=0.9)
-
-            if similar_keys:
-                selected_desc = self._ask_user_for_similar_key_selection("Description", downloaded.name, similar_keys, downloaded.url)
-                if selected_desc:
-                    # Save to memory with current product name as key
-                    self.memory[memory_key][downloaded.name] = selected_desc
-                    self._save_memory_file(memory_key)
-                    return selected_desc
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     desc_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(downloaded.name, desc_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         selected_desc = self._ask_user_for_similar_key_selection("Description", downloaded.name, similar_keys, downloaded.url)
+        #         if selected_desc:
+        #             # Save to memory with current product name as key
+        #             self.memory[memory_key][downloaded.name] = selected_desc
+        #             self._save_memory_file(memory_key)
+        #             return selected_desc
 
         # Use OpenAI for translation and validation (not generation)
         if self.openai and downloaded.description:
@@ -1627,18 +1628,18 @@ class ProductParser:
                 self._save_memory_file(memory_key)
                 return normalized_keywords
 
-        # Try to find similar keys in memory
-        if memory_key in self.memory:
-            keywords_memory = self.memory[memory_key]
-            similar_keys = self._find_similar_memory_keys(downloaded.name, keywords_memory, threshold=0.9)
-
-            if similar_keys:
-                selected_keywords = self._ask_user_for_similar_key_selection("Google Keywords", downloaded.name, similar_keys, downloaded.url)
-                if selected_keywords:
-                    # Save to memory with current product name as key
-                    self.memory[memory_key][downloaded.name] = selected_keywords
-                    self._save_memory_file(memory_key)
-                    return selected_keywords
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     keywords_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(downloaded.name, keywords_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         selected_keywords = self._ask_user_for_similar_key_selection("Google Keywords", downloaded.name, similar_keys, downloaded.url)
+        #         if selected_keywords:
+        #             # Save to memory with current product name as key
+        #             self.memory[memory_key][downloaded.name] = selected_keywords
+        #             self._save_memory_file(memory_key)
+        #             return selected_keywords
 
         # Use OpenAI with memory content
         if self.openai:
@@ -1827,18 +1828,18 @@ class ProductParser:
                 self._save_memory_file(memory_key)
                 return normalized_shortdesc
 
-        # Try to find similar keys in memory
-        if memory_key in self.memory:
-            shortdesc_memory = self.memory[memory_key]
-            similar_keys = self._find_similar_memory_keys(downloaded.name, shortdesc_memory, threshold=0.9)
-
-            if similar_keys:
-                selected_shortdesc = self._ask_user_for_similar_key_selection("Short Description", downloaded.name, similar_keys, downloaded.url)
-                if selected_shortdesc:
-                    # Save to memory with current product name as key
-                    self.memory[memory_key][downloaded.name] = selected_shortdesc
-                    self._save_memory_file(memory_key)
-                    return selected_shortdesc
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     shortdesc_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(downloaded.name, shortdesc_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         selected_shortdesc = self._ask_user_for_similar_key_selection("Short Description", downloaded.name, similar_keys, downloaded.url)
+        #         if selected_shortdesc:
+        #             # Save to memory with current product name as key
+        #             self.memory[memory_key][downloaded.name] = selected_shortdesc
+        #             self._save_memory_file(memory_key)
+        #             return selected_shortdesc
 
         # Use OpenAI for translation and validation (or generation from description)
         if self.openai:
@@ -2048,18 +2049,18 @@ class ProductParser:
                 self._save_memory_file(memory_key)
                 return normalized_variant_name
 
-        # Try to find similar keys in memory
-        if memory_key in self.memory:
-            name_memory = self.memory[memory_key]
-            similar_keys = self._find_similar_memory_keys(name, name_memory, threshold=0.9)
-
-            if similar_keys:
-                selected_variant_name = self._ask_user_for_similar_key_selection("Variant Name", name, similar_keys, downloaded.url)
-                if selected_variant_name:
-                    # Save to memory with current variant name as key
-                    self.memory[memory_key][name] = selected_variant_name
-                    self._save_memory_file(memory_key)
-                    return selected_variant_name
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     name_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(name, name_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         selected_variant_name = self._ask_user_for_similar_key_selection("Variant Name", name, similar_keys, downloaded.url)
+        #         if selected_variant_name:
+        #             # Save to memory with current variant name as key
+        #             self.memory[memory_key][name] = selected_variant_name
+        #             self._save_memory_file(memory_key)
+        #             return selected_variant_name
 
         # Use OpenAI with memory content
         if self.openai:
@@ -2107,18 +2108,18 @@ class ProductParser:
                 self._save_memory_file(memory_key)
                 return normalized_variant_value
 
-        # Try to find similar keys in memory
-        if memory_key in self.memory:
-            value_memory = self.memory[memory_key]
-            similar_keys = self._find_similar_memory_keys(value, value_memory, threshold=0.9)
-
-            if similar_keys:
-                selected_variant_value = self._ask_user_for_similar_key_selection("Variant Value", value, similar_keys, downloaded.url)
-                if selected_variant_value:
-                    # Save to memory with current variant value as key
-                    self.memory[memory_key][value] = selected_variant_value
-                    self._save_memory_file(memory_key)
-                    return selected_variant_value
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     value_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(value, value_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         selected_variant_value = self._ask_user_for_similar_key_selection("Variant Value", value, similar_keys, downloaded.url)
+        #         if selected_variant_value:
+        #             # Save to memory with current variant value as key
+        #             self.memory[memory_key][value] = selected_variant_value
+        #             self._save_memory_file(memory_key)
+        #             return selected_variant_value
 
         # Use OpenAI with memory content
         if self.openai:
@@ -2166,18 +2167,18 @@ class ProductParser:
                 self._save_memory_file(memory_key)
                 return normalized_keywords
 
-        # Try to find similar keys in memory
-        if memory_key in self.memory:
-            keywords_memory = self.memory[memory_key]
-            similar_keys = self._find_similar_memory_keys(downloaded.name, keywords_memory, threshold=0.9)
-
-            if similar_keys:
-                selected_keywords = self._ask_user_for_similar_key_selection("Zbozi Keywords", downloaded.name, similar_keys, downloaded.url)
-                if selected_keywords:
-                    # Save to memory with current product name as key
-                    self.memory[memory_key][downloaded.name] = selected_keywords
-                    self._save_memory_file(memory_key)
-                    return selected_keywords
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     keywords_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(downloaded.name, keywords_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         selected_keywords = self._ask_user_for_similar_key_selection("Zbozi Keywords", downloaded.name, similar_keys, downloaded.url)
+        #         if selected_keywords:
+        #             # Save to memory with current product name as key
+        #             self.memory[memory_key][downloaded.name] = selected_keywords
+        #             self._save_memory_file(memory_key)
+        #             return selected_keywords
 
         # Use OpenAI with memory content
         if self.openai:
@@ -2761,18 +2762,18 @@ class ProductParser:
                 self._save_memory_file(memory_key)
                 return normalized_stock_status
 
-        # Try to find similar keys in memory
-        if memory_key in self.memory:
-            stock_status_memory = self.memory[memory_key]
-            similar_keys = self._find_similar_memory_keys(stock_status, stock_status_memory, threshold=0.9)
-
-            if similar_keys:
-                selected_stock_status = self._ask_user_for_similar_key_selection("Stock Status", stock_status, similar_keys)
-                if selected_stock_status:
-                    # Save to memory with current stock status as key
-                    self.memory[memory_key][stock_status] = selected_stock_status
-                    self._save_memory_file(memory_key)
-                    return selected_stock_status
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     stock_status_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(stock_status, stock_status_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         selected_stock_status = self._ask_user_for_similar_key_selection("Stock Status", stock_status, similar_keys)
+        #         if selected_stock_status:
+        #             # Save to memory with current stock status as key
+        #             self.memory[memory_key][stock_status] = selected_stock_status
+        #             self._save_memory_file(memory_key)
+        #             return selected_stock_status
 
         # Use OpenAI if available
         if self.openai:
