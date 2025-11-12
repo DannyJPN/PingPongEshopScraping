@@ -120,7 +120,7 @@ def normalize_value(value: str) -> str:
     return ' '.join(value.lower().split())
 
 
-def find_similar_values(values: list, threshold: float = 0.8) -> list:
+def find_similar_values(values: list, threshold: float = 0.9) -> list:
     """
     Najde podobné VALUES pomocí fuzzy matchingu.
 
@@ -165,7 +165,7 @@ def find_similar_values(values: list, threshold: float = 0.8) -> list:
     return similar_groups
 
 
-def find_similar_keys(deleted_keys: list, all_keys: list, threshold: float = 0.8) -> dict:
+def find_similar_keys(deleted_keys: list, all_keys: list, threshold: float = 0.9) -> dict:
     """
     Najde podobné KEYs k mazaným KEYs pomocí fuzzy matchingu.
 
@@ -342,7 +342,7 @@ def get_keys_to_remove(keys: list, initial_page: int = 1) -> list:
     print("Příkazy:")
     print("  [číslo]         - Označit KEY k vymazání (např. '3' nebo '1,5,7' nebo '1-5')")
     print("  'all'           - Vymazat všechny KEYs (celou VALUE)")
-    print("  'none' / Enter  - Ponechat všechny KEYs (VALUE je OK)")
+    print("  [Enter]         - Ponechat všechny KEYs (VALUE je OK)")
     print("\nNavigace (pro velké skupiny):")
     print("  'next' / 'n'    - Další stránka")
     print("  'prev' / 'p'    - Předchozí stránka")
@@ -368,7 +368,7 @@ def get_keys_to_remove(keys: list, initial_page: int = 1) -> list:
         if response.lower() == 'q':
             return None  # Signal to quit
 
-        if response.lower() in ['none', '']:
+        if response == '':
             return list(marked_for_removal)
 
         if response.lower() == 'all':
@@ -470,7 +470,7 @@ def get_keys_to_remove(keys: list, initial_page: int = 1) -> list:
                 print(f"❌ Chyba: Některé číslo je mimo rozsah 1-{len(keys)}")
 
         except ValueError:
-            print("❌ Neplatný příkaz. Zadejte čísla KEYs nebo příkaz (např. 'next', 'search', 'none')")
+            print("❌ Neplatný příkaz. Zadejte čísla KEYs nebo příkaz (např. 'next', 'search', Enter)")
 
 
 def save_memory_file(filepath: Path, data: dict):
@@ -514,8 +514,8 @@ Dostupné aliasy souborů:
                        help='Alias memory souboru (např. brand, model, type)')
     parser.add_argument('-l', '--language', default='CS',
                        help='Jazyk (CS nebo SK, default: CS)')
-    parser.add_argument('--threshold', type=float, default=0.8,
-                       help='Práh podobnosti pro detekci duplicit (0.0-1.0, default: 0.8)')
+    parser.add_argument('--threshold', type=float, default=0.9,
+                       help='Práh podobnosti pro detekci duplicit (0.0-1.0, default: 0.9)')
 
     args = parser.parse_args()
 
