@@ -397,13 +397,17 @@ class ProductParser:
         # shortdesc = from ShortDescMemory or OpenAI
         #repaired.shortdesc = self._get_short_description(downloaded)
 
-        # name = from NameMemory or OpenAI
+        # name = from NameMemory or OpenAI (composed from type + brand + model)
         repaired.name = self._get_product_name(downloaded)
+
+        # Extract individual components: type, brand, and model
+        # These are needed for filtering and export logic
+        repaired.type = self._get_product_type(downloaded)
+        repaired.brand = self._get_brand(downloaded)
+        repaired.model = self._get_product_model(downloaded)
+
         # category = from CategoryMemory or OpenAI (needed for code generation)
         repaired.category = self._get_category(downloaded)
-
-        # brand = from ProductBrandMemory or OpenAI (needed for code generation)
-        repaired.brand = self._get_brand(downloaded)
 
 
         # category_ids = derived from category using CategoryIDList

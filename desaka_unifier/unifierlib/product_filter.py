@@ -54,12 +54,8 @@ class ProductFilter:
 
                 # Check ItemFilter if we have filter data
                 if item_filter_data:
-                    # Extract product type from category (first part before >)
-                    product_type = ""
-                    if product.category:
-                        category_parts = product.category.split('>')
-                        if category_parts:
-                            product_type = category_parts[0].strip().lower()
+                    # Use product type directly from RepairedProduct.type field
+                    product_type = product.type.strip().lower() if product.type else ""
 
                     # Check if combination is allowed
                     is_allowed = False
