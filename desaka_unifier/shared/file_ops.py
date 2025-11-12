@@ -74,6 +74,43 @@ def load_txt_file(file_path: str) -> List[str]:
         raise
 
 
+def append_to_txt_file(file_path: str, lines: List[str]) -> None:
+    """
+    Append lines to a text file in UTF-8 format.
+
+    Args:
+        file_path (str): Path to the text file
+        lines (List[str]): Lines to append to the file
+    """
+    try:
+        logging.debug(f"Appending {len(lines)} lines to text file: {file_path}")
+
+        # Ensure the parent directory exists
+        parent_dir = os.path.dirname(file_path)
+        if parent_dir and not os.path.exists(parent_dir):
+            ensure_directory_exists(parent_dir)
+
+        # Append with UTF-8 encoding
+        with open(file_path, 'a', encoding='utf-8') as f:
+            for line in lines:
+                f.write(f"{line}\n")
+
+        logging.debug(f"Successfully appended {len(lines)} lines to: {file_path}")
+
+    except PermissionError as e:
+        logging.error(f"Permission denied while appending to file {file_path}. Error: {str(e)}", exc_info=True)
+        import sys
+        sys.exit(1)
+    except OSError as e:
+        logging.error(f"OS error while appending to file {file_path}. Error: {str(e)}", exc_info=True)
+        import sys
+        sys.exit(1)
+    except Exception as e:
+        logging.error(f"Error appending to text file {file_path}. Error: {str(e)}", exc_info=True)
+        import sys
+        sys.exit(1)
+
+
 
 
 
