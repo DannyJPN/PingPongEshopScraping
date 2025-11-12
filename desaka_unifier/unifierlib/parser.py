@@ -676,19 +676,24 @@ class ProductParser:
             except ValueError:
                 print(f"❌ Invalid input. Please enter a number between 1 and {len(similar_keys)} or 'none'")
 
-    def _heuristic_extraction(self, downloaded: DownloadedProduct, values: List[str]) -> tuple:
+    def _heuristic_extraction(self, downloaded: DownloadedProduct, values: List[str], skip_direct_match: bool = False) -> tuple:
         """
         Perform heuristic extraction on downloaded product.
 
         Args:
             downloaded (DownloadedProduct): Product to extract from
             values (List[str]): List of values to search for
+            skip_direct_match (bool): If True, skip direct text matching and only use similarity-based search
 
         Returns:
             tuple: (Single match if exactly one found or None, List of all matches)
         """
         if not values:
             return None, []
+
+        # If skip_direct_match is True, go directly to similarity-based search
+        if skip_direct_match:
+            return self._heuristic_similarity_search(downloaded, values, threshold=0.8)
 
         # Collect all texts to search in
         texts = []
@@ -794,11 +799,11 @@ class ProductParser:
         category_name_memory = self.memory.get(category_name_memory_key, {})
         available_categories = list(category_name_memory.values()) if category_name_memory else []
 
-        # Try heuristic extraction
+        # Try heuristic extraction (skip direct matching for categories, only use similarity-based search)
         single_match = None
         all_matches = []
         if available_categories:
-            single_match, all_matches = self._heuristic_extraction(downloaded, available_categories)
+            single_match, all_matches = self._heuristic_extraction(downloaded, available_categories, skip_direct_match=True)
 
             # Use OpenAI with CategoryNameMemory (translated category names) even if memory is empty
         if not single_match and self.openai:
