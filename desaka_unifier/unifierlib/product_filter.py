@@ -41,19 +41,9 @@ class ProductFilter:
         filtered_products = []
         rejected_products = []
         
-        # Load ItemFilter data
+        # Load ItemFilter data - use directly without redundant transformation
         item_filter_data = self.memory.get('ItemFilter', [])
-        
-        # Convert to list of allowed combinations
-        allowed_combinations = []
-        for row in item_filter_data:
-            if isinstance(row, dict) and 'typ_produktu' in row and 'znacka' in row and 'eshop_url' in row:
-                allowed_combinations.append({
-                    'typ': row['typ_produktu'].strip().lower(),
-                    'znacka': row['znacka'].strip().lower(),
-                    'url': row['eshop_url'].strip().lower()
-                })
-        
+
         with tqdm(total=len(repaired_products), desc="Filtering products", unit="product", miniters=1, mininterval=0.01) as pbar:
             for product in repaired_products:
                 # Check if category is "Vyřadit"
@@ -63,7 +53,7 @@ class ProductFilter:
                     continue
 
                 # Check ItemFilter if we have filter data
-                if allowed_combinations:
+                if item_filter_data:
                     # Extract product type from category (first part before >)
                     product_type = ""
                     if product.category:
@@ -73,12 +63,18 @@ class ProductFilter:
 
                     # Check if combination is allowed
                     is_allowed = False
-                    for combo in allowed_combinations:
-                        if (combo['typ'] == product_type and
-                            combo['znacka'] == product.brand.strip().lower() and
-                            combo['url'] in product.url.strip().lower()):
-                            is_allowed = True
-                            break
+                    for filter_row in item_filter_data:
+                        if isinstance(filter_row, dict) and 'product_type' in filter_row and 'brand' in filter_row and 'eshop_url' in filter_row:
+                            # Normalize values for comparison
+                            filter_type = filter_row['product_type'].strip().lower()
+                            filter_brand = filter_row['brand'].strip().lower()
+                            filter_url = filter_row['eshop_url'].strip().lower()
+
+                            if (filter_type == product_type and
+                                filter_brand == product.brand.strip().lower() and
+                                filter_url in product.url.strip().lower()):
+                                is_allowed = True
+                                break
 
                     if is_allowed:
                         filtered_products.append(product)
