@@ -166,8 +166,8 @@ class ScriptRunner:
 
             # Calculate eshop-specific result directory
             if eshop_name.lower() in ['pincesobchod', 'pincesobchod_cs', 'pincesobchod_sk'] or 'pincesobchod' in eshop_name.lower():
-                # Pincesobchod needs language suffix in result dir
-                eshop_result_dir = os.path.join(result_dir, f"Pincesobchod_{language}")
+                # Pincesobchod adds language suffix itself, so just pass base folder
+                eshop_result_dir = os.path.join(result_dir, "Pincesobchod")
             else:
                 # Other eshops use eshop name as result dir
                 eshop_result_dir = os.path.join(result_dir, eshop_name)
