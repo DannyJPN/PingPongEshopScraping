@@ -407,17 +407,17 @@ class ProductParser:
 
 
         # category_ids = derived from category using CategoryIDList
-       # repaired.category_ids = self._get_category_ids(repaired.category, downloaded)
+        repaired.category_ids = self._get_category_ids(repaired.category, downloaded)
 
 
 
         # code = complex code generation (needs brand and category)
-       # repaired.code = self._generate_code(repaired.brand, repaired.category, downloaded.name)
+        repaired.code = self._generate_code(repaired.brand, repaired.category, downloaded.name)
 
         # Variants = complex variant processing (needs code for variant codes)
         repaired.Variants = self._process_variants(downloaded, repaired.code)
         # price and price_standard = from variants
-      #  repaired.price, repaired.price_standard = self._get_prices(downloaded)
+        repaired.price, repaired.price_standard = self._get_prices(downloaded)
 
         # glami_category = from CategoryMappingGlami or user input
        # repaired.glami_category = self._get_category_mapping(repaired.category, 'Glami', downloaded)
@@ -2230,7 +2230,7 @@ class ProductParser:
         # Create variant products
         if repaired.Variants:
             for i, variant in enumerate(repaired.Variants):
-                variant_product = self._create_variant_export_product_complete(repaired, variant, i + 1)
+                variant_product = self._create_variant_export_product(repaired, variant, i + 1)
                 export_products.append(variant_product)
 
         return export_products

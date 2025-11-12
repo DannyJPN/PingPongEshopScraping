@@ -102,10 +102,9 @@ class ProductMerger:
             'price': self._merge_string_values([p.price for p in products]),
             'price_standard': self._merge_string_values([p.price_standard for p in products]),
             'shortdesc': self._merge_string_values([p.shortdesc for p in products]),
-            'variantcode': self._merge_string_values([p.variantcode for p in products]),
             'zbozi_category': self._merge_string_values([p.zbozi_category for p in products]),
             'zbozi_keywords': self._merge_string_values([p.zbozi_keywords for p in products]),
-            'URL': self._merge_string_values([p.URL for p in products])
+            'url': self._merge_string_values([p.url for p in products])
         }
         
         # Merge variants
