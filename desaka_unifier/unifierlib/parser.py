@@ -794,20 +794,14 @@ class ProductParser:
         category_name_memory = self.memory.get(category_name_memory_key, {})
         available_categories = list(category_name_memory.values()) if category_name_memory else []
 
-        # Try heuristic extraction
+        # Heuristic extraction disabled for categories (low hit rate due to strict category format)
         single_match = None
         all_matches = []
-        if available_categories:
-            single_match, all_matches = self._heuristic_extraction(downloaded, available_categories)
 
-            # Use OpenAI with CategoryNameMemory (translated category names) even if memory is empty
+        # Use OpenAI with CategoryNameMemory (translated category names) even if memory is empty
         if not single_match and self.openai:
-            # Include information about heuristic matches in the AI prompt if any were found
+            # Heuristic analysis is disabled for categories, so no heuristic info to provide
             heuristic_info = ""
-            if all_matches:
-                heuristic_info = f"Heuristic analysis found these potential categories in the text: {', '.join(all_matches)}. Please evaluate these candidates in your decision."
-            else:
-                heuristic_info = "Heuristic analysis did not find any matching categories in the text."
 
             category = self.openai.find_category(downloaded, available_categories, self.language, heuristic_info)
             if category:
@@ -830,11 +824,8 @@ class ProductParser:
                         return self._get_translated_category_name(standardized_key)
 
         # Ask user directly if AI not available or failed
-        print("\n🔍 HEURISTIC ANALYSIS RESULTS FOR CATEGORY:")
-        if all_matches:
-            print(f"  Found potential matches: {', '.join(all_matches)}")
-        else:
-            print("  No matches found in product text")
+        print("\n🔍 CATEGORY DETECTION:")
+        print("  (Heuristic analysis disabled for categories)")
 
         user_category = self._ask_user_for_product_value("category", downloaded, heuristic_match=single_match)
         if user_category:
