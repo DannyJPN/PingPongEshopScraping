@@ -1716,19 +1716,6 @@ class ProductParser:
 
             return formatted_name
 
-        # Try to find similar keys in memory
-        if memory_key in self.memory:
-            name_memory = self.memory[memory_key]
-            similar_keys = self._find_similar_memory_keys(downloaded.name, name_memory, threshold=0.8)
-
-            if similar_keys:
-                selected_name = self._ask_user_for_similar_key_selection("Product Name", downloaded.name, similar_keys, downloaded.url)
-                if selected_name:
-                    # Save to memory with current product name as key
-                    self.memory[memory_key][downloaded.name] = selected_name
-                    self._save_memory_file(memory_key)
-                    return selected_name
-
         # Get individual components
         product_type = self._get_product_type(downloaded)
         product_brand = self._get_brand(downloaded, for_name_composition=True)  # Use unified method with parameter
