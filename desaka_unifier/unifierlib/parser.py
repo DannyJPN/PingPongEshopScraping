@@ -2033,7 +2033,7 @@ class ProductParser:
                 # Copy price information from original variant
                 processed_variant.current_price = getattr(variant, 'current_price', 0.0) or 0.0
                 processed_variant.basic_price = getattr(variant, 'basic_price', 0.0) or 0.0
-                processed_variant.stock_status = self._standardize_stock_status(getattr(variant, 'stock_status', ''))
+                processed_variant.stock_status = self._standardize_stock_status(getattr(variant, 'stock_status', ''), downloaded)
 
                 # Generate variant code for this specific variant
                 if base_code:
@@ -2750,7 +2750,7 @@ class ProductParser:
 
         return variant_product
 
-    def _standardize_stock_status(self, stock_status: str) -> str:
+    def _standardize_stock_status(self, stock_status: str, downloaded: DownloadedProduct) -> str:
         """Standardize stock status using memory or OpenAI."""
         if not stock_status or not stock_status.strip():
             return ""
@@ -2806,7 +2806,7 @@ class ProductParser:
                     return confirmed_value
 
         # Ask user directly if AI not available or failed
-        user_value = self._ask_user_for_variant_value("Stock Status", stock_status, f"Stock status: {stock_status}")
+        user_value = self._ask_user_for_variant_value("Stock Status", stock_status, downloaded, f"Stock status: {stock_status}")
         if user_value:
             user_value = user_value.strip()
             # Save to memory
