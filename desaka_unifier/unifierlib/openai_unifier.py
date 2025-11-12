@@ -643,37 +643,56 @@ Please return your response as valid JSON only."""
 
         return None
 
-    def translate_and_validate_short_description(self, short_description: str, language: str, description: str = "") -> Optional[str]:
+    def translate_and_validate_short_description(self, short_description: str, language: str, description: str = "",
+                                                 product_type: str = None, product_brand: str = None,
+                                                 product_model: str = None) -> Optional[str]:
         """Translate and validate short description using OpenAI, or generate from description if short_description is empty."""
         from unifierlib.memory_manager import get_language_name
         target_language = get_language_name(language, self.supported_languages_data)
 
         system_prompt = self._create_system_prompt('translation', language)
 
+        # Build product context section if available
+        product_context = ""
+        if product_type or product_brand or product_model:
+            context_parts = []
+            if product_type:
+                context_parts.append(f"- Type: {product_type}")
+            if product_brand:
+                context_parts.append(f"- Brand: {product_brand}")
+            if product_model:
+                context_parts.append(f"- Model: {product_model}")
+            product_context = "\n\nProduct context:\n" + "\n".join(context_parts)
+
         # If short description is empty but description is available, generate from description
         if not short_description or not short_description.strip():
             if description and description.strip():
-                user_prompt = f"""I humbly request your help in generating a short product description for table tennis equipment from the full description. Please assist me in creating a proper short description.
+                user_prompt = f"""I humbly request your help in generating a short product description for table tennis equipment from the full description.{product_context}
 
 Full product description: {description}
 
 I respectfully ask you to:
-1. Create a concise short description based on the full description
-2. If the text is not in {target_language}, translate it to {target_language} using proper table tennis SLANG and terminology - prioritize table tennis industry terms over literal translations:
+1. Create a concise short description (maximum 150 characters including spaces)
+2. Use COMPLETE sentences only - never end with ellipsis (...)
+3. Structure: Start with product type and key benefit
+   Example for rubber: "Potah pro výjimečný spin a kontrolu v útočné hře."
+   Example for blade: "Ofenzivní dřevo s vynikající rychlostí a stabilitou."
+   Example for shoes: "Profesionální boty pro maximální přilnavost a komfort."
+4. If the text is not in {target_language}, translate using proper table tennis SLANG and terminology - prioritize table tennis industry terms over literal translations:
    • "rubber" = "potah" (NEVER "guma")
    • "blade" = "dřevo" (NEVER "čepel")
    • "paddle/racket" = "pálka"
-3. Maximum 150 characters
-4. Focus on the most important product features and benefits
-5. Return plain text without HTML
-6. Return the result as JSON with the property "shortdesc"
+5. Focus on ONE key selling point (spin, speed, control, stability, etc.)
+6. Use active, specific language - avoid generic phrases
+7. Return plain text without HTML
+8. Return the result as JSON with the property "shortdesc"
 
 Please return your response as valid JSON only."""
             else:
                 return None
         else:
             # Original logic for translating existing short description
-            user_prompt = f"""I humbly request your help in translating and validating a short product description for table tennis equipment. Please assist me in creating a proper short description.
+            user_prompt = f"""I humbly request your help in translating and validating a short product description for table tennis equipment.{product_context}
 
 Original short description: {short_description}
 
@@ -682,10 +701,12 @@ I respectfully ask you to:
    • "rubber" = "potah" (NEVER "guma")
    • "blade" = "dřevo" (NEVER "čepel")
    • "paddle/racket" = "pálka"
-2. Maximum 150 characters
-3. Keep the original meaning intact
-4. Return plain text without HTML
-5. Return the result as JSON with the property "shortdesc"
+2. Maximum 150 characters including spaces
+3. Use COMPLETE sentences only - never end with ellipsis (...)
+4. Keep the original meaning intact
+5. Focus on ONE key selling point
+6. Return plain text without HTML
+7. Return the result as JSON with the property "shortdesc"
 
 Please return your response as valid JSON only."""
 
