@@ -836,7 +836,7 @@ class ProductParser:
         else:
             print("  No matches found in product text")
 
-        user_category = self._ask_user_for_product_value("category", downloaded)
+        user_category = self._ask_user_for_product_value("category", downloaded, heuristic_match=single_match)
         if user_category:
             # Find the key for this category value
             category_key = self._find_category_key_by_value(user_category)
@@ -851,15 +851,14 @@ class ProductParser:
                 # Return the translated category name for this language
                 return self._get_translated_category_name(standardized_key)
             else:
-                # If category key not found, try old standardization for backward compatibility
-                standardized_category = self._standardize_category(user_category)
-                if standardized_category:
-                    # Save to memory
-                    if memory_key not in self.memory:
-                        self.memory[memory_key] = {}
-                    self.memory[memory_key][downloaded.name] = standardized_category
-                    self._save_memory_file(memory_key)
-                    return standardized_category
+                # If category key not found, use user input as-is for backward compatibility
+                # This handles old categories that might not have keys in the new system
+                logging.debug(f"Category key not found for '{user_category}', saving user input as-is")
+                if memory_key not in self.memory:
+                    self.memory[memory_key] = {}
+                self.memory[memory_key][downloaded.name] = user_category
+                self._save_memory_file(memory_key)
+                return user_category
 
         return ""
 
@@ -949,7 +948,7 @@ class ProductParser:
         else:
             print("  No matches found in product text")
 
-        user_brand = self._ask_user_for_product_value("Brand", downloaded)
+        user_brand = self._ask_user_for_product_value("Brand", downloaded, heuristic_match=single_match)
         if user_brand:
             # Save to memory
             if memory_key not in self.memory:
@@ -1039,7 +1038,7 @@ class ProductParser:
         else:
             print("  No matches found in product text")
 
-        user_type = self._ask_user_for_product_value("Product Type", downloaded)
+        user_type = self._ask_user_for_product_value("Product Type", downloaded, heuristic_match=single_match)
         if user_type:
             # Save to memory
             if memory_key not in self.memory:
@@ -1121,7 +1120,7 @@ class ProductParser:
         else:
             print("  No matches found in product text")
 
-        user_model = self._ask_user_for_product_value("Product Model", downloaded)
+        user_model = self._ask_user_for_product_value("Product Model", downloaded, heuristic_match=single_match)
         if user_model:
             # Save to memory
             if memory_key not in self.memory:
@@ -1197,9 +1196,10 @@ class ProductParser:
         if category_key in category_list:
             return category_key
 
-        # If not found, try to find a match using the old standardization logic
-        # This is for backward compatibility
-        return self._standardize_category(category_key)
+        # If not found in CategoryList, return as-is for backward compatibility
+        # (old categories might not be in the new CategoryList yet)
+        logging.debug(f"Category key '{category_key}' not found in CategoryList, returning as-is")
+        return category_key
 
     def _get_category_ids(self, category: str, downloaded: DownloadedProduct) -> str:
         """Get category IDs from category path using the new key-based system."""
@@ -1440,7 +1440,7 @@ class ProductParser:
         except KeyboardInterrupt:
             return ai_suggestion.strip() if ai_suggestion else ""
 
-    def _ask_user_for_product_value(self, property_name: str, downloaded: DownloadedProduct, current_value: str = "") -> str:
+    def _ask_user_for_product_value(self, property_name: str, downloaded: DownloadedProduct, current_value: str = "", heuristic_match: str = None) -> str:
         """Ask user for product property value with detailed product information display."""
         try:
             # Create a more readable display format similar to AI confirmation
@@ -1451,6 +1451,11 @@ class ProductParser:
             if downloaded.url:
                 print(f"🔗 URL: {downloaded.url}")
             print("-" * 80)
+
+            # Display heuristic match if found
+            if heuristic_match:
+                print(f"🔍 HEURISTIC FOUND: {heuristic_match}")
+                print("-" * 80)
 
             # Display current product properties for context
             print(f"📄 Current Product Properties:")
@@ -1477,10 +1482,16 @@ class ProductParser:
                 print(f"   Current {property_name}: (empty)")
 
             print("=" * 80)
-            response = input(f"✏️  Please enter {property_name}: ").strip()
-            return response if response else ""
+
+            # Adjust prompt based on whether heuristic match exists
+            if heuristic_match:
+                response = input(f"✏️  Press Enter to use '{heuristic_match}' or type new value: ").strip()
+                return response if response else heuristic_match
+            else:
+                response = input(f"✏️  Please enter {property_name}: ").strip()
+                return response if response else ""
         except KeyboardInterrupt:
-            return ""
+            return heuristic_match if heuristic_match else ""
 
     def _ask_user_for_variant_value(self, property_name: str, original_value: str, downloaded: DownloadedProduct, context_info: str = "") -> str:
         """Ask user for variant property value with context information display."""
