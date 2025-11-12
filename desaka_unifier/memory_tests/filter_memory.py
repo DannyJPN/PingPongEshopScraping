@@ -5,7 +5,7 @@ Filtrování memory souborů - automatické čištění podle pravidel
 
 Skript provádí kaskádové filtrování memory souborů:
 1. Načte CategoryNameMemory a identifikuje hierarchicky neúplné kategorie (pouze detekce, soubor se nemodifikuje)
-2. Čistí CategoryMemory od neúplných kategorií
+2. Čistí CategoryMemory od neúplných a neexistujících kategorií
 3. Čistí ProductBrandMemory od neznámých značek (načte seznam z BrandCodeList)
 4. Odstraní značky z ProductType a ProductModel Memory
 5. Odstraní modely z typů a slova typů z modelů
@@ -122,31 +122,37 @@ def filter_incomplete_categories(category_name_memory: Dict[str, str]) -> Set[st
 
 def filter_category_memory(
     category_memory: Dict[str, str],
-    incomplete_categories: Set[str]
+    incomplete_categories: Set[str],
+    valid_categories: Set[str]
 ) -> Dict[str, str]:
     """
-    Odstraní záznamy s neúplnými kategoriemi.
+    Odstraní záznamy s neúplnými a neexistujícími kategoriemi.
 
     Args:
         category_memory: CategoryMemory slovník
         incomplete_categories: Set neúplných kategorií
+        valid_categories: Set platných kategorií (z CategoryNameMemory)
 
     Returns:
         Vyfiltrovaný slovník
     """
-    print("\n🧹 Čištění CategoryMemory od neúplných kategorií...")
+    print("\n🧹 Čištění CategoryMemory od neúplných a neexistujících kategorií...")
     filtered = {}
-    removed_count = 0
+    removed_incomplete = 0
+    removed_nonexistent = 0
 
     with tqdm(total=len(category_memory), desc="Filtrování CategoryMemory", unit="záznam") as pbar:
         for key, value in category_memory.items():
-            if value not in incomplete_categories:
-                filtered[key] = value
+            if value in incomplete_categories:
+                removed_incomplete += 1
+            elif value not in valid_categories:
+                removed_nonexistent += 1
             else:
-                removed_count += 1
+                filtered[key] = value
             pbar.update(1)
 
-    print(f"   ❌ Odstraněno: {removed_count} záznamů")
+    print(f"   ❌ Odstraněno neúplných: {removed_incomplete} záznamů")
+    print(f"   ❌ Odstraněno neexistujících: {removed_nonexistent} záznamů")
     print(f"   ✓ Zbývá: {len(filtered)} záznamů")
 
     return filtered
@@ -465,7 +471,7 @@ Příklady použití:
 
 Skript provádí kaskádové filtrování:
 1. Načte CategoryNameMemory a najde neúplné kategorie (pouze zdrojový soubor, nemodifikuje se)
-2. Čistí CategoryMemory od neúplných kategorií
+2. Čistí CategoryMemory od neúplných a neexistujících kategorií
 3. Načte BrandCodeList a čistí ProductBrandMemory od neznámých značek
 4. Odstraní značky z ProductType a ProductModel Memory
 5. Odstraní modely z typů a slova typů z modelů
@@ -506,10 +512,12 @@ Poznámka: CategoryNameMemory a BrandCodeList jsou pouze zdrojové soubory
         print(f"✓ Načteno {len(category_name_memory)} záznamů z CategoryNameMemory")
 
         incomplete_categories = filter_incomplete_categories(category_name_memory)
+        valid_categories = set(category_name_memory.values())
         print(f"\n📊 Nalezeno {len(incomplete_categories)} hierarchicky neúplných kategorií")
+        print(f"📊 Celkem {len(valid_categories)} platných kategorií v CategoryNameMemory")
         print(f"ℹ️  CategoryNameMemory zůstává beze změny - použije se jen pro filtrování CategoryMemory")
 
-        # ===== 2. CategoryMemory - vyčistit neúplné kategorie =====
+        # ===== 2. CategoryMemory - vyčistit neúplné a neexistující kategorie =====
         print("\n" + "="*80)
         print("KROK 2: Čištění CategoryMemory")
         print("="*80)
@@ -518,7 +526,7 @@ Poznámka: CategoryNameMemory a BrandCodeList jsou pouze zdrojové soubory
         category_memory = load_memory_as_dict(category_filepath)
         print(f"✓ Načteno {len(category_memory)} záznamů z CategoryMemory")
 
-        category_memory = filter_category_memory(category_memory, incomplete_categories)
+        category_memory = filter_category_memory(category_memory, incomplete_categories, valid_categories)
         save_memory_dict(category_memory, category_filepath, dry_run)
 
         # ===== 3. BrandCodeList - načíst seznam značek =====
