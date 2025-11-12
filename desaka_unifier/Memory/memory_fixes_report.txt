@@ -1,0 +1,11 @@
+FINÁLNÍ REPORT OPRAV MEMORY SOUBORŮ
+================================================================================
+
+Celkem provedeno oprav: 28324
+
+Detailní statistiky:
+  types_fixed: 8041
+  models_german_cleaned: 16726
+  models_both_fixed: 1550
+  models_types_removed: 2007
+  categories_ok: True
