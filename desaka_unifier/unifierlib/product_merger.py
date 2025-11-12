@@ -186,30 +186,47 @@ class ProductMerger:
     def _get_variant_key(self, variant: Variant) -> str:
         """
         Generate a unique key for variant comparison.
-        
+
         Variants are considered duplicate if all properties match:
         - current_price
-        - basic_price  
+        - basic_price
         - stock_status
         - key_value_pairs (order doesn't matter)
-        
+
+        The comparison is order-independent for key_value_pairs - variants with
+        the same keys and values in different order are considered identical.
+
         Args:
             variant: Variant to generate key for
-            
+
         Returns:
             String key for variant comparison
         """
-        # Sort key_value_pairs to make order irrelevant
-        sorted_kvp = {}
+        # Normalize and sort key_value_pairs to make order and case irrelevant
+        # Convert to list of tuples, normalize both keys and values, then sort
+        normalized_kvp = []
         if variant.key_value_pairs:
-            sorted_kvp = dict(sorted(variant.key_value_pairs.items()))
-        
-        key_data = {
-            'current_price': variant.current_price,
-            'basic_price': variant.basic_price,
-            'stock_status': variant.stock_status,
-            'key_value_pairs': sorted_kvp
-        }
-        
+            for key, value in variant.key_value_pairs.items():
+                # Normalize key: strip whitespace, convert to lowercase
+                normalized_key = str(key).strip().lower()
+                # Normalize value: strip whitespace, convert to string, lowercase
+                normalized_value = str(value).strip().lower()
+                normalized_kvp.append((normalized_key, normalized_value))
+            # Sort by key to ensure consistent ordering
+            normalized_kvp.sort()
+
+        # Create comparison tuple (tuples are hashable and can be compared)
+        key_data = (
+            variant.current_price,
+            variant.basic_price,
+            variant.stock_status.strip().lower() if variant.stock_status else '',
+            tuple(normalized_kvp)  # Convert list to tuple for hashability
+        )
+
         # Convert to JSON string for consistent comparison
-        return json.dumps(key_data, sort_keys=True, ensure_ascii=False)
+        return json.dumps({
+            'current_price': key_data[0],
+            'basic_price': key_data[1],
+            'stock_status': key_data[2],
+            'key_value_pairs': key_data[3]
+        }, sort_keys=True, ensure_ascii=False)
