@@ -30,7 +30,8 @@ from .constants import (
     DESC_MEMORY_PREFIX,
     SHORT_DESC_MEMORY_PREFIX,
     KEYWORDS_GOOGLE_PREFIX,
-    KEYWORDS_ZBOZI_PREFIX
+    KEYWORDS_ZBOZI_PREFIX,
+    CATEGORY_ID_LIST
 )
 
 
@@ -142,8 +143,8 @@ class ProductMerger:
                                                   'category', products),
             'brand': self._merge_string_values([p.brand for p in products],
                                                'brand', products),
-            'category_ids': self._merge_string_values([p.category_ids for p in products],
-                                                      'category_ids', products),
+            # category_ids is derived from category, will be recalculated after merge
+            'category_ids': '',  # Will be set by _recalculate_category_ids()
             'code': self._merge_string_values([p.code for p in products],
                                               'code', products),
             'desc': self._merge_string_values([p.desc for p in products],
@@ -184,6 +185,9 @@ class ProductMerger:
         for key, value in merged_data.items():
             setattr(merged_product, key, value)
 
+        # Recalculate category_ids from category (derived field)
+        merged_product.category_ids = self._recalculate_category_ids(merged_product.category)
+
         # Update NameMemory if type/brand/model were resolved
         # This ensures NameMemory stays consistent with the chosen values
         if merged_data.get('type') or merged_data.get('brand') or merged_data.get('model'):
@@ -196,7 +200,68 @@ class ProductMerger:
 
         logging.debug(f"Successfully merged {len(products)} products into one: {merged_product.name}")
         return merged_product
-    
+
+    def _recalculate_category_ids(self, category: str) -> str:
+        """
+        Recalculate category_ids from category path.
+
+        Category IDs are derived from category path by splitting on '>', reversing,
+        and looking up each part in CategoryIDList.
+
+        Args:
+            category: Category path (e.g., "Potahy>Softy>Softy ALL")
+
+        Returns:
+            str: Comma-separated category IDs (e.g., "123,456,789")
+        """
+        if not category or not category.strip():
+            return ""
+
+        # Load CategoryIDList
+        category_id_list_path = os.path.join(self.memory_dir, CATEGORY_ID_LIST)
+
+        try:
+            # Validate path
+            category_id_list_path = self._validate_file_path(category_id_list_path)
+
+            csv_data = load_csv_file(category_id_list_path)
+
+            # Convert to dict (category_part -> ID)
+            id_mapping = {}
+            for row in csv_data:
+                # CategoryIDList has columns like "Category" and "ID" or similar
+                # Try different column name patterns
+                if 'Category' in row and 'ID' in row:
+                    id_mapping[row['Category']] = row['ID']
+                elif 'category' in row and 'id' in row:
+                    id_mapping[row['category']] = row['id']
+                # Fallback: assume first two columns are category and ID
+                elif len(row) >= 2:
+                    keys = list(row.keys())
+                    id_mapping[row[keys[0]]] = row[keys[1]]
+
+            # Split category by >, reverse, and map to IDs
+            category_parts = [part.strip() for part in category.split('>')]
+            category_parts.reverse()
+
+            ids = []
+            for part in category_parts:
+                if part in id_mapping:
+                    ids.append(str(id_mapping[part]))
+                else:
+                    logging.warning(f"Category part '{part}' not found in CategoryIDList, skipping")
+
+            result = ','.join(ids)
+            logging.debug(f"Recalculated category_ids: '{category}' -> '{result}'")
+            return result
+
+        except FileNotFoundError:
+            logging.warning(f"CategoryIDList not found at {category_id_list_path}, cannot recalculate category_ids")
+            return ""
+        except Exception as e:
+            logging.error(f"Error recalculating category_ids: {str(e)}", exc_info=True)
+            return ""
+
     def _merge_string_values(self, values: List[str], field_name: str,
                              products: List[RepairedProduct], allow_multiple: bool = False) -> str:
         """
