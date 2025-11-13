@@ -87,8 +87,8 @@ def main():
         products = extract_products(product_detail_page_paths)
 
         # Step 9: Iterate through all the products and create folders for images
-        download_product_main_image(products, root_folder, overwrite, stats)
-        download_product_gallery_images(products, root_folder, overwrite, stats)
+        download_product_main_image(products, root_folder, overwrite, stats=stats)
+        download_product_gallery_images(products, root_folder, overwrite, stats=stats)
 
         # Step 10: Generate the final CSV output
         csv_output_path = f"{get_full_day_folder(root_folder)}/{CSV_OUTPUT_NAME}"

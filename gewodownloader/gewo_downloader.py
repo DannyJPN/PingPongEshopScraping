@@ -73,32 +73,32 @@ def main():
         category_links = extract_category_links(main_page_dom)
 
         # Step 3: Download all the category first pages
-        category_firstpage_paths = download_category_firstpages(category_links, root_folder, overwrite, stats)
+        category_firstpage_paths = download_category_firstpages(category_links, root_folder, overwrite, stats=stats)
 
         # Step 4: Make a list of all the category pages and download them
         category_page_links = extract_all_category_pages_links(category_firstpage_paths)
 
         # Step 5: Download all category pages with "strana" URLs
-        category_pages_downloaded_paths = download_category_pages(category_page_links, root_folder, overwrite, stats)
+        category_pages_downloaded_paths = download_category_pages(category_page_links, root_folder, overwrite, stats=stats)
 
         # Step 6: Scrape all of the category pages for their next pages (those with strana-NUMBER)
         product_detail_links = extract_all_product_detail_links(category_pages_downloaded_paths)
 
         # Step 7: Download all the product detail pages
-        product_detail_page_paths = download_product_detail_pages(product_detail_links, root_folder, overwrite, stats)
+        product_detail_page_paths = download_product_detail_pages(product_detail_links, root_folder, overwrite, stats=stats)
         product_detail_variant_links = extract_all_product_variant_detail_links(product_detail_page_paths)
-        product_detail_variant_page_paths = download_product_detail_variant_pages(product_detail_variant_links, root_folder, overwrite, stats)
+        product_detail_variant_page_paths = download_product_detail_variant_pages(product_detail_variant_links, root_folder, overwrite, stats=stats)
         logging.info(f"Extracted paths : {len(product_detail_variant_page_paths)}")
         product_detail_all_variant_links = extract_all_product_variant_detail_links(product_detail_variant_page_paths)
-        product_detail_all_variant_page_paths = download_product_detail_variant_pages(product_detail_all_variant_links, root_folder, overwrite, stats)
+        product_detail_all_variant_page_paths = download_product_detail_variant_pages(product_detail_all_variant_links, root_folder, overwrite, stats=stats)
         product_detail_all_variant_page_paths.extend(product_detail_variant_page_paths)
 
         # Step 8: Make a list of product class instances using the extraction methods
         products = extract_products(product_detail_all_variant_page_paths)
 
         # Step 9: Iterate through all the products and create folders for images
-        download_product_main_image(products, root_folder, overwrite, stats)
-        download_product_gallery_images(products, root_folder, overwrite, stats)
+        download_product_main_image(products, root_folder, overwrite, stats=stats)
+        download_product_gallery_images(products, root_folder, overwrite, stats=stats)
 
         # Step 10: Generate the final CSV output
         csv_output_path = f"{get_full_day_folder(root_folder)}/{CSV_OUTPUT_NAME}"
