@@ -4,7 +4,6 @@ from tqdm import tqdm
 from shared.utils import get_photos_folder
 from shared.utils import sanitize_filename
 from shared.image_downloader import download_image
-from shared.download_constants import BASE_RETRY_DELAY
 
 def download_product_main_image(products,rootfolder, overwrite, stats=None):
     with tqdm(total=len(products), desc="Downloading main images") as pbar:
@@ -17,16 +16,7 @@ def download_product_main_image(products,rootfolder, overwrite, stats=None):
 
                 # Update progress bar with statistics
                 if stats:
-                    url = products[i].main_photo_link
-                    total_req, failed_req = stats.get_stats(url)
-                    if total_req > 0:
-                        success_rate = ((total_req - failed_req) / total_req) * 100
-                        failure_rate = stats.get_failure_rate(url)
-                        current_delay = BASE_RETRY_DELAY * (1 + failure_rate)
-                        pbar.set_postfix({
-                            'OK': f'{success_rate:.1f}%',
-                            'delay': f'{current_delay:.3f}s'
-                        })
+                    stats.update_progress_bar(pbar, products[i].main_photo_link)
                 pbar.update(1)
             except Exception as e:
                 logging.error(f"Error downloading main image for product {products[i].name}: {e}", exc_info=True)
@@ -47,15 +37,7 @@ def download_product_gallery_images(products,rootfolder, overwrite, stats=None):
 
                     # Update progress bar with statistics
                     if stats:
-                        total_req, failed_req = stats.get_stats(link)
-                        if total_req > 0:
-                            success_rate = ((total_req - failed_req) / total_req) * 100
-                            failure_rate = stats.get_failure_rate(link)
-                            current_delay = BASE_RETRY_DELAY * (1 + failure_rate)
-                            pbar.set_postfix({
-                                'OK': f'{success_rate:.1f}%',
-                                'delay': f'{current_delay:.3f}s'
-                            })
+                        stats.update_progress_bar(pbar, link)
                     pbar.update(1)
             except Exception as e:
                 logging.error(f"Error downloading gallery images for product {products[i].name}: {e}", exc_info=True)

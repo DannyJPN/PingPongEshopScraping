@@ -120,6 +120,26 @@ class DownloadStats:
         with self._lock:
             return dict(self._stats)
 
+    def update_progress_bar(self, pbar, url: str) -> None:
+        """
+        Update progress bar with current statistics.
+
+        Args:
+            pbar: tqdm progress bar instance
+            url: URL to get statistics for
+        """
+        from shared.download_constants import BASE_RETRY_DELAY
+
+        total_req, failed_req = self.get_stats(url)
+        if total_req > 0:
+            success_rate = ((total_req - failed_req) / total_req) * 100
+            failure_rate = self.get_failure_rate(url)
+            current_delay = BASE_RETRY_DELAY * (1 + failure_rate)
+            pbar.set_postfix({
+                'OK': f'{success_rate:.1f}%',
+                'delay': f'{current_delay:.3f}s'
+            })
+
     def log_summary(self) -> None:
         """Log summary of all domain statistics."""
         with self._lock:
