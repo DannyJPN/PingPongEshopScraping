@@ -4,6 +4,7 @@ import logging
 from tqdm import tqdm  # Import TQDM
 from shared.image_downloader import download_image
 from shared.utils import get_products_folder, get_photos_folder, sanitize_filename
+from shared.download_constants import BASE_RETRY_DELAY
 
 def process_json_file(json_filepath, result_folder, lang_code, overwrite, stats=None):
     try:
@@ -62,6 +63,18 @@ def process_json_file(json_filepath, result_folder, lang_code, overwrite, stats=
             for image_url, image_filepath in main_images:
                 logging.debug(f"Downloading main image from {image_url} to {image_filepath}")
                 download_image(image_url, image_filepath, overwrite=overwrite, stats=stats)
+
+                # Update progress bar with statistics
+                if stats:
+                    total_req, failed_req = stats.get_stats(image_url)
+                    if total_req > 0:
+                        success_rate = ((total_req - failed_req) / total_req) * 100
+                        failure_rate = stats.get_failure_rate(image_url)
+                        current_delay = BASE_RETRY_DELAY * (1 + failure_rate)
+                        pbar.set_postfix({
+                            'OK': f'{success_rate:.1f}%',
+                            'delay': f'{current_delay:.3f}s'
+                        })
                 pbar.update(1)
 
         # Download gallery images
@@ -69,6 +82,18 @@ def process_json_file(json_filepath, result_folder, lang_code, overwrite, stats=
             for image_url, image_filepath in gallery_images:
                 logging.debug(f"Downloading gallery image from {image_url} to {image_filepath}")
                 download_image(image_url, image_filepath, overwrite=overwrite, stats=stats)
+
+                # Update progress bar with statistics
+                if stats:
+                    total_req, failed_req = stats.get_stats(image_url)
+                    if total_req > 0:
+                        success_rate = ((total_req - failed_req) / total_req) * 100
+                        failure_rate = stats.get_failure_rate(image_url)
+                        current_delay = BASE_RETRY_DELAY * (1 + failure_rate)
+                        pbar.set_postfix({
+                            'OK': f'{success_rate:.1f}%',
+                            'delay': f'{current_delay:.3f}s'
+                        })
                 pbar.update(1)
 
     except Exception as e:

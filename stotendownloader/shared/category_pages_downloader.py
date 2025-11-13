@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 from datetime import datetime
 from shared.webpage_downloader import download_webpage
 from shared.utils import sanitize_filename, get_pages_folder
+from shared.download_constants import BASE_RETRY_DELAY
 
 def download_category_pages(category_page_links, root_folder, overwrite=False, debug=False, stats=None):
     """
@@ -38,7 +39,17 @@ def download_category_pages(category_page_links, root_folder, overwrite=False, d
                     # Add the absolute path to the list of downloaded files
                     downloaded_files.append(os.path.abspath(file_path))
 
-                # Update progress bar
+                # Update progress bar with statistics
+                if stats:
+                    total_req, failed_req = stats.get_stats(url)
+                    if total_req > 0:
+                        success_rate = ((total_req - failed_req) / total_req) * 100
+                        failure_rate = stats.get_failure_rate(url)
+                        current_delay = BASE_RETRY_DELAY * (1 + failure_rate)
+                        pbar.set_postfix({
+                            'OK': f'{success_rate:.1f}%',
+                            'delay': f'{current_delay:.3f}s'
+                        })
                 pbar.update(1)
 
             except Exception as e:
