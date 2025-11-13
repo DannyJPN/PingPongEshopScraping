@@ -28,7 +28,7 @@ class ScriptRunner:
         self.completed_scripts = []
         self.failed_scripts = []
 
-    def run_scripts_parallel(self, eshop_list: List[Dict[str, Any]], language: str, result_dir: str,
+    def run_scripts_parallel(self, eshop_list: List[Dict[str, Any]], language: str, result_dir: str, log_dir: str,
                              debug: bool = False, overwrite: bool = False, max_workers: int = 5) -> bool:
         """
         Run eshop downloader scripts in parallel with progress tracking.
@@ -37,6 +37,7 @@ class ScriptRunner:
             eshop_list (List[Dict[str, Any]]): List of eshop information from EshopList.csv
             language (str): Language code to pass to scripts
             result_dir (str): Base result directory
+            log_dir (str): Log directory to pass to scripts
             debug (bool): Debug flag to pass to scripts
             overwrite (bool): Overwrite flag to pass to scripts
             max_workers (int): Maximum number of parallel workers
@@ -56,7 +57,7 @@ class ScriptRunner:
                 with ThreadPoolExecutor(max_workers=max_workers) as executor:
                     # Submit all scripts for execution
                     future_to_eshop = {
-                        executor.submit(self._run_single_script, eshop, language, result_dir, debug, overwrite): eshop
+                        executor.submit(self._run_single_script, eshop, language, result_dir, log_dir, debug, overwrite): eshop
                         for eshop in eshop_list
                     }
 
@@ -101,7 +102,7 @@ class ScriptRunner:
 
         return failed_scripts == 0
 
-    def _run_single_script(self, eshop: Dict[str, Any], language: str, result_dir: str,
+    def _run_single_script(self, eshop: Dict[str, Any], language: str, result_dir: str, log_dir: str,
                           debug: bool, overwrite: bool) -> bool:
         """
         Run a single eshop downloader script in its own window.
@@ -110,6 +111,7 @@ class ScriptRunner:
             eshop (Dict[str, Any]): Eshop information containing Name, URL, Script
             language (str): Language code to pass to the script
             result_dir (str): Base result directory
+            log_dir (str): Log directory to pass to script
             debug (bool): Debug flag to pass to script
             overwrite (bool): Overwrite flag to pass to script
 
@@ -166,14 +168,15 @@ class ScriptRunner:
 
             # Calculate eshop-specific result directory
             if eshop_name.lower() in ['pincesobchod', 'pincesobchod_cs', 'pincesobchod_sk'] or 'pincesobchod' in eshop_name.lower():
-                # Pincesobchod needs language suffix in result dir
-                eshop_result_dir = os.path.join(result_dir, f"Pincesobchod_{language}")
+                # Pincesobchod adds language suffix itself, so just pass base folder
+                eshop_result_dir = os.path.join(result_dir, "Pincesobchod")
             else:
                 # Other eshops use eshop name as result dir
                 eshop_result_dir = os.path.join(result_dir, eshop_name)
 
             # Add common parameters for all scripts
-            script_args.extend(["--result_folder", eshop_result_dir])
+            script_args.extend(["--result_dir", eshop_result_dir])
+            script_args.extend(["--log_dir", log_dir])
 
             if debug:
                 script_args.append("--debug")
@@ -187,13 +190,13 @@ class ScriptRunner:
                 country_code = language_to_country_code(language)
                 if country_code:
                     script_args.extend(["--country_code", country_code])
-                    logging.debug(f"Using pincesobchod parameters: --country_code {country_code} (converted from language {language}), --result_folder {eshop_result_dir}")
+                    logging.debug(f"Using pincesobchod parameters: --country_code {country_code} (converted from language {language}), --result_dir {eshop_result_dir}, --log_dir {log_dir}")
                 else:
                     logging.error(f"Failed to convert language '{language}' to country code for pincesobchod")
                     return False
             else:
                 # Other eshops don't expect any language parameter
-                logging.debug(f"Using standard parameters: --result_folder {eshop_result_dir}")
+                logging.debug(f"Using standard parameters: --result_dir {eshop_result_dir}, --log_dir {log_dir}")
 
             # Log final command for debugging
             logging.debug(f"Final script command: {' '.join(script_args)}")

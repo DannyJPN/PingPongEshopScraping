@@ -8,6 +8,7 @@ DEFAULT_LANGUAGE = "CS"
 DEFAULT_RESULT_DIR = "H:/Desaka"
 DEFAULT_MEMORY_DIR = os.path.join(SCRIPT_DIR, "Memory")
 DEFAULT_EXPORT_DIR = "H:/Desaka/Results"
+DEFAULT_LOG_DIR = r"H:/Logs"
 DEFAULT_CONFIRM_AI_RESULTS = False
 DEFAULT_ENABLE_FINE_TUNING = False
 DEFAULT_USE_FINE_TUNED_MODELS = False
@@ -92,7 +93,7 @@ MEMORY_KEY_VARIANT_NAME_MEMORY = "VariantNameMemory_{language}"
 MEMORY_KEY_VARIANT_VALUE_MEMORY = "VariantValueMemory_{language}"
 MEMORY_KEY_STOCK_STATUS_MEMORY = "StockStatusMemory_{language}"
 
-# Log directory
-LOG_DIR = r"H:/Logs"
+# Log directory (deprecated - use DEFAULT_LOG_DIR)
+LOG_DIR = DEFAULT_LOG_DIR
 # Script execution settings
 PROGRESS_BAR_UPDATE_INTERVAL = 0.1  # Update progress bar every 0.1 seconds
