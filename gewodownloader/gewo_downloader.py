@@ -42,7 +42,7 @@ def main():
     args = parse_arguments()
     # Ensure the log directory exists
     if not os.path.exists(args.log_dir):
-        os.makedirs(LOG_DIR)
+        os.makedirs(args.log_dir)
 
     # Generate the log filename
     LOG_FILE = get_log_filename(args.log_dir)
