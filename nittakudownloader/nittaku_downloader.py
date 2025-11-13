@@ -15,13 +15,13 @@ from nittakulib.product_attribute_extractor import extract_products
 from nittakulib.category_pages_link_extractor import extract_all_category_pages_links
 from shared.product_image_downloader import download_product_main_image
 from shared.product_image_downloader import download_product_gallery_images
-from nittakulib.constants import DEFAULT_RESULT_FOLDER
+from nittakulib.constants import DEFAULT_RESULT_DIR
 from shared.logging_config import setup_logging
 from nittakulib.constants import CSV_OUTPUT_NAME
 from shared.product_to_eshop_csv_saver import export_to_csv
 from tqdm import tqdm
 from nittakulib.constants import MAIN_URL
-from nittakulib.constants import MAIN_PAGE_FILENAME,CSV_OUTPUT_NAME, LOG_DIR
+from nittakulib.constants import MAIN_PAGE_FILENAME,CSV_OUTPUT_NAME, DEFAULT_LOG_DIR
 from shared.utils import get_full_day_folder
 from shared.utils import get_log_filename
 
@@ -29,23 +29,24 @@ from shared.utils import get_log_filename
 
 def parse_arguments():
     parser = ArgumentParser(description="NittakuDownloader")
-    parser.add_argument("--result_folder", type=str, default=DEFAULT_RESULT_FOLDER, help="Root folder for the script's output")
+    parser.add_argument("--result_dir", type=str, default=DEFAULT_RESULT_DIR, help="Root folder for the script's output")
+    parser.add_argument("--log_dir", type=str, default=DEFAULT_LOG_DIR, help="Directory for log files")
     parser.add_argument("--overwrite", action="store_true", help="Whether to overwrite existing downloaded resources")
     parser.add_argument("--debug", action="store_true", help="Enable console logging for non-errors")
     return parser.parse_args()
 
 def main():
     args = parse_arguments()
-    if not os.path.exists(LOG_DIR):
+    if not os.path.exists(args.log_dir):
         os.makedirs(LOG_DIR)
 
     # Generate the log filename
-    LOG_FILE = get_log_filename(LOG_DIR)
+    LOG_FILE = get_log_filename(args.log_dir)
 
     # Setup logging with the log file path
     setup_logging(args.debug, LOG_FILE)
 
-    root_folder = args.result_folder
+    root_folder = args.result_dir
     overwrite = args.overwrite
 
 
