@@ -51,9 +51,12 @@ class ProductMerger:
         """
         self.language = language
         self.memory_dir = memory_dir
+        self.trash_dir = os.path.join(os.path.dirname(memory_dir), "Trash")
         # LRU cache: OrderedDict maintains insertion order, we'll move accessed items to end
         self.memory_cache: OrderedDict[str, Dict[str, str]] = OrderedDict()
         self.memory_dirty = set()  # Track which memory files have been modified
+        # Track trash entries to write at the end
+        self.trash_entries: Dict[str, List[Dict[str, str]]] = {}
     
     def merge_products(self, repaired_products: List[RepairedProduct]) -> List[RepairedProduct]:
         """
@@ -96,6 +99,9 @@ class ProductMerger:
 
         # Save all modified memory files (batch save for efficiency)
         self.save_all_dirty_memory_files()
+
+        # Save all trash entries (incorrect values from merge conflicts)
+        self._save_all_trash_files()
 
         logging.info(f"Product merging completed. {len(repaired_products)} -> {len(merged_products)} products")
         return merged_products
@@ -673,10 +679,48 @@ class ProductMerger:
 
         logging.info(f"All dirty memory files saved successfully")
 
+    def _save_all_trash_files(self):
+        """
+        Save all trash entries (incorrect values from merge conflicts).
+        Appends to existing trash files or creates new ones.
+        """
+        if not self.trash_entries:
+            logging.debug("No trash entries to save")
+            return
+
+        # Ensure trash directory exists
+        os.makedirs(self.trash_dir, exist_ok=True)
+
+        logging.info(f"Saving trash entries for {len(self.trash_entries)} memory files...")
+
+        for memory_name, entries in self.trash_entries.items():
+            if not entries:
+                continue
+
+            trash_filepath = os.path.join(self.trash_dir, f"{memory_name}_{self.language}_trash.csv")
+
+            try:
+                # Load existing trash file if it exists
+                if os.path.exists(trash_filepath):
+                    existing_entries = load_csv_file(trash_filepath)
+                    all_entries = existing_entries + entries
+                    save_csv_file(all_entries, trash_filepath)
+                    logging.info(f"Appended {len(entries)} trash entries to {trash_filepath} (total: {len(all_entries)})")
+                else:
+                    # Create new trash file
+                    save_csv_file(entries, trash_filepath)
+                    logging.info(f"Created new trash file {trash_filepath} with {len(entries)} entries")
+
+            except Exception as e:
+                logging.error(f"Error saving trash file {trash_filepath}: {str(e)}", exc_info=True)
+
+        logging.info(f"All trash entries saved successfully")
+
     def _update_memory_for_field(self, field_name: str, products: List[RepairedProduct],
                                   new_value: str):
         """
         Update memory file for a given field with the chosen value.
+        Also write incorrect (non-chosen) values to trash file.
 
         Args:
             field_name: Field name (e.g., 'type', 'brand', 'category')
@@ -692,10 +736,31 @@ class ProductMerger:
         # Load memory file
         memory_dict = self._load_memory_file(memory_prefix)
 
+        # Collect incorrect values (values that were NOT chosen) for trash
+        incorrect_entries = []
+
         # Update all original_names from products to point to new value
         for product in products:
             if product.original_name:
+                old_value = getattr(product, field_name, '')
+
+                # If old value differs from chosen value, add to trash
+                if old_value and old_value.strip() and old_value.strip().lower() != new_value.strip().lower():
+                    incorrect_entries.append({
+                        'KEY': product.original_name,
+                        'VALUE': old_value,
+                        'REASON': f'Merge conflict: user chose "{new_value}" instead'
+                    })
+
+                # Update memory with correct value
                 memory_dict[product.original_name] = new_value
+
+        # Add incorrect values to trash
+        if incorrect_entries:
+            if memory_prefix not in self.trash_entries:
+                self.trash_entries[memory_prefix] = []
+            self.trash_entries[memory_prefix].extend(incorrect_entries)
+            logging.info(f"Added {len(incorrect_entries)} incorrect values to trash for {memory_prefix}")
 
         # Update cache
         cache_key = f"{memory_prefix}_{self.language}"

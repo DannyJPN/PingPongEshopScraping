@@ -92,7 +92,7 @@ def save_memory_dict(data: Dict[str, str], filepath: Path, dry_run: bool = False
 
 def save_trash_data(trash_data: Dict[str, TrashData], language: str, dry_run: bool = False):
     """
-    Uloží smazaná data do trash souborů.
+    Přidá smazaná data do trash souborů (append mode).
 
     Args:
         trash_data: Slovník {memory_name: list of trash records}
@@ -102,23 +102,31 @@ def save_trash_data(trash_data: Dict[str, TrashData], language: str, dry_run: bo
     if dry_run:
         return
 
-    # Vytvoř trash složku s timestampem
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    trash_dir = Path(__file__).parent / 'trash' / f"{language}_{timestamp}"
+    # Trash složka je vedle Memory složky
+    trash_dir = Path(__file__).parent.parent / 'Trash'
     trash_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"\n📦 Ukládání smazaných záznamů do: {trash_dir}")
+    print(f"\n📦 Přidávání smazaných záznamů do: {trash_dir}")
 
-    # Ulož každý trash soubor
+    # Přidej do každého trash souboru (append mode)
     for memory_name, records in trash_data.items():
         if not records:
             continue
 
         trash_filepath = trash_dir / f"{memory_name}_{language}_trash.csv"
-        save_csv_file(records, str(trash_filepath))
-        print(f"   ✓ {memory_name}: {len(records)} smazaných záznamů")
 
-    print(f"✅ Trash soubory uloženy do: {trash_dir}")
+        # Pokud soubor existuje, načti ho a připoj nové záznamy
+        if trash_filepath.exists():
+            existing_records = load_csv_file(str(trash_filepath))
+            all_records = existing_records + records
+            save_csv_file(all_records, str(trash_filepath))
+            print(f"   ✓ {memory_name}: přidáno {len(records)} záznamů (celkem: {len(all_records)})")
+        else:
+            # Nový soubor
+            save_csv_file(records, str(trash_filepath))
+            print(f"   ✓ {memory_name}: vytvořeno s {len(records)} záznamy")
+
+    print(f"✅ Trash soubory aktualizovány v: {trash_dir}")
 
 
 def filter_incomplete_categories(category_name_memory: Dict[str, str]) -> Set[str]:
@@ -555,9 +563,10 @@ Poznámka: CategoryNameMemory a BrandCodeList jsou pouze zdrojové soubory
           pro detekci pravidel - nejsou modifikovány ani ukládány.
 
 Trash režim (--save-trash):
-  Všechny smazané záznamy jsou uloženy do memory_tests/trash/
-  ve složce s timestampem pro pozdější kontrolu. Každý záznam obsahuje
-  KEY, VALUE a REASON (důvod smazání).
+  Všechny smazané záznamy jsou přidány do desaka_unifier/Trash/
+  do persistentních souborů (např. CategoryMemory_CS_trash.csv).
+  Každý záznam obsahuje KEY, VALUE a REASON (důvod smazání).
+  Záznamy se PŘIDÁVAJÍ (append), nikoli nepřepisují.
         """
     )
 
