@@ -5,8 +5,6 @@ from tqdm import tqdm
 from urllib.parse import urlparse
 from datetime import datetime
 from shared.webpage_downloader import download_webpage
-from shared.html_loader import load_html_as_dom_tree
-from gewolib.category_pages_link_extractor import extract_category_pages_links
 from shared.utils import sanitize_filename, get_pages_folder
 
 def download_category_pages(category_page_links, root_folder, overwrite=False, debug=False, stats=None):
