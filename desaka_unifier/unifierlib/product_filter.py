@@ -86,15 +86,15 @@ class ProductFilter:
     
     def save_rejected_products_to_wrongs(self, rejected_products: List[RepairedProduct], wrongs_file_path: str = None):
         """
-        Save rejected products to Wrongs.txt file in Trash folder.
+        Save rejected products to Wrongs.txt file in Memory folder.
 
         Args:
             rejected_products (List[RepairedProduct]): List of rejected products
-            wrongs_file_path (str): Path to Wrongs.txt file (default: Trash/Wrongs.txt)
+            wrongs_file_path (str): Path to Wrongs.txt file (default: Memory/Wrongs.txt)
         """
         if wrongs_file_path is None:
             script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            wrongs_file_path = os.path.join(script_dir, "Trash", WRONGS_FILE)
+            wrongs_file_path = os.path.join(script_dir, "Memory", WRONGS_FILE)
 
         try:
             # Prepare lines to append

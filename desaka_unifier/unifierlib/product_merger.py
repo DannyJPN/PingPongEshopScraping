@@ -683,6 +683,7 @@ class ProductMerger:
         """
         Save all trash entries (incorrect values from merge conflicts).
         Appends to existing trash files or creates new ones.
+        Only unique rows (KEY+VALUE) are kept - no duplicate rows.
         """
         if not self.trash_entries:
             logging.debug("No trash entries to save")
@@ -700,16 +701,37 @@ class ProductMerger:
             trash_filepath = os.path.join(self.trash_dir, f"{memory_name}_{self.language}_trash.csv")
 
             try:
-                # Load existing trash file if it exists
+                # Load existing trash file if it exists and build set of unique rows
+                existing_rows = set()
                 if os.path.exists(trash_filepath):
                     existing_entries = load_csv_file(trash_filepath)
-                    all_entries = existing_entries + entries
-                    save_csv_file(all_entries, trash_filepath)
-                    logging.info(f"Appended {len(entries)} trash entries to {trash_filepath} (total: {len(all_entries)})")
+                    for entry in existing_entries:
+                        # Create unique row identifier from KEY+VALUE
+                        row_id = (entry.get('KEY', ''), entry.get('VALUE', ''))
+                        existing_rows.add(row_id)
+
+                # Filter out duplicate rows from new entries
+                unique_new_entries = []
+                new_count = 0
+                for entry in entries:
+                    row_id = (entry.get('KEY', ''), entry.get('VALUE', ''))
+                    if row_id not in existing_rows:
+                        unique_new_entries.append(entry)
+                        existing_rows.add(row_id)
+                        new_count += 1
+
+                # Append unique entries
+                if unique_new_entries:
+                    if os.path.exists(trash_filepath):
+                        all_entries = load_csv_file(trash_filepath) + unique_new_entries
+                        save_csv_file(all_entries, trash_filepath)
+                        logging.info(f"Appended {new_count} unique trash entries to {trash_filepath} (total: {len(all_entries)})")
+                    else:
+                        # Create new trash file
+                        save_csv_file(unique_new_entries, trash_filepath)
+                        logging.info(f"Created new trash file {trash_filepath} with {new_count} entries")
                 else:
-                    # Create new trash file
-                    save_csv_file(entries, trash_filepath)
-                    logging.info(f"Created new trash file {trash_filepath} with {len(entries)} entries")
+                    logging.debug(f"No new unique entries to add to {trash_filepath}")
 
             except Exception as e:
                 logging.error(f"Error saving trash file {trash_filepath}: {str(e)}", exc_info=True)
@@ -748,8 +770,7 @@ class ProductMerger:
                 if old_value and old_value.strip() and old_value.strip().lower() != new_value.strip().lower():
                     incorrect_entries.append({
                         'KEY': product.original_name,
-                        'VALUE': old_value,
-                        'REASON': f'Merge conflict: user chose "{new_value}" instead'
+                        'VALUE': old_value
                     })
 
                 # Update memory with correct value
