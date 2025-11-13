@@ -48,6 +48,7 @@ class ProductMerger:
         self.language = language
         self.memory_dir = memory_dir
         self.memory_cache = {}  # Cache for loaded memory files
+        self.memory_dirty = set()  # Track which memory files have been modified
     
     def merge_products(self, repaired_products: List[RepairedProduct]) -> List[RepairedProduct]:
         """
@@ -87,6 +88,9 @@ class ProductMerger:
                     merged_product = self._merge_product_group(products)
                     merged_products.append(merged_product)
                 pbar.update(1)
+
+        # Save all modified memory files (batch save for efficiency)
+        self.save_all_dirty_memory_files()
 
         logging.info(f"Product merging completed. {len(repaired_products)} -> {len(merged_products)} products")
         return merged_products
@@ -500,17 +504,23 @@ class ProductMerger:
             self.memory_cache[cache_key] = {}
             return {}
 
-    def _save_memory_file(self, memory_prefix: str):
+    def _save_memory_file(self, memory_prefix: str, force: bool = False):
         """
-        Save memory file to disk.
+        Save memory file to disk if it has been modified (dirty flag).
 
         Args:
             memory_prefix: Memory file prefix (e.g., 'CategoryMemory')
+            force: If True, save even if not marked as dirty
         """
         cache_key = f"{memory_prefix}_{self.language}"
 
         if cache_key not in self.memory_cache:
             logging.warning(f"Cannot save memory file {cache_key}: not in cache")
+            return
+
+        # Check if file needs saving
+        if not force and cache_key not in self.memory_dirty:
+            logging.debug(f"Skipping save of {cache_key}: no changes")
             return
 
         # Construct and validate file path
@@ -523,10 +533,35 @@ class ProductMerger:
                        for key, value in self.memory_cache[cache_key].items()]
 
             save_csv_file(csv_data, file_path)
-            logging.debug(f"Saved memory file: {file_path} ({len(csv_data)} entries)")
+            logging.info(f"Saved memory file: {file_path} ({len(csv_data)} entries)")
+
+            # Clear dirty flag after successful save
+            self.memory_dirty.discard(cache_key)
 
         except Exception as e:
             logging.error(f"Error saving memory file {file_path}: {str(e)}", exc_info=True)
+            # Keep dirty flag set so we can retry later
+            raise
+
+    def save_all_dirty_memory_files(self):
+        """
+        Save all memory files that have been modified (batch save at end).
+        """
+        if not self.memory_dirty:
+            logging.debug("No dirty memory files to save")
+            return
+
+        logging.info(f"Saving {len(self.memory_dirty)} modified memory files...")
+
+        # Get list of dirty files (copy to avoid modification during iteration)
+        dirty_files = list(self.memory_dirty)
+
+        for cache_key in dirty_files:
+            # Extract prefix from cache_key (remove language suffix)
+            memory_prefix = cache_key.rsplit('_', 1)[0]
+            self._save_memory_file(memory_prefix, force=True)
+
+        logging.info(f"All dirty memory files saved successfully")
 
     def _update_memory_for_field(self, field_name: str, products: List[RepairedProduct],
                                   new_value: str):
@@ -556,10 +591,10 @@ class ProductMerger:
         cache_key = f"{memory_prefix}_{self.language}"
         self.memory_cache[cache_key] = memory_dict
 
-        # Save to disk
-        self._save_memory_file(memory_prefix)
+        # Mark as dirty (needs saving)
+        self.memory_dirty.add(cache_key)
 
-        logging.info(f"Updated {memory_prefix}_{self.language}.csv: set {len(products)} entries to '{new_value}'")
+        logging.info(f"Updated {memory_prefix}_{self.language}.csv in memory: set {len(products)} entries to '{new_value}'")
 
     def _update_name_memory(self, products: List[RepairedProduct], type_val: str,
                             brand_val: str, model_val: str):
@@ -590,10 +625,10 @@ class ProductMerger:
         cache_key = f"{NAME_MEMORY_PREFIX}_{self.language}"
         self.memory_cache[cache_key] = memory_dict
 
-        # Save to disk
-        self._save_memory_file(NAME_MEMORY_PREFIX)
+        # Mark as dirty (needs saving)
+        self.memory_dirty.add(cache_key)
 
-        logging.info(f"Updated {NAME_MEMORY_PREFIX}_{self.language}.csv: set {len(products)} entries to '{composed_name}'")
+        logging.info(f"Updated {NAME_MEMORY_PREFIX}_{self.language}.csv in memory: set {len(products)} entries to '{composed_name}'")
 
     def _get_variant_key(self, variant: Variant) -> str:
         """
