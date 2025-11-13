@@ -15,7 +15,7 @@ Merging rules:
 import logging
 import os
 from typing import List, Dict, Any, Optional
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 import json
 from tqdm import tqdm
 from .repaired_product import RepairedProduct
@@ -37,6 +37,9 @@ from .constants import (
 class ProductMerger:
     """Handles merging of duplicate RepairedProducts."""
 
+    # Maximum number of memory files to keep in cache (LRU eviction)
+    MAX_CACHE_SIZE = 10
+
     def __init__(self, language: str, memory_dir: str):
         """
         Initialize the ProductMerger.
@@ -47,7 +50,8 @@ class ProductMerger:
         """
         self.language = language
         self.memory_dir = memory_dir
-        self.memory_cache = {}  # Cache for loaded memory files
+        # LRU cache: OrderedDict maintains insertion order, we'll move accessed items to end
+        self.memory_cache: OrderedDict[str, Dict[str, str]] = OrderedDict()
         self.memory_dirty = set()  # Track which memory files have been modified
     
     def merge_products(self, repaired_products: List[RepairedProduct]) -> List[RepairedProduct]:
@@ -461,9 +465,29 @@ class ProductMerger:
 
         return abs_file_path
 
+    def _evict_lru_cache_if_needed(self):
+        """
+        Evict least recently used cache entry if cache is full.
+        Only evicts clean (non-dirty) entries.
+        """
+        if len(self.memory_cache) < self.MAX_CACHE_SIZE:
+            return
+
+        # Try to evict oldest clean entry (FIFO for clean items)
+        for cache_key in list(self.memory_cache.keys()):
+            if cache_key not in self.memory_dirty:
+                # Found a clean entry to evict
+                self.memory_cache.pop(cache_key)
+                logging.debug(f"Evicted {cache_key} from cache (LRU, clean)")
+                return
+
+        # If all entries are dirty, we can't evict any
+        # This is acceptable - dirty entries will be saved at end
+        logging.warning(f"Cache full ({len(self.memory_cache)} entries), but all are dirty. Cannot evict.")
+
     def _load_memory_file(self, memory_prefix: str) -> Dict[str, str]:
         """
-        Load memory file from disk (with caching).
+        Load memory file from disk (with LRU caching).
 
         Args:
             memory_prefix: Memory file prefix (e.g., 'CategoryMemory')
@@ -473,9 +497,14 @@ class ProductMerger:
         """
         cache_key = f"{memory_prefix}_{self.language}"
 
-        # Check cache first
+        # Check cache first (and move to end for LRU)
         if cache_key in self.memory_cache:
+            # Move to end (most recently used)
+            self.memory_cache.move_to_end(cache_key)
             return self.memory_cache[cache_key]
+
+        # Evict LRU entry if cache is full
+        self._evict_lru_cache_if_needed()
 
         # Construct and validate file path
         file_path = os.path.join(self.memory_dir, f"{cache_key}.csv")
@@ -490,7 +519,7 @@ class ProductMerger:
                 if 'KEY' in row and 'VALUE' in row:
                     memory_dict[row['KEY']] = row['VALUE']
 
-            # Cache it
+            # Cache it (add to end)
             self.memory_cache[cache_key] = memory_dict
             logging.debug(f"Loaded memory file: {file_path} ({len(memory_dict)} entries)")
             return memory_dict
