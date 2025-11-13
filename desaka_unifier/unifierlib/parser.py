@@ -397,13 +397,17 @@ class ProductParser:
         # shortdesc = from ShortDescMemory or OpenAI
         #repaired.shortdesc = self._get_short_description(downloaded)
 
-        # name = from NameMemory or OpenAI
+        # name = from NameMemory or OpenAI (composed from type + brand + model)
         repaired.name = self._get_product_name(downloaded)
+
+        # Extract individual components: type, brand, and model
+        # These are needed for filtering and export logic
+        repaired.type = self._get_product_type(downloaded)
+        repaired.brand = self._get_brand(downloaded)
+        repaired.model = self._get_product_model(downloaded)
+
         # category = from CategoryMemory or OpenAI (needed for code generation)
         repaired.category = self._get_category(downloaded)
-
-        # brand = from ProductBrandMemory or OpenAI (needed for code generation)
-        repaired.brand = self._get_brand(downloaded)
 
 
         # category_ids = derived from category using CategoryIDList
@@ -2235,64 +2239,6 @@ class ProductParser:
 
         return export_products
 
-    def _create_main_export_product(self, repaired: RepairedProduct) -> ExportMainProduct:
-        """Create main export product from repaired product."""
-        main_product = ExportMainProduct()
-
-        # Basic product information - map all available fields
-        main_product.nazev = repaired.name
-        main_product.kod = repaired.code
-        main_product.popis = repaired.desc
-        main_product.popis_strucny = repaired.shortdesc
-        main_product.vyrobce = "" if repaired.brand and self._is_desaka_brand(repaired.brand) else repaired.brand
-        main_product.kategorie_id = repaired.category_ids
-
-        # Pricing information
-        main_product.cena = float(repaired.price) if repaired.price else 0.0
-        main_product.cena_bezna = float(repaired.price_standard) if repaired.price_standard else main_product.cena
-
-        # Feed-specific categories and keywords
-        main_product.glami_kategorie = repaired.glami_category
-        main_product.google_kategorie = repaired.google_category
-        main_product.heurekacz_kategorie = repaired.heureka_category
-        main_product.zbozicz_kategorie = repaired.zbozi_category
-        main_product.google_stitek_0 = repaired.google_keywords
-        main_product.zbozicz_stitek_0 = repaired.zbozi_keywords
-
-        # Apply default values from memory for fields not set from repaired product
-        self._apply_default_export_values(main_product)
-
-        return main_product
-
-    def _create_variant_export_product(self, repaired: RepairedProduct, variant: Any, variant_index: int) -> ExportProductVariant:
-        """Create variant export product from repaired product and variant."""
-        variant_product = ExportProductVariant()
-
-        # Basic identification - only set what's different from main product
-        variant_product.varianta_id = f"{repaired.code}-V{variant_index:02d}"
-        variant_product.kod = f"{repaired.code}-V{variant_index:02d}"
-        variant_product.ean = getattr(variant, 'ean', '') if hasattr(variant, 'ean') else ''
-        variant_product.cena = float(getattr(variant, 'price', repaired.price)) if getattr(variant, 'price', repaired.price) else 0.0
-        variant_product.cena_bezna = float(getattr(variant, 'price_standard', repaired.price_standard)) if getattr(variant, 'price_standard', repaired.price_standard) else variant_product.cena
-
-        # Variant-specific properties
-        if hasattr(variant, 'key_value_pairs') and variant.key_value_pairs:
-            pairs = list(variant.key_value_pairs.items())
-            if len(pairs) > 0:
-                variant_product.varianta1_nazev = pairs[0][0]
-                variant_product.varianta1_hodnota = pairs[0][1]
-            if len(pairs) > 1:
-                variant_product.varianta2_nazev = pairs[1][0]
-                variant_product.varianta2_hodnota = pairs[1][1]
-            if len(pairs) > 2:
-                variant_product.varianta3_nazev = pairs[2][0]
-                variant_product.varianta3_hodnota = pairs[2][1]
-
-        # Apply default values from memory for variant-specific fields
-        self._apply_default_export_values(variant_product, is_variant=True)
-
-        return variant_product
-
     def _apply_default_export_values(self, export_product: ExportProduct, is_variant: bool = False):
         """Apply default values from DefaultExportProductValues memory."""
         default_values = self.memory.get(MEMORY_KEY_DEFAULT_EXPORT_PRODUCT_VALUES, [])
@@ -2528,7 +2474,7 @@ class ProductParser:
 
         return main_product
 
-    def _create_variant_export_product(self, repaired: RepairedProduct, variant: Any, variant_index: int) -> ExportProductVariant:
+    def _create_variant_export_product_complete(self, repaired: RepairedProduct, variant: Any, variant_index: int) -> ExportProductVariant:
         """Create variant export product with complete 96-column specification."""
         variant_product = ExportProductVariant()
 

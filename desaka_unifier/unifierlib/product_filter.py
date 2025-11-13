@@ -9,8 +9,10 @@ import os
 import logging
 from typing import List, Tuple, Dict, Any
 from datetime import datetime
+from tqdm import tqdm
 from .repaired_product import RepairedProduct
 from .constants import WRONGS_FILE
+from shared.file_ops import append_to_txt_file
 
 
 class ProductFilter:
@@ -40,57 +42,52 @@ class ProductFilter:
         filtered_products = []
         rejected_products = []
         
-        # Load ItemFilter data
+        # Load ItemFilter data - use directly without redundant transformation
         item_filter_data = self.memory.get('ItemFilter', [])
-        
-        # Convert to list of allowed combinations
-        allowed_combinations = []
-        for row in item_filter_data:
-            if isinstance(row, dict) and 'typ_produktu' in row and 'znacka' in row and 'eshop_url' in row:
-                allowed_combinations.append({
-                    'typ': row['typ_produktu'].strip().lower(),
-                    'znacka': row['znacka'].strip().lower(),
-                    'url': row['eshop_url'].strip().lower()
-                })
-        
-        for product in repaired_products:
-            # Check if category is "Vyřadit"
-            if product.category and product.category.strip().lower() == "vyřadit":
-                rejected_products.append(product)
-                continue
-                
-            # Check ItemFilter if we have filter data
-            if allowed_combinations:
-                # Extract product type from category (first part before >)
-                product_type = ""
-                if product.category:
-                    category_parts = product.category.split('>')
-                    if category_parts:
-                        product_type = category_parts[0].strip().lower()
-                
-                # Check if combination is allowed
-                is_allowed = False
-                for combo in allowed_combinations:
-                    if (combo['typ'] == product_type and 
-                        combo['znacka'] == product.brand.strip().lower() and
-                        combo['url'] in product.url.strip().lower()):
-                        is_allowed = True
-                        break
-                
-                if is_allowed:
-                    filtered_products.append(product)
-                else:
+
+        with tqdm(total=len(repaired_products), desc="Filtering products", unit="product", miniters=1, mininterval=0.01) as pbar:
+            for product in repaired_products:
+                # Check if category is "Vyřadit"
+                if product.category and product.category.strip().lower() == "vyřadit":
                     rejected_products.append(product)
-            else:
-                # No filter data, allow all products that are not "Vyřadit"
-                filtered_products.append(product)
+                    pbar.update(1)
+                    continue
+
+                # Check ItemFilter if we have filter data
+                if item_filter_data:
+                    # Use product type directly from RepairedProduct.type field
+                    product_type = product.type.strip().lower() if product.type else ""
+
+                    # Check if combination is allowed
+                    is_allowed = False
+                    for filter_row in item_filter_data:
+                        if isinstance(filter_row, dict) and 'product_type' in filter_row and 'brand' in filter_row and 'eshop_url' in filter_row:
+                            # Normalize values for comparison
+                            filter_type = filter_row['product_type'].strip().lower()
+                            filter_brand = filter_row['brand'].strip().lower()
+                            filter_url = filter_row['eshop_url'].strip().lower()
+
+                            if (filter_type == product_type and
+                                filter_brand == product.brand.strip().lower() and
+                                filter_url in product.url.strip().lower()):
+                                is_allowed = True
+                                break
+
+                    if is_allowed:
+                        filtered_products.append(product)
+                    else:
+                        rejected_products.append(product)
+                else:
+                    # No filter data, allow all products that are not "Vyřadit"
+                    filtered_products.append(product)
+                pbar.update(1)
         
         return filtered_products, rejected_products
     
     def save_rejected_products_to_wrongs(self, rejected_products: List[RepairedProduct], wrongs_file_path: str = None):
         """
         Save rejected products to Wrongs.txt file.
-        
+
         Args:
             rejected_products (List[RepairedProduct]): List of rejected products
             wrongs_file_path (str): Path to Wrongs.txt file (default: Memory/Wrongs.txt)
@@ -98,14 +95,18 @@ class ProductFilter:
         if wrongs_file_path is None:
             script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             wrongs_file_path = os.path.join(script_dir, "Memory", WRONGS_FILE)
-        
+
         try:
-            with open(wrongs_file_path, 'a', encoding='utf-8') as f:
-                for product in rejected_products:
-                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    reason = "Category: Vyřadit" if product.category and product.category.strip().lower() == "vyřadit" else "ItemFilter: Not allowed"
-                    f.write(f"{timestamp} - {product.name} ({product.url}) - {reason}\n")
-            
+            # Prepare lines to append
+            lines = []
+            for product in rejected_products:
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                reason = "Category: Vyřadit" if product.category and product.category.strip().lower() == "vyřadit" else "ItemFilter: Not allowed"
+                line = f"{timestamp} - {product.name} ({product.url}) - {reason}"
+                lines.append(line)
+
+            # Use file_ops module to append lines
+            append_to_txt_file(wrongs_file_path, lines)
             logging.info(f"Saved {len(rejected_products)} rejected products to {wrongs_file_path}")
 
         except Exception as e:
