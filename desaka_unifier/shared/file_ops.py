@@ -198,11 +198,11 @@ def save_csv_file(csv_data, filepath):
 
     Uses atomic write pattern: write to temp file, then rename.
     This prevents corruption if the write fails partway through.
+    Backup provides additional safety in case of errors.
     """
     import csv
     import shutil
     import tempfile
-    import fcntl
 
     temp_fd = None
     temp_path = None
@@ -233,24 +233,18 @@ def save_csv_file(csv_data, filepath):
         )
 
         try:
-            # Acquire exclusive lock on temp file
-            fcntl.flock(temp_fd, fcntl.LOCK_EX)
-
             # Write to temp file via pandas
             df.to_csv(temp_path, index=False, quotechar='"', quoting=csv.QUOTE_ALL, encoding='utf-8')
 
             # Ensure data is written to disk
             os.fsync(temp_fd)
 
-            # Release lock before closing
-            fcntl.flock(temp_fd, fcntl.LOCK_UN)
-
         finally:
             os.close(temp_fd)
             temp_fd = None
 
         # Atomic rename: replace original file with temp file
-        # This is atomic on POSIX systems
+        # This is atomic on POSIX systems and safe on Windows
         shutil.move(temp_path, filepath)
         temp_path = None
 
