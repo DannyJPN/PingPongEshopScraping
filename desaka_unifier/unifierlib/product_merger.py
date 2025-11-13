@@ -159,7 +159,7 @@ class ProductMerger:
             'zbozi_keywords': self._merge_string_values([p.zbozi_keywords for p in products],
                                                         'zbozi_keywords', products),
             'url': self._merge_string_values([p.url for p in products],
-                                             'url', products)
+                                             'url', products, allow_multiple=True)
         }
 
         # Merge variants
@@ -322,6 +322,8 @@ class ProductMerger:
         for item in values:
             print(f"  [{item['index']}] {item['value']}")
             print(f"      (from original_name: '{item['product'].original_name}')")
+            if hasattr(item['product'], 'url') and item['product'].url:
+                print(f"      (URL: {item['product'].url})")
 
         # Ask user to choose
         while True:
