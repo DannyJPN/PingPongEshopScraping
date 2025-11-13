@@ -9,7 +9,13 @@ openai>=1.0.0  # OpenAI and xAI Grok (Grok uses OpenAI-compatible API)
 anthropic>=0.18.0  # Anthropic Claude
 google-generativeai>=0.3.0  # Google Gemini
 mistralai>=0.1.0  # Mistral AI
-ollama>=0.1.0  # Local models via Ollama
+
+# Local models support
+ollama>=0.1.0  # Ollama backend
+transformers>=4.35.0  # Hugging Face transformers (local inference)
+torch>=2.0.0  # PyTorch for local model inference
+accelerate>=0.24.0  # Efficient loading of large models
+sentencepiece>=0.1.99  # Tokenizer support for some models
 
 # HTTP requests (if needed for web scraping)
 requests>=2.28.0

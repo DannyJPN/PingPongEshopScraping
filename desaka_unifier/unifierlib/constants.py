@@ -98,5 +98,7 @@ LOG_DIR = DEFAULT_LOG_DIR
 # Script execution settings
 PROGRESS_BAR_UPDATE_INTERVAL = 0.1  # Update progress bar every 0.1 seconds
 
-# Local model storage settings
-LOCAL_MODEL_STORAGE_PATH = os.path.expanduser("~/.ollama")  # Default Ollama storage location
+# Local model storage settings (multi-backend support)
+LOCAL_MODEL_STORAGE_PATH_OLLAMA = os.path.expanduser("~/.ollama")  # Ollama storage
+LOCAL_MODEL_STORAGE_PATH_LMSTUDIO = os.path.expanduser("~/.cache/lm-studio")  # LM Studio storage
+LOCAL_MODEL_STORAGE_PATH_HUGGINGFACE = os.path.expanduser("~/.cache/huggingface")  # Hugging Face storage
