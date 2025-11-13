@@ -13,20 +13,41 @@ Merging rules:
 """
 
 import logging
-from typing import List, Dict, Any
+import os
+from typing import List, Dict, Any, Optional
 from collections import defaultdict
 import json
 from tqdm import tqdm
 from .repaired_product import RepairedProduct
 from .variant import Variant
+from shared.file_ops import load_csv_file, save_csv_file
+from .constants import (
+    PRODUCT_TYPE_MEMORY_PREFIX,
+    PRODUCT_BRAND_MEMORY_PREFIX,
+    PRODUCT_MODEL_MEMORY_PREFIX,
+    CATEGORY_MEMORY_PREFIX,
+    NAME_MEMORY_PREFIX,
+    DESC_MEMORY_PREFIX,
+    SHORT_DESC_MEMORY_PREFIX,
+    KEYWORDS_GOOGLE_PREFIX,
+    KEYWORDS_ZBOZI_PREFIX
+)
 
 
 class ProductMerger:
     """Handles merging of duplicate RepairedProducts."""
-    
-    def __init__(self):
-        """Initialize the ProductMerger."""
-        pass
+
+    def __init__(self, language: str, memory_dir: str):
+        """
+        Initialize the ProductMerger.
+
+        Args:
+            language: Language code (e.g., 'CS', 'SK')
+            memory_dir: Path to Memory directory
+        """
+        self.language = language
+        self.memory_dir = memory_dir
+        self.memory_cache = {}  # Cache for loaded memory files
     
     def merge_products(self, repaired_products: List[RepairedProduct]) -> List[RepairedProduct]:
         """
@@ -155,13 +176,23 @@ class ProductMerger:
         for key, value in merged_data.items():
             setattr(merged_product, key, value)
 
+        # Update NameMemory if type/brand/model were resolved
+        # This ensures NameMemory stays consistent with the chosen values
+        if merged_data.get('type') or merged_data.get('brand') or merged_data.get('model'):
+            self._update_name_memory(
+                products,
+                merged_data.get('type', ''),
+                merged_data.get('brand', ''),
+                merged_data.get('model', '')
+            )
+
         logging.debug(f"Successfully merged {len(products)} products into one: {merged_product.name}")
         return merged_product
     
     def _merge_string_values(self, values: List[str], field_name: str,
                              products: List[RepairedProduct], allow_multiple: bool = False) -> str:
         """
-        Merge string values - raises exception if multiple different values exist.
+        Merge string values - asks user to resolve conflicts if multiple different values exist.
 
         Args:
             values: List of string values to merge
@@ -171,9 +202,6 @@ class ProductMerger:
 
         Returns:
             Single merged value (or combined with '|' if allow_multiple=True)
-
-        Raises:
-            ValueError: If multiple conflicting values exist and allow_multiple=False
         """
         # Filter out None and empty values
         valid_values = [v.strip() for v in values if v and v.strip()]
@@ -196,17 +224,18 @@ class ProductMerger:
             # For original_name, combine all unique values
             return '|'.join(sorted(set(valid_values)))
 
-        # For all other fields, this is an error that must be resolved manually
-        # TODO: Implement user interface to resolve conflicts
-        # For now, raise an exception to force manual resolution
-        error_msg = f"\nMERGE CONFLICT: Field '{field_name}' has multiple different values:\n"
-        for i, product in enumerate(products):
-            value = getattr(product, field_name, '')
-            error_msg += f"  Product {i+1} (original_name='{product.original_name}'): {field_name}='{value}'\n"
-        error_msg += "\nUser must resolve this conflict in the source data before merging can proceed."
+        # For all other fields, ask user to resolve conflict
+        logging.warning(f"Conflict detected in field '{field_name}' - asking user to resolve")
 
-        logging.error(error_msg)
-        raise ValueError(error_msg)
+        # Ask user interactively
+        chosen_value = self._ask_user_for_conflict_resolution(field_name, products)
+
+        # Update memory file for this field
+        self._update_memory_for_field(field_name, products, chosen_value)
+
+        logging.info(f"User resolved conflict for field '{field_name}': chose '{chosen_value}'")
+
+        return chosen_value
 
     def _merge_prices(self, prices: List[str]) -> str:
         """
@@ -259,7 +288,222 @@ class ProductMerger:
         
         logging.debug(f"Merged {len(variants)} variants into {len(unique_variants)} unique variants")
         return unique_variants
-    
+
+    def _ask_user_for_conflict_resolution(self, field_name: str,
+                                           products: List[RepairedProduct]) -> str:
+        """
+        Ask user to resolve merge conflict interactively.
+
+        Args:
+            field_name: Name of the conflicting field
+            products: List of products with conflicting values
+
+        Returns:
+            str: User-chosen or user-entered value
+        """
+        print(f"\n{'='*80}")
+        print(f"MERGE CONFLICT: Field '{field_name}' has multiple different values")
+        print(f"{'='*80}")
+
+        # Get values for this field from all products
+        values = []
+        for i, product in enumerate(products):
+            value = getattr(product, field_name, '')
+            if value and value.strip():
+                values.append({
+                    'index': i + 1,
+                    'value': value,
+                    'product': product
+                })
+
+        # Display options
+        print(f"\nProduct name: {products[0].name}")
+        print(f"\nConflicting values for field '{field_name}':")
+        for item in values:
+            print(f"  [{item['index']}] {item['value']}")
+            print(f"      (from original_name: '{item['product'].original_name}')")
+
+        # Ask user to choose
+        while True:
+            user_input = input(f"\nChoose option number (1-{len(values)}), or press ENTER to enter custom value: ").strip()
+
+            if user_input == "":
+                # User wants to enter custom value
+                custom_value = input(f"Enter correct value for '{field_name}': ").strip()
+                if custom_value:
+                    return custom_value
+                else:
+                    print("ERROR: Value cannot be empty. Please try again.")
+                    continue
+
+            # Check if valid number
+            try:
+                choice = int(user_input)
+                if 1 <= choice <= len(values):
+                    return values[choice - 1]['value']
+                else:
+                    print(f"ERROR: Invalid choice. Please enter number 1-{len(values)} or press ENTER.")
+            except ValueError:
+                print(f"ERROR: Invalid input. Please enter number 1-{len(values)} or press ENTER.")
+
+    def _get_memory_file_for_field(self, field_name: str) -> Optional[str]:
+        """
+        Get memory file name for a given field.
+
+        Args:
+            field_name: Field name (e.g., 'type', 'brand', 'model', 'category')
+
+        Returns:
+            Optional[str]: Memory file name prefix (without language suffix)
+        """
+        field_to_memory = {
+            'type': PRODUCT_TYPE_MEMORY_PREFIX,
+            'brand': PRODUCT_BRAND_MEMORY_PREFIX,
+            'model': PRODUCT_MODEL_MEMORY_PREFIX,
+            'category': CATEGORY_MEMORY_PREFIX,
+            'desc': DESC_MEMORY_PREFIX,
+            'shortdesc': SHORT_DESC_MEMORY_PREFIX,
+            'google_keywords': KEYWORDS_GOOGLE_PREFIX,
+            'zbozi_keywords': KEYWORDS_ZBOZI_PREFIX,
+        }
+
+        return field_to_memory.get(field_name, None)
+
+    def _load_memory_file(self, memory_prefix: str) -> Dict[str, str]:
+        """
+        Load memory file from disk (with caching).
+
+        Args:
+            memory_prefix: Memory file prefix (e.g., 'CategoryMemory')
+
+        Returns:
+            Dict[str, str]: Memory data (KEY -> VALUE mapping)
+        """
+        cache_key = f"{memory_prefix}_{self.language}"
+
+        # Check cache first
+        if cache_key in self.memory_cache:
+            return self.memory_cache[cache_key]
+
+        # Load from disk
+        file_path = os.path.join(self.memory_dir, f"{cache_key}.csv")
+
+        try:
+            csv_data = load_csv_file(file_path)
+
+            # Convert to dict (KEY -> VALUE)
+            memory_dict = {}
+            for row in csv_data:
+                if 'KEY' in row and 'VALUE' in row:
+                    memory_dict[row['KEY']] = row['VALUE']
+
+            # Cache it
+            self.memory_cache[cache_key] = memory_dict
+            logging.debug(f"Loaded memory file: {file_path} ({len(memory_dict)} entries)")
+            return memory_dict
+
+        except FileNotFoundError:
+            logging.warning(f"Memory file not found: {file_path}. Will create new one.")
+            self.memory_cache[cache_key] = {}
+            return {}
+        except Exception as e:
+            logging.error(f"Error loading memory file {file_path}: {str(e)}", exc_info=True)
+            self.memory_cache[cache_key] = {}
+            return {}
+
+    def _save_memory_file(self, memory_prefix: str):
+        """
+        Save memory file to disk.
+
+        Args:
+            memory_prefix: Memory file prefix (e.g., 'CategoryMemory')
+        """
+        cache_key = f"{memory_prefix}_{self.language}"
+
+        if cache_key not in self.memory_cache:
+            logging.warning(f"Cannot save memory file {cache_key}: not in cache")
+            return
+
+        file_path = os.path.join(self.memory_dir, f"{cache_key}.csv")
+
+        try:
+            # Convert dict to CSV format (KEY, VALUE)
+            csv_data = [{"KEY": key, "VALUE": value}
+                       for key, value in self.memory_cache[cache_key].items()]
+
+            save_csv_file(csv_data, file_path)
+            logging.debug(f"Saved memory file: {file_path} ({len(csv_data)} entries)")
+
+        except Exception as e:
+            logging.error(f"Error saving memory file {file_path}: {str(e)}", exc_info=True)
+
+    def _update_memory_for_field(self, field_name: str, products: List[RepairedProduct],
+                                  new_value: str):
+        """
+        Update memory file for a given field with the chosen value.
+
+        Args:
+            field_name: Field name (e.g., 'type', 'brand', 'category')
+            products: List of products that had conflicting values
+            new_value: The chosen/entered value to save to memory
+        """
+        memory_prefix = self._get_memory_file_for_field(field_name)
+
+        if not memory_prefix:
+            logging.warning(f"No memory file mapped for field '{field_name}'. Skipping memory update.")
+            return
+
+        # Load memory file
+        memory_dict = self._load_memory_file(memory_prefix)
+
+        # Update all original_names from products to point to new value
+        for product in products:
+            if product.original_name:
+                memory_dict[product.original_name] = new_value
+
+        # Update cache
+        cache_key = f"{memory_prefix}_{self.language}"
+        self.memory_cache[cache_key] = memory_dict
+
+        # Save to disk
+        self._save_memory_file(memory_prefix)
+
+        logging.info(f"Updated {memory_prefix}_{self.language}.csv: set {len(products)} entries to '{new_value}'")
+
+    def _update_name_memory(self, products: List[RepairedProduct], type_val: str,
+                            brand_val: str, model_val: str):
+        """
+        Update NameMemory based on type/brand/model values.
+
+        Args:
+            products: List of products to update
+            type_val: Product type value
+            brand_val: Product brand value
+            model_val: Product model value
+        """
+        # Compose name from type + brand + model
+        if brand_val and brand_val.strip():
+            composed_name = f"{type_val} {brand_val} {model_val}".strip()
+        else:
+            composed_name = f"{type_val} {model_val}".strip()
+
+        # Load NameMemory
+        memory_dict = self._load_memory_file(NAME_MEMORY_PREFIX)
+
+        # Update all original_names
+        for product in products:
+            if product.original_name:
+                memory_dict[product.original_name] = composed_name
+
+        # Update cache
+        cache_key = f"{NAME_MEMORY_PREFIX}_{self.language}"
+        self.memory_cache[cache_key] = memory_dict
+
+        # Save to disk
+        self._save_memory_file(NAME_MEMORY_PREFIX)
+
+        logging.info(f"Updated {NAME_MEMORY_PREFIX}_{self.language}.csv: set {len(products)} entries to '{composed_name}'")
+
     def _get_variant_key(self, variant: Variant) -> str:
         """
         Generate a unique key for variant comparison.
