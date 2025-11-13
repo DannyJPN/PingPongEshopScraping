@@ -655,11 +655,26 @@ class ProductMerger:
             brand_val: Product brand value
             model_val: Product model value
         """
+        # Validate that we have at least type and model
+        # (brand can be empty, but type and model are required for meaningful name)
+        if not type_val or not type_val.strip():
+            logging.warning(f"Cannot update NameMemory: type is empty for products {[p.original_name for p in products]}")
+            return
+
+        if not model_val or not model_val.strip():
+            logging.warning(f"Cannot update NameMemory: model is empty for products {[p.original_name for p in products]}")
+            return
+
         # Compose name from type + brand + model
         if brand_val and brand_val.strip():
             composed_name = f"{type_val} {brand_val} {model_val}".strip()
         else:
             composed_name = f"{type_val} {model_val}".strip()
+
+        # Validate composed name is not empty
+        if not composed_name or not composed_name.strip():
+            logging.error(f"Cannot update NameMemory: composed name is empty after combining type/brand/model")
+            return
 
         # Load NameMemory
         memory_dict = self._load_memory_file(NAME_MEMORY_PREFIX)
