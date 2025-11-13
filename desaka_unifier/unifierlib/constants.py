@@ -97,3 +97,6 @@ MEMORY_KEY_STOCK_STATUS_MEMORY = "StockStatusMemory_{language}"
 LOG_DIR = DEFAULT_LOG_DIR
 # Script execution settings
 PROGRESS_BAR_UPDATE_INTERVAL = 0.1  # Update progress bar every 0.1 seconds
+
+# Local model storage settings
+LOCAL_MODEL_STORAGE_PATH = os.path.expanduser("~/.ollama")  # Default Ollama storage location
