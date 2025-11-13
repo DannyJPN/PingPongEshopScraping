@@ -2,10 +2,11 @@
 import logging
 from tqdm import tqdm
 from urllib.parse import urlparse
+from datetime import datetime
 from shared.webpage_downloader import download_webpage
 from shared.utils import get_products_folder
 
-def download_product_detail_pages(product_detail_urls, root_folder, overwrite=False, debug=False):
+def download_product_detail_pages(product_detail_urls, root_folder, overwrite=False, debug=False, stats=None):
     """
     Downloads all product detail pages and displays a progress bar.
 
@@ -32,8 +33,8 @@ def download_product_detail_pages(product_detail_urls, root_folder, overwrite=Fa
                 logging.debug(f"Downloading webpage from URL: {url} to filepath: {file_path}")
 
                 # Download the webpage
-                if download_webpage(url, file_path, overwrite=overwrite, debug=debug):
-                    # Add the absolute path to the list of downloaded files only if download is successful
+                if download_webpage(url, file_path, overwrite=overwrite, stats=stats):
+                    # Add the absolute path to the list of downloaded files
                     downloaded_files.append(os.path.abspath(file_path))
 
                 # Update progress bar

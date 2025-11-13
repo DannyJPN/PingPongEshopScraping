@@ -1,11 +1,12 @@
-import os
+﻿import os
 import logging
 from tqdm import tqdm
 from urllib.parse import urlparse
+from datetime import datetime
 from shared.webpage_downloader import download_webpage
 from shared.utils import get_products_folder
 
-def download_product_detail_pages(product_detail_urls, root_folder, overwrite=False, debug=False):
+def download_product_detail_pages(product_detail_urls, root_folder, overwrite=False, debug=False, stats=None):
     """
     Downloads all product detail pages and displays a progress bar.
 
@@ -26,14 +27,14 @@ def download_product_detail_pages(product_detail_urls, root_folder, overwrite=Fa
 
                 # Parse URL to create a valid filename
                 parsed_url = urlparse(url)
-                filename = (parsed_url.path + parsed_url.query).strip("/").replace('/', '_') + '.html'
+                filename = (parsed_url.path+parsed_url.query).strip("/").replace('/', '_') + '.html'
                 file_path = os.path.join(products_folder, filename)
 
                 logging.debug(f"Downloading webpage from URL: {url} to filepath: {file_path}")
 
                 # Download the webpage
-                if download_webpage(url, file_path, overwrite=overwrite):
-                    # Add the absolute path to the list of downloaded files only if successful
+                if download_webpage(url, file_path, overwrite=overwrite, stats=stats):
+                    # Add the absolute path to the list of downloaded files
                     downloaded_files.append(os.path.abspath(file_path))
 
                 # Update progress bar
@@ -47,3 +48,13 @@ def download_product_detail_pages(product_detail_urls, root_folder, overwrite=Fa
     unique_sorted_files = sorted(set(downloaded_files))
     logging.debug(f"Unique sorted downloaded product detail pages: {len(unique_sorted_files)}")
     return unique_sorted_files
+
+
+
+
+
+
+
+
+
+

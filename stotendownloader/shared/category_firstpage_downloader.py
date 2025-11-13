@@ -2,10 +2,11 @@
 import logging
 from tqdm import tqdm
 from urllib.parse import urlparse
+from datetime import datetime
 from shared.webpage_downloader import download_webpage
 from shared.utils import sanitize_filename, get_pages_folder
 
-def download_category_firstpages(category_urls, root_folder, overwrite=False, debug=False):
+def download_category_firstpages(category_urls, root_folder, overwrite=False, debug=False, stats=None):
     """
     Downloads the first pages of categories and displays a progress bar.
 
@@ -24,16 +25,15 @@ def download_category_firstpages(category_urls, root_folder, overwrite=False, de
             try:
                 # Parse URL to create a valid filename
                 parsed_url = urlparse(url)
-                filename = (parsed_url.path + parsed_url.query).strip("/").replace('/', '_') + '.html'
+                filename = (parsed_url.path+parsed_url.query).strip("/").replace('/', '_') + '.html'
                 logging.debug(f"Original filename: {filename}")
                 sanitized_filename = sanitize_filename(filename)
                 logging.debug(f"Sanitized filename: {sanitized_filename}")
                 file_path = os.path.join(pages_folder, sanitized_filename)
 
                 # Download the webpage
-                download_successful = download_webpage(url, file_path, overwrite=overwrite, debug=debug)
-                if download_successful:
-                    # Add the absolute path to the list of downloaded files only if download is successful
+                if download_webpage(url, file_path, overwrite=overwrite, stats=stats):
+                    # Add the absolute path to the list of downloaded files
                     downloaded_files.append(os.path.abspath(file_path))
 
                 # Update progress bar

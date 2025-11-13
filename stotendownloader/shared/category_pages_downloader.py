@@ -3,14 +3,17 @@ import os
 import logging
 from tqdm import tqdm
 from urllib.parse import urlparse
+from datetime import datetime
 from shared.webpage_downloader import download_webpage
+from shared.html_loader import load_html_as_dom_tree
+from gewolib.category_pages_link_extractor import extract_category_pages_links
 from shared.utils import sanitize_filename, get_pages_folder
 
-def download_category_pages(category_page_links, root_folder, overwrite=False, debug=False):
+def download_category_pages(category_page_links, root_folder, overwrite=False, debug=False, stats=None):
     """
     Downloads all category pages and displays a progress bar.
 
-    :param category_page_links: List of URLs to category pages.
+    :param category_first_page_paths: List of file paths to category first pages.
     :param root_folder: Root folder for saving the downloaded pages.
     :param overwrite: Boolean indicating whether to overwrite existing files.
     :param debug: Boolean indicating whether to enable debug logging.
@@ -25,7 +28,7 @@ def download_category_pages(category_page_links, root_folder, overwrite=False, d
             try:
                 # Parse URL to create a valid filename
                 parsed_url = urlparse(url)
-                filename = (parsed_url.path + parsed_url.query).strip("/").replace('/', '_') + '.html'
+                filename = (parsed_url.path+parsed_url.query).strip("/").replace('/', '_') + '.html'
                 logging.debug(f"Original filename: {filename}")
                 sanitized_filename = sanitize_filename(filename)
                 logging.debug(f"Sanitized filename: {sanitized_filename}")
@@ -33,8 +36,8 @@ def download_category_pages(category_page_links, root_folder, overwrite=False, d
 
                 logging.debug(f"Downloading webpage from URL: {url} to filepath: {file_path}")
                 # Download the webpage
-                if download_webpage(url, file_path, overwrite=overwrite, debug=debug):
-                    # Add the absolute path to the list of downloaded files only if download is successful
+                if download_webpage(url, file_path, overwrite=overwrite, stats=stats):
+                    # Add the absolute path to the list of downloaded files
                     downloaded_files.append(os.path.abspath(file_path))
 
                 # Update progress bar

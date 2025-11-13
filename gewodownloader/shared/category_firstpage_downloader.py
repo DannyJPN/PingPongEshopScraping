@@ -6,7 +6,7 @@ from datetime import datetime
 from shared.webpage_downloader import download_webpage
 from shared.utils import sanitize_filename, get_pages_folder
 
-def download_category_firstpages(category_urls, root_folder, overwrite=False, debug=False):
+def download_category_firstpages(category_urls, root_folder, overwrite=False, debug=False, stats=None):
     """
     Downloads the first pages of categories and displays a progress bar.
 
@@ -32,7 +32,7 @@ def download_category_firstpages(category_urls, root_folder, overwrite=False, de
                 file_path = os.path.join(pages_folder, sanitized_filename)
 
                 # Download the webpage
-                if download_webpage(url, file_path, overwrite=overwrite):
+                if download_webpage(url, file_path, overwrite=overwrite, stats=stats):
                     # Add the absolute path to the list of downloaded files
                     downloaded_files.append(os.path.abspath(file_path))
 
