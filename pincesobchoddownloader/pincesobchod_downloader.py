@@ -3,6 +3,7 @@ import argparse
 import logging
 import json
 from shared.logging_config import setup_logging
+from shared.download_stats import DownloadStats
 from shared.country_to_language import get_language_code
 from shared.directory_manager import ensure_directories
 from shared.json_downloader import download_json_file
@@ -40,22 +41,33 @@ def main():
     # Append language code to result folder path
     result_folder = f"{args.result_dir}_{lang_code}"
 
+    # Create download statistics tracker
+    stats = DownloadStats()
+    logging.info("Download statistics tracker initialized")
+
     # Ensure necessary directories are created
     ensure_directories(result_folder)
     logging.info("Directory structure ensured successfully.")
 
-    # Build the JSON URL using the pattern from constants
-    json_url = API_URL_PATTERN.format(COUNTRY_CODE=args.country_code.lower())
-    
-    # Build the JSON filename using the pattern from constants
-    json_filename = JSON_FILENAME_PATTERN.format(LANGUAGE_CODE=lang_code)
-    json_filepath = os.path.join(get_full_day_folder(result_folder), json_filename)
-    
-    # Download the JSON file
-    download_json_file(json_url, json_filepath, lang_code, overwrite=args.overwrite)
+    try:
+        # Build the JSON URL using the pattern from constants
+        json_url = API_URL_PATTERN.format(COUNTRY_CODE=args.country_code.lower())
 
-    # Process the downloaded JSON file
-    process_json_file(json_filepath, result_folder, lang_code, args.overwrite)
+        # Build the JSON filename using the pattern from constants
+        json_filename = JSON_FILENAME_PATTERN.format(LANGUAGE_CODE=lang_code)
+        json_filepath = os.path.join(get_full_day_folder(result_folder), json_filename)
+
+        # Download the JSON file
+        download_json_file(json_url, json_filepath, lang_code, overwrite=args.overwrite, stats=stats)
+
+        # Process the downloaded JSON file
+        process_json_file(json_filepath, result_folder, lang_code, args.overwrite, stats=stats)
+
+    finally:
+        # Log download statistics summary
+        logging.info("\n" + "="*60)
+        stats.log_summary()
+        logging.info("="*60)
 
 if __name__ == '__main__':
     main()
