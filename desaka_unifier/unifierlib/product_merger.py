@@ -289,6 +289,55 @@ class ProductMerger:
         logging.debug(f"Merged {len(variants)} variants into {len(unique_variants)} unique variants")
         return unique_variants
 
+    def _sanitize_user_input(self, value: str, field_name: str) -> str:
+        """
+        Sanitize user input to prevent injection attacks and invalid data.
+
+        Args:
+            value: User input value
+            field_name: Name of the field (for context-specific validation)
+
+        Returns:
+            str: Sanitized value
+
+        Raises:
+            ValueError: If input contains dangerous characters or patterns
+        """
+        # Strip whitespace
+        value = value.strip()
+
+        # Check max length (reasonable limit for product data)
+        MAX_LENGTH = 5000
+        if len(value) > MAX_LENGTH:
+            raise ValueError(f"Input too long ({len(value)} chars). Maximum {MAX_LENGTH} characters allowed.")
+
+        # Check for null bytes (can cause issues in CSV)
+        if '\x00' in value:
+            raise ValueError("Input contains null bytes which are not allowed.")
+
+        # Check for CSV injection patterns (formulas)
+        csv_dangerous_prefixes = ['=', '+', '-', '@', '\t', '\r']
+        if any(value.startswith(prefix) for prefix in csv_dangerous_prefixes):
+            raise ValueError(f"Input cannot start with {csv_dangerous_prefixes} (CSV injection prevention).")
+
+        # Check for control characters (except newline which might be in descriptions)
+        import re
+        control_chars = re.findall(r'[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f]', value)
+        if control_chars:
+            raise ValueError(f"Input contains invalid control characters.")
+
+        # Field-specific validation
+        if field_name in ['category', 'type']:
+            # Category and type should not contain pipe characters (used as separator)
+            if '|' in value and field_name == 'category':
+                # Allow > for category paths like "Potahy>Softy>Softy ALL"
+                pass
+            # Check for reasonable category format
+            if len(value) > 500:
+                raise ValueError(f"Category/Type value too long ({len(value)} chars). Maximum 500 characters.")
+
+        return value
+
     def _ask_user_for_conflict_resolution(self, field_name: str,
                                            products: List[RepairedProduct]) -> str:
         """
@@ -333,7 +382,14 @@ class ProductMerger:
                 # User wants to enter custom value
                 custom_value = input(f"Enter correct value for '{field_name}': ").strip()
                 if custom_value:
-                    return custom_value
+                    # Sanitize custom input
+                    try:
+                        sanitized = self._sanitize_user_input(custom_value, field_name)
+                        return sanitized
+                    except ValueError as e:
+                        print(f"ERROR: Invalid input - {str(e)}")
+                        print("Please try again.")
+                        continue
                 else:
                     print("ERROR: Value cannot be empty. Please try again.")
                     continue
@@ -342,7 +398,14 @@ class ProductMerger:
             try:
                 choice = int(user_input)
                 if 1 <= choice <= len(values):
-                    return values[choice - 1]['value']
+                    # Pre-existing values are already in the system, but still validate
+                    chosen_value = values[choice - 1]['value']
+                    try:
+                        sanitized = self._sanitize_user_input(chosen_value, field_name)
+                        return sanitized
+                    except ValueError as e:
+                        logging.warning(f"Pre-existing value failed validation: {str(e)}. Using anyway.")
+                        return chosen_value
                 else:
                     print(f"ERROR: Invalid choice. Please enter number 1-{len(values)} or press ENTER.")
             except ValueError:
