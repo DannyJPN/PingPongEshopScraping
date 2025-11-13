@@ -332,7 +332,7 @@ def main():
 
         # Step 5.5: Merge duplicate products
         logging.info("Merging duplicate products...")
-        product_merger = ProductMerger(language=args.Language, memory_dir=memory_dir)
+        product_merger = ProductMerger(language=args.language, memory_dir=memory_dir)
         merged_products = product_merger.merge_products(repaired_products)
 
         logging.info(f"Product merging completed:")
