@@ -188,15 +188,14 @@ class ProductMerger:
         # Recalculate category_ids from category (derived field)
         merged_product.category_ids = self._recalculate_category_ids(merged_product.category)
 
-        # Update NameMemory if type/brand/model were resolved
-        # This ensures NameMemory stays consistent with the chosen values
-        if merged_data.get('type') or merged_data.get('brand') or merged_data.get('model'):
-            self._update_name_memory(
-                products,
-                merged_data.get('type', ''),
-                merged_data.get('brand', ''),
-                merged_data.get('model', '')
-            )
+        # Update NameMemory ONLY if all three components (type, brand, model) are present
+        # This ensures we don't create incomplete name compositions
+        type_val = merged_data.get('type', '').strip()
+        brand_val = merged_data.get('brand', '').strip()
+        model_val = merged_data.get('model', '').strip()
+
+        if type_val and brand_val and model_val:
+            self._update_name_memory(products, type_val, brand_val, model_val)
 
         logging.debug(f"Successfully merged {len(products)} products into one: {merged_product.name}")
         return merged_product
