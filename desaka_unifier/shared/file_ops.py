@@ -99,16 +99,16 @@ def append_to_txt_file(file_path: str, lines: List[str]) -> None:
 
     except PermissionError as e:
         logging.error(f"Permission denied while appending to file {file_path}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        raise
     except OSError as e:
-        logging.error(f"OS error while appending to file {file_path}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        if e.errno == 28:  # ENOSPC - No space left on device
+            logging.error(f"Disk full while appending to file {file_path}. Error: {str(e)}", exc_info=True)
+        else:
+            logging.error(f"OS error while appending to file {file_path}. Error: {str(e)}", exc_info=True)
+        raise
     except Exception as e:
         logging.error(f"Error appending to text file {file_path}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        raise
 
 
 
@@ -302,16 +302,16 @@ def save_json_file(data: Dict[str, Any], filepath: str) -> None:
 
     except PermissionError as e:
         logging.error(f"Permission denied while saving file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        raise
     except OSError as e:
-        logging.error(f"OS error while saving file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        if e.errno == 28:  # ENOSPC - No space left on device
+            logging.error(f"Disk full while saving file {filepath}. Error: {str(e)}", exc_info=True)
+        else:
+            logging.error(f"OS error while saving file {filepath}. Error: {str(e)}", exc_info=True)
+        raise
     except Exception as e:
         logging.error(f"Error saving JSON file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        raise
 
 
 def save_jsonl_file(data: List[Dict[str, Any]], filepath: str) -> None:
@@ -334,13 +334,13 @@ def save_jsonl_file(data: List[Dict[str, Any]], filepath: str) -> None:
 
     except PermissionError as e:
         logging.error(f"Permission denied while saving file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        raise
     except OSError as e:
-        logging.error(f"OS error while saving file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        if e.errno == 28:  # ENOSPC - No space left on device
+            logging.error(f"Disk full while saving file {filepath}. Error: {str(e)}", exc_info=True)
+        else:
+            logging.error(f"OS error while saving file {filepath}. Error: {str(e)}", exc_info=True)
+        raise
     except Exception as e:
         logging.error(f"Error saving JSONL file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        raise
