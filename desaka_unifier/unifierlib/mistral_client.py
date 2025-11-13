@@ -10,7 +10,7 @@ import json
 import time
 import logging
 from typing import Dict, Any, Optional, List
-from unifierlib.constants import DEFAULT_MAX_TOKENS
+from unifierlib.constants import DEFAULT_MAX_TOKENS, API_KEY_MISTRAL
 
 
 class MistralClient:
@@ -21,7 +21,7 @@ class MistralClient:
 
     def __init__(self, use_fine_tuned_models: bool = False, fine_tuned_models: Optional[Dict[str, str]] = None):
         """Initialize Mistral client with API key from environment."""
-        api_key = os.getenv('MISTRAL_API_KEY')
+        api_key = os.getenv(API_KEY_MISTRAL)
         if not api_key:
             raise ValueError("MISTRAL_API_KEY environment variable is not set")
 

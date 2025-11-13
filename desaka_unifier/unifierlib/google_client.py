@@ -10,7 +10,7 @@ import json
 import time
 import logging
 from typing import Dict, Any, Optional, List
-from unifierlib.constants import DEFAULT_MAX_TOKENS
+from unifierlib.constants import DEFAULT_MAX_TOKENS, API_KEY_GOOGLE
 
 
 class GoogleClient:
@@ -21,7 +21,7 @@ class GoogleClient:
 
     def __init__(self, use_fine_tuned_models: bool = False, fine_tuned_models: Optional[Dict[str, str]] = None):
         """Initialize Google Gemini client with API key from environment."""
-        api_key = os.getenv('GOOGLE_API_KEY')
+        api_key = os.getenv(API_KEY_GOOGLE)
         if not api_key:
             raise ValueError("GOOGLE_API_KEY environment variable is not set")
 

@@ -10,7 +10,7 @@ import json
 import time
 import logging
 from typing import Dict, Any, Optional, List
-from unifierlib.constants import DEFAULT_MAX_TOKENS
+from unifierlib.constants import DEFAULT_MAX_TOKENS, API_KEY_ANTHROPIC
 
 
 class AnthropicClient:
@@ -21,7 +21,7 @@ class AnthropicClient:
 
     def __init__(self, use_fine_tuned_models: bool = False, fine_tuned_models: Optional[Dict[str, str]] = None):
         """Initialize Anthropic client with API key from environment."""
-        api_key = os.getenv('ANTHROPIC_API_KEY')
+        api_key = os.getenv(API_KEY_ANTHROPIC)
         if not api_key:
             raise ValueError("ANTHROPIC_API_KEY environment variable is not set")
 

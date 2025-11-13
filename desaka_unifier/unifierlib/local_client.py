@@ -13,7 +13,7 @@ import subprocess
 import shutil
 from enum import Enum
 from typing import Dict, Any, Optional, List
-from unifierlib.constants import DEFAULT_MAX_TOKENS
+from unifierlib.constants import DEFAULT_MAX_TOKENS, API_KEY_HUGGINGFACE, API_KEY_HUGGINGFACE_ALT
 
 
 class LocalBackend(Enum):
@@ -242,7 +242,7 @@ class LocalClient:
             logging.debug(f"Hugging Face libraries not installed: {str(e)}")
 
             # Try Hugging Face Inference API as fallback
-            hf_token = os.getenv('HUGGINGFACE_API_KEY') or os.getenv('HF_TOKEN')
+            hf_token = os.getenv(API_KEY_HUGGINGFACE) or os.getenv(API_KEY_HUGGINGFACE_ALT)
             if hf_token:
                 try:
                     import requests
