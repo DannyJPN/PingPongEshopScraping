@@ -167,6 +167,10 @@ def main():
     # Parse arguments first to get debug flag
     args = parse_arguments()
 
+    # Ensure log directory exists BEFORE setting up logging
+    if not os.path.exists(args.log_dir):
+        os.makedirs(args.log_dir)
+
     # Generate the log filename
     log_file = get_log_filename(args.log_dir)
     logging.debug(f"Generated log filename: {log_file}")

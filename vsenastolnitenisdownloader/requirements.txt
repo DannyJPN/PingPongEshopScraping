@@ -8,3 +8,6 @@ requests>=2.28.0
 
 # Progress bars
 tqdm>=4.64.0
+
+# Colored logging
+colorlog>=6.7.0
