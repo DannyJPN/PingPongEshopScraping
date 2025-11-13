@@ -132,11 +132,12 @@ class DownloadStats:
 
         total_req, failed_req = self.get_stats(url)
         if total_req > 0:
-            success_rate = ((total_req - failed_req) / total_req) * 100
+            success_req = total_req - failed_req
+            success_rate = (success_req / total_req) * 100
             failure_rate = self.get_failure_rate(url)
             current_delay = BASE_RETRY_DELAY * (1 + failure_rate)
             pbar.set_postfix({
-                'OK': f'{success_rate:.1f}%',
+                'OK': f'{success_req}/{total_req} ({success_rate:.1f}%)',
                 'delay': f'{current_delay:.3f}s'
             })
 
