@@ -525,11 +525,30 @@ class ProductMerger:
             return memory_dict
 
         except FileNotFoundError:
-            logging.warning(f"Memory file not found: {file_path}. Will create new one.")
+            # Recoverable: file doesn't exist yet, will be created on first save
+            logging.info(f"Memory file not found: {file_path}. Will create new one on first save.")
+            self.memory_cache[cache_key] = {}
+            return {}
+        except PermissionError as e:
+            # Serious: cannot read file due to permissions
+            logging.error(f"Permission denied reading memory file {file_path}: {str(e)}", exc_info=True)
+            raise  # Re-raise, this is a fatal error
+        except OSError as e:
+            # Serious: disk error, corrupted filesystem, etc
+            if e.errno == 28:  # ENOSPC - No space left on device
+                logging.error(f"Disk full while reading memory file {file_path}", exc_info=True)
+            else:
+                logging.error(f"OS error reading memory file {file_path}: {str(e)}", exc_info=True)
+            raise  # Re-raise, this is a fatal error
+        except UnicodeDecodeError as e:
+            # Recoverable but concerning: file encoding issue
+            logging.error(f"Encoding error in memory file {file_path}: {str(e)}. File may be corrupted.", exc_info=True)
+            # Try to continue with empty dict
             self.memory_cache[cache_key] = {}
             return {}
         except Exception as e:
-            logging.error(f"Error loading memory file {file_path}: {str(e)}", exc_info=True)
+            # Unknown error - log and continue with empty dict
+            logging.error(f"Unexpected error loading memory file {file_path}: {str(e)}", exc_info=True)
             self.memory_cache[cache_key] = {}
             return {}
 
