@@ -193,14 +193,31 @@ def load_csv_file(filepath):
 
 
 def save_csv_file(csv_data, filepath):
-    """Save data to a CSV file in UTF-8 format with backup creation."""
+    """
+    Save data to a CSV file in UTF-8 format with atomic write and backup creation.
+
+    Uses atomic write pattern: write to temp file, then rename.
+    This prevents corruption if the write fails partway through.
+    """
+    import csv
+    import shutil
+    import tempfile
+    import fcntl
+
+    temp_fd = None
+    temp_path = None
+
     try:
         # Create backup of existing file
         if os.path.exists(filepath):
             backup_filepath = f"{filepath}.{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv_old"
-            import shutil
             shutil.copy(filepath, backup_filepath)
             logging.debug(f"Backup of the original file created: {backup_filepath}")
+
+        # Ensure parent directory exists
+        parent_dir = os.path.dirname(filepath)
+        if parent_dir and not os.path.exists(parent_dir):
+            ensure_directory_exists(parent_dir)
 
         df = pd.DataFrame(csv_data)
 
@@ -208,23 +225,62 @@ def save_csv_file(csv_data, filepath):
         logging.debug(f"Data being saved: {df.head()}")
         logging.debug(f"Saving CSV with UTF-8 encoding to: {filepath}")
 
-        # Save with UTF-8 encoding
-        import csv
-        df.to_csv(filepath, index=False, quotechar='"', quoting=csv.QUOTE_ALL, encoding='utf-8')
+        # Atomic write: write to temporary file first
+        temp_fd, temp_path = tempfile.mkstemp(
+            dir=parent_dir if parent_dir else '.',
+            prefix='.tmp_',
+            suffix='.csv'
+        )
+
+        try:
+            # Acquire exclusive lock on temp file
+            fcntl.flock(temp_fd, fcntl.LOCK_EX)
+
+            # Write to temp file via pandas
+            df.to_csv(temp_path, index=False, quotechar='"', quoting=csv.QUOTE_ALL, encoding='utf-8')
+
+            # Ensure data is written to disk
+            os.fsync(temp_fd)
+
+            # Release lock before closing
+            fcntl.flock(temp_fd, fcntl.LOCK_UN)
+
+        finally:
+            os.close(temp_fd)
+            temp_fd = None
+
+        # Atomic rename: replace original file with temp file
+        # This is atomic on POSIX systems
+        shutil.move(temp_path, filepath)
+        temp_path = None
+
         logging.debug(f"CSV file saved successfully in UTF-8 format: {filepath}")
 
     except PermissionError as e:
         logging.error(f"Permission denied while saving file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        raise
     except OSError as e:
-        logging.error(f"OS error while saving file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        if e.errno == 28:  # ENOSPC - No space left on device
+            logging.error(f"Disk full while saving file {filepath}. Error: {str(e)}", exc_info=True)
+        else:
+            logging.error(f"OS error while saving file {filepath}. Error: {str(e)}", exc_info=True)
+        raise
     except Exception as e:
         logging.error(f"Error saving CSV file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        raise
+    finally:
+        # Cleanup: remove temp file if it exists
+        if temp_fd is not None:
+            try:
+                os.close(temp_fd)
+            except:
+                pass
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+                logging.debug(f"Cleaned up temp file: {temp_path}")
+            except:
+                pass
 
 
 def save_json_file(data: Dict[str, Any], filepath: str) -> None:
