@@ -3,8 +3,8 @@ HTTP download constants for retry logic and error handling.
 """
 
 # Retry configuration
-MAX_RETRY_ATTEMPTS = 5          # Maximum retry attempts (max allowed: 100)
-BASE_RETRY_DELAY = 0.01         # Base delay in seconds (will be multiplied by failure rate)
+MAX_RETRY_ATTEMPTS = 100        # Maximum retry attempts
+BASE_RETRY_DELAY = 0.01         # Base delay in seconds (multiplied by 1 + failure rate)
 
 # HTTP status codes that should be retried
 RETRY_STATUS_CODES = [
