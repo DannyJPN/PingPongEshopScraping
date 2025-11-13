@@ -270,7 +270,8 @@ def filter_contains_brand(
             contains_brand = False
             found_brand = None
             for brand in brands:
-                if brand.lower() in value.lower():
+                # Hledáme pouze značky delší než 3 znaky
+                if len(brand) >= 3 and brand.lower() in value.lower():
                     contains_brand = True
                     found_brand = brand
                     break
@@ -315,7 +316,8 @@ def filter_types_containing_models(
             contains_model = False
             found_model = None
             for model in model_values:
-                if model in value:  # Celá hodnota modelu
+                # Hledáme pouze modely delší než 3 znaky
+                if len(model) >= 3 and model in value:  # Celá hodnota modelu
                     contains_model = True
                     found_model = model
                     break
@@ -352,12 +354,12 @@ def filter_models_containing_type_words(
     """
     print("\n🧹 Čištění ProductModelMemory od záznamů obsahujících slova typů...")
 
-    # Extrahuj všechna slova z typů
+    # Extrahuj všechna slova z typů (pouze slova delší než 3 znaky)
     type_words = set()
     for type_value in type_values:
         # Rozdělení podle mezery a pomlčky
         words = re.split(r'[\s\-]+', type_value)
-        type_words.update(word.lower() for word in words if word)
+        type_words.update(word.lower() for word in words if word and len(word) >= 3)
 
     filtered = {}
     trash = []
@@ -413,7 +415,8 @@ def filter_models_containing_variant_values(
             contains_variant = False
             found_variant = None
             for variant in long_variant_values:
-                if variant in value:
+                # Dodatečná kontrola délky (již filtrováno v long_variant_values, ale pro jistotu)
+                if len(variant) >= 3 and variant in value:
                     contains_variant = True
                     found_variant = variant
                     break
