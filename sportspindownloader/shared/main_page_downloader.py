@@ -3,8 +3,6 @@ import logging
 from datetime import datetime
 from shared.webpage_downloader import download_webpage
 from shared.utils import get_full_day_folder
-from shared.html_loader import load_html_as_dom_tree
-from gewolib.category_link_extractor import extract_category_links
 
 def download_main_page(root_folder,MAIN_URL,MAIN_PAGE_FILENAME, overwrite=False, stats=None):
     try:
