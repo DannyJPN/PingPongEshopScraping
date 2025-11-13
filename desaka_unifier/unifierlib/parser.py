@@ -1454,9 +1454,17 @@ class ProductParser:
             print("=" * 80)
             response = input(f"✅ Press Enter to confirm AI suggestion or type new value: ").strip()
 
-            # If user changed the value, write original AI suggestion to trash
-            if response and response != ai_suggestion and memory_prefix and product_key:
-                self._add_to_trash(memory_prefix, product_key, ai_suggestion)
+            # If user provided input (not just Enter to accept), check if it differs from AI suggestion
+            if response and memory_prefix and product_key:
+                # Normalize for comparison
+                ai_normalized = (ai_suggestion or "").strip()
+                response_normalized = response.strip()
+
+                # If user's value differs from AI suggestion, write AI suggestion to trash
+                # This includes cases where AI returned None/"" (incorrect) or wrong value
+                if ai_normalized != response_normalized:
+                    # Write AI suggestion to trash (even if empty - that's an incorrect example)
+                    self._add_to_trash(memory_prefix, product_key, ai_normalized)
 
             return response if response else ai_suggestion.strip() if ai_suggestion else ""
         except KeyboardInterrupt:
@@ -2789,10 +2797,12 @@ class ProductParser:
         Args:
             memory_prefix: Memory file prefix (e.g., "ProductBrandMemory")
             product_key: Product key (usually downloaded.name)
-            value: The incorrect value to trash
+            value: The incorrect value to trash (can be empty string)
         """
-        if not memory_prefix or not product_key or not value:
+        if not memory_prefix or not product_key:
             return
+
+        # Allow empty value - it's a valid incorrect example (AI returned nothing when it should have)
 
         if memory_prefix not in self.trash_entries:
             self.trash_entries[memory_prefix] = []

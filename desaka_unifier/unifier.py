@@ -487,6 +487,13 @@ def main():
         else:
             logging.info("Fine-tuning skipped (--EnableFineTuning not set)")
 
+        # Step 13: Save trash entries from parser (incorrect AI suggestions)
+        logging.info("Saving trash entries from parser...")
+        try:
+            parser.save_trash_files(args.memory_dir)
+        except Exception as e:
+            logging.error(f"Error saving parser trash files: {str(e)}", exc_info=True)
+
     except Exception as e:
         logging.error(f"Fatal error during initialization: {str(e)}", exc_info=True)
         sys.exit(1)
