@@ -434,6 +434,29 @@ class ProductMerger:
 
         return field_to_memory.get(field_name, None)
 
+    def _validate_file_path(self, file_path: str) -> str:
+        """
+        Validate that file path is within memory_dir bounds.
+
+        Args:
+            file_path: File path to validate
+
+        Returns:
+            str: Validated absolute file path
+
+        Raises:
+            ValueError: If path escapes memory_dir
+        """
+        # Get absolute paths
+        abs_memory_dir = os.path.abspath(self.memory_dir)
+        abs_file_path = os.path.abspath(file_path)
+
+        # Check if file path is within memory_dir
+        if not abs_file_path.startswith(abs_memory_dir):
+            raise ValueError(f"Path traversal detected: {file_path} is outside memory directory {abs_memory_dir}")
+
+        return abs_file_path
+
     def _load_memory_file(self, memory_prefix: str) -> Dict[str, str]:
         """
         Load memory file from disk (with caching).
@@ -450,8 +473,9 @@ class ProductMerger:
         if cache_key in self.memory_cache:
             return self.memory_cache[cache_key]
 
-        # Load from disk
+        # Construct and validate file path
         file_path = os.path.join(self.memory_dir, f"{cache_key}.csv")
+        file_path = self._validate_file_path(file_path)
 
         try:
             csv_data = load_csv_file(file_path)
@@ -489,7 +513,9 @@ class ProductMerger:
             logging.warning(f"Cannot save memory file {cache_key}: not in cache")
             return
 
+        # Construct and validate file path
         file_path = os.path.join(self.memory_dir, f"{cache_key}.csv")
+        file_path = self._validate_file_path(file_path)
 
         try:
             # Convert dict to CSV format (KEY, VALUE)
