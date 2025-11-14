@@ -14,6 +14,7 @@ from unifierlib.memory_manager import load_eshop_list, load_supported_languages
 from unifierlib.result_loader import load_eshop_results
 from unifierlib.repaired_product import RepairedProduct
 from unifierlib.product_merger import ProductMerger
+from unifierlib.token_tracker import get_tracker
 
 from unifierlib.constants import (
     DEFAULT_LANGUAGE,
@@ -516,6 +517,13 @@ def main():
     except Exception as e:
         logging.error(f"Fatal error during initialization: {str(e)}", exc_info=True)
         sys.exit(1)
+
+    # Display AI token usage and cost statistics
+    try:
+        tracker = get_tracker()
+        tracker.print_statistics()
+    except Exception as e:
+        logging.warning(f"Failed to display token statistics: {str(e)}")
 
     end_time = datetime.now()
     logging.info(f"Script ended at {end_time.strftime('%Y-%m-%d %H:%M:%S')}")

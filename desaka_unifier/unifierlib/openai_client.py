@@ -11,6 +11,7 @@ import time
 import logging
 from typing import Dict, Any, Optional, List
 from unifierlib.constants import DEFAULT_MAX_TOKENS, API_KEY_OPENAI
+from unifierlib.token_tracker import get_tracker
 
 
 class OpenAIClient:
@@ -118,6 +119,21 @@ class OpenAIClient:
                 temperature=temperature,
                 max_tokens=max_tokens
             )
+
+            # Track token usage if available
+            if hasattr(response, 'usage') and response.usage:
+                try:
+                    tracker = get_tracker()
+                    tracker.track_usage(
+                        model=model,
+                        prompt_tokens=response.usage.prompt_tokens,
+                        completion_tokens=response.usage.completion_tokens,
+                        total_tokens=response.usage.total_tokens,
+                        task_type=task_type
+                    )
+                except Exception as tracking_error:
+                    # Don't fail the API call if tracking fails
+                    logging.warning(f"Failed to track token usage: {str(tracking_error)}")
 
             if response.choices and len(response.choices) > 0:
                 response_content = response.choices[0].message.content.strip()
