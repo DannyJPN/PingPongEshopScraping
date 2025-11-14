@@ -5,11 +5,9 @@ from tqdm import tqdm
 from urllib.parse import urlparse
 from datetime import datetime
 from shared.webpage_downloader import download_webpage
-from shared.html_loader import load_html_as_dom_tree
-
 from shared.utils import sanitize_filename, get_pages_folder
 
-def download_category_pages(category_page_links, root_folder, overwrite=False, debug=False):
+def download_category_pages(category_page_links, root_folder, overwrite=False, debug=False, stats=None):
     """
     Downloads all category pages and displays a progress bar.
 
@@ -28,7 +26,7 @@ def download_category_pages(category_page_links, root_folder, overwrite=False, d
             try:
                 # Parse URL to create a valid filename
                 parsed_url = urlparse(url)
-                filename = (parsed_url.path + parsed_url.query).strip("/").replace('/', '_') + '.html'
+                filename = (parsed_url.path+parsed_url.query).strip("/").replace('/', '_') + '.html'
                 logging.debug(f"Original filename: {filename}")
                 sanitized_filename = sanitize_filename(filename)
                 logging.debug(f"Sanitized filename: {sanitized_filename}")
@@ -36,11 +34,13 @@ def download_category_pages(category_page_links, root_folder, overwrite=False, d
 
                 logging.debug(f"Downloading webpage from URL: {url} to filepath: {file_path}")
                 # Download the webpage
-                if download_webpage(url, file_path, overwrite=overwrite):
-                    # Add the absolute path to the list of downloaded files only if successful
+                if download_webpage(url, file_path, overwrite=overwrite, stats=stats):
+                    # Add the absolute path to the list of downloaded files
                     downloaded_files.append(os.path.abspath(file_path))
 
-                # Update progress bar
+                # Update progress bar with statistics
+                if stats:
+                    stats.update_progress_bar(pbar, url)
                 pbar.update(1)
 
             except Exception as e:

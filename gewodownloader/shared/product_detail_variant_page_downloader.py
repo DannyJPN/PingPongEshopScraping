@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 from shared.utils import get_products_folder
 from shared.webpage_downloader import download_webpage
 
-def download_product_detail_variant_pages(product_variant_detail_urls, root_folder, overwrite=False, debug=False):
+def download_product_detail_variant_pages(product_variant_detail_urls, root_folder, overwrite=False, debug=False, stats=None):
     """
     Downloads all product detail variant pages from the given URLs and saves them to the specified root folder.
 
@@ -32,11 +32,13 @@ def download_product_detail_variant_pages(product_variant_detail_urls, root_fold
                 logging.debug(f"Downloading webpage from URL: {url} to filepath: {filepath}")
 
                 # Download the webpage
-                if download_webpage(url, filepath, overwrite=overwrite):
+                if download_webpage(url, filepath, overwrite=overwrite, stats=stats):
                     # Add the absolute path to the list of downloaded files
                     downloaded_files.append(os.path.abspath(filepath))
 
-                # Update progress bar
+                # Update progress bar with statistics
+                if stats:
+                    stats.update_progress_bar(pbar, url)
                 pbar.update(1)
 
             except Exception as e:
