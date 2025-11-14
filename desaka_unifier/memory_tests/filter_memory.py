@@ -134,14 +134,13 @@ def save_trash_data(trash_data: Dict[str, TrashData], language: str, dry_run: bo
 
         # Append unique records
         if unique_new_records:
-            if trash_filepath.exists():
-                all_records = load_csv_file(str(trash_filepath)) + unique_new_records
-                save_csv_file(all_records, str(trash_filepath))
-                print(f"   ✓ {memory_name}: přidáno {len(unique_new_records)} unikátních záznamů (celkem: {len(all_records)})")
-            else:
-                # Nový soubor
-                save_csv_file(unique_new_records, str(trash_filepath))
-                print(f"   ✓ {memory_name}: vytvořeno s {len(unique_new_records)} záznamy")
+            from shared.file_ops import append_to_csv_file
+            # Use append mode - no backups
+            append_to_csv_file(str(trash_filepath), unique_new_records)
+
+            # Count total for reporting
+            total_count = len(load_csv_file(str(trash_filepath)))
+            print(f"   ✓ {memory_name}: přidáno {len(unique_new_records)} unikátních záznamů (celkem: {total_count})")
         else:
             print(f"   ○ {memory_name}: žádné nové unikátní záznamy")
 
