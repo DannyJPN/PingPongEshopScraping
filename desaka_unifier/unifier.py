@@ -28,19 +28,30 @@ from unifierlib.constants import (
     ESHOP_LIST
 )
 
-# Global variable to hold script runner for signal handling
+# Global variables to hold instances for signal handling and cleanup
 script_runner_instance = None
+parser_instance = None
+memory_dir_for_cleanup = None
 
 
 def signal_handler(signum, frame):
-    """Handle Ctrl+C (SIGINT) signal to gracefully stop all running scripts."""
-    global script_runner_instance
+    """Handle Ctrl+C (SIGINT) signal to gracefully stop all running scripts and save trash files."""
+    global script_runner_instance, parser_instance, memory_dir_for_cleanup
 
     logging.warning("Received interrupt signal (Ctrl+C). Stopping all running scripts...")
 
     if script_runner_instance:
         script_runner_instance.stop_all_scripts()
         logging.info("All scripts have been stopped.")
+
+    # Save trash files before exiting
+    if parser_instance and memory_dir_for_cleanup:
+        try:
+            logging.info("Saving parser trash files before exit...")
+            parser_instance.save_trash_files(memory_dir_for_cleanup)
+            logging.info("Parser trash files saved successfully")
+        except Exception as e:
+            logging.error(f"Error saving parser trash files during cleanup: {str(e)}", exc_info=True)
 
     logging.info("Exiting unifier...")
     sys.exit(0)
@@ -162,7 +173,7 @@ def parse_arguments():
 
 
 def main():
-    global script_runner_instance
+    global script_runner_instance, parser_instance, memory_dir_for_cleanup
 
     # Parse arguments first to get debug flag
     args = parse_arguments()
@@ -189,6 +200,9 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
     try:
+        # Set memory_dir for cleanup (in case of early exit or Ctrl+C)
+        memory_dir_for_cleanup = args.memory_dir
+
         # Step 1: Ensure required directories exist
         directories_to_check = [
             args.log_dir,
@@ -310,6 +324,9 @@ def main():
             supported_languages_data=supported_languages_data,
             skip_ai=args.skip_ai
         )
+
+        # Set global parser instance for cleanup on Ctrl+C or error
+        parser_instance = parser
 
         # Sort downloaded products by name before conversion
         logging.debug("Sorting downloaded products by name...")
@@ -497,6 +514,15 @@ def main():
     except Exception as e:
         logging.error(f"Fatal error during initialization: {str(e)}", exc_info=True)
         sys.exit(1)
+    finally:
+        # Always try to save parser trash files on exit (even if already saved in Step 13)
+        # The save method handles duplicates, so saving twice is safe
+        if parser_instance and memory_dir_for_cleanup:
+            try:
+                logging.debug("Finally block: ensuring parser trash files are saved...")
+                parser_instance.save_trash_files(memory_dir_for_cleanup)
+            except Exception as e:
+                logging.error(f"Error in finally block while saving parser trash files: {str(e)}", exc_info=True)
 
     end_time = datetime.now()
     logging.info(f"Script ended at {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
