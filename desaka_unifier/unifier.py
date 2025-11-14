@@ -308,7 +308,8 @@ def main():
             use_fine_tuned_models=args.use_fine_tuned_models,
             fine_tuned_models=fine_tuned_models,
             supported_languages_data=supported_languages_data,
-            skip_ai=args.skip_ai
+            skip_ai=args.skip_ai,
+            memory_dir=args.memory_dir
         )
 
         # Sort downloaded products by name before conversion
@@ -487,12 +488,6 @@ def main():
         else:
             logging.info("Fine-tuning skipped (--EnableFineTuning not set)")
 
-        # Step 13: Save trash entries from parser (incorrect AI suggestions)
-        logging.info("Saving trash entries from parser...")
-        try:
-            parser.save_trash_files(args.memory_dir)
-        except Exception as e:
-            logging.error(f"Error saving parser trash files: {str(e)}", exc_info=True)
 
     except Exception as e:
         logging.error(f"Fatal error during initialization: {str(e)}", exc_info=True)

@@ -44,7 +44,7 @@ class ProductParser:
                  export_products: Optional[List[Any]] = None, repaired_products: Optional[List[Any]] = None,
                  confirm_ai_results: bool = False, use_fine_tuned_models: bool = False,
                  fine_tuned_models: Optional[Dict[str, str]] = None, supported_languages_data: Optional[list] = None,
-                 skip_ai: bool = False):
+                 skip_ai: bool = False, memory_dir: Optional[str] = None):
         """
         Initialize parser with optional memory data, language, export products and AI confirmation setting.
 
@@ -58,6 +58,7 @@ class ProductParser:
             fine_tuned_models (Optional[Dict[str, str]]): Dictionary mapping task types to model IDs
             supported_languages_data (Optional[list]): Pre-loaded supported languages data
             skip_ai (bool): Whether to skip using AI for property evaluation (default: False)
+            memory_dir (Optional[str]): Path to Memory directory (for trash file writing)
         """
         self.memory = memory_data or {}
         self.language = language or 'CS'
@@ -65,13 +66,11 @@ class ProductParser:
         self.repaired_products = repaired_products or []
         self.confirm_ai_results = confirm_ai_results
         self.supported_languages_data = supported_languages_data
+        self.memory_dir = memory_dir
 
         # Track assigned codes to avoid duplicates
         self.assigned_codes = set()
         self.assigned_variant_codes = set()
-
-        # Track trash entries (incorrect AI suggestions that user changed)
-        self.trash_entries: Dict[str, List[Dict[str, str]]] = {}
 
         # Initialize assigned codes from existing products
         self._initialize_assigned_codes()
@@ -2811,97 +2810,51 @@ class ProductParser:
 
     def _add_to_trash(self, memory_prefix: str, product_key: str, value: str):
         """
-        Add entry to trash tracking (incorrect AI suggestion that user changed).
+        Immediately append entry to trash file (fire-and-forget).
 
         Args:
             memory_prefix: Memory file prefix (e.g., "ProductBrandMemory")
             product_key: Product key (usually downloaded.name)
             value: The incorrect value to trash (can be empty string)
         """
-        if not memory_prefix or not product_key:
-            return
-
-        # Allow empty value - it's a valid incorrect example (AI returned nothing when it should have)
-
-        if memory_prefix not in self.trash_entries:
-            self.trash_entries[memory_prefix] = []
-
-        self.trash_entries[memory_prefix].append({
-            'KEY': product_key,
-            'VALUE': value
-        })
-
-        # Debug output to show trash entry was added
-        print(f"\n🗑️  DEBUG: Added to trash - {memory_prefix}: KEY='{product_key}', VALUE='{value}'")
-        print(f"    Total trash entries in {memory_prefix}: {len(self.trash_entries[memory_prefix])}\n")
-
-    def save_trash_files(self, memory_dir: str):
-        """
-        Save all trash entries to trash files.
-        Appends to existing trash files or creates new ones.
-        Only unique rows (KEY+VALUE) are kept.
-
-        Args:
-            memory_dir: Path to Memory directory (Trash will be created next to it)
-        """
-        print(f"\n🗑️  DEBUG save_trash_files: Called with memory_dir='{memory_dir}'")
-        print(f"    Total trash entry types: {len(self.trash_entries)}")
-        for prefix, entries in self.trash_entries.items():
-            print(f"    - {prefix}: {len(entries)} entries")
-
-        if not self.trash_entries:
-            logging.debug("No trash entries to save from parser")
-            print("    No trash entries to save - returning\n")
+        if not memory_prefix or not product_key or not self.memory_dir:
             return
 
         from shared.file_ops import load_csv_file, save_csv_file
 
-        trash_dir = os.path.join(os.path.dirname(memory_dir), "Trash")
-        print(f"    Trash directory: {trash_dir}")
+        # Determine trash directory and file path
+        trash_dir = os.path.join(os.path.dirname(self.memory_dir), "Trash")
         os.makedirs(trash_dir, exist_ok=True)
 
-        logging.info(f"Saving {len(self.trash_entries)} trash entry types from parser...")
+        trash_filepath = os.path.join(trash_dir, f"{memory_prefix}_{self.language}_trash.csv")
 
-        for memory_name, entries in self.trash_entries.items():
-            if not entries:
-                continue
-
-            trash_filepath = os.path.join(trash_dir, f"{memory_name}_{self.language}_trash.csv")
-
-            try:
-                # Load existing trash file if it exists and build set of unique rows
-                existing_rows = set()
-                if os.path.exists(trash_filepath):
-                    existing_entries = load_csv_file(trash_filepath)
-                    for entry in existing_entries:
-                        row_id = (entry.get('KEY', ''), entry.get('VALUE', ''))
-                        existing_rows.add(row_id)
-
-                # Filter out duplicate rows from new entries
-                unique_new_entries = []
-                new_count = 0
-                for entry in entries:
+        try:
+            # Load existing trash file to check for duplicates
+            existing_rows = set()
+            all_entries = []
+            if os.path.exists(trash_filepath):
+                all_entries = load_csv_file(trash_filepath)
+                for entry in all_entries:
                     row_id = (entry.get('KEY', ''), entry.get('VALUE', ''))
-                    if row_id not in existing_rows:
-                        unique_new_entries.append(entry)
-                        existing_rows.add(row_id)
-                        new_count += 1
+                    existing_rows.add(row_id)
 
-                # Append unique entries
-                if unique_new_entries:
-                    if os.path.exists(trash_filepath):
-                        all_entries = load_csv_file(trash_filepath) + unique_new_entries
-                        save_csv_file(all_entries, trash_filepath)
-                        logging.info(f"Appended {new_count} unique trash entries to {trash_filepath} (total: {len(all_entries)})")
-                    else:
-                        # Create new trash file
-                        save_csv_file(unique_new_entries, trash_filepath)
-                        logging.info(f"Created new trash file {trash_filepath} with {new_count} entries")
-                else:
-                    logging.debug(f"No new unique entries to add to {trash_filepath}")
+            # Check if this exact row already exists
+            new_row_id = (product_key, value)
+            if new_row_id in existing_rows:
+                logging.debug(f"Trash entry already exists: {memory_prefix} - KEY='{product_key}', VALUE='{value}'")
+                return
 
-            except Exception as e:
-                logging.error(f"Error saving trash file {trash_filepath}: {str(e)}", exc_info=True)
+            # Append new entry
+            new_entry = {'KEY': product_key, 'VALUE': value}
+            all_entries.append(new_entry)
 
-        logging.info(f"All trash entries from parser saved successfully")
+            # Save immediately (fire-and-forget)
+            save_csv_file(all_entries, trash_filepath)
+
+            print(f"\n🗑️  Trash: {memory_prefix} - KEY='{product_key}', VALUE='{value}' → {trash_filepath}")
+            logging.debug(f"Added trash entry to {trash_filepath}")
+
+        except Exception as e:
+            logging.error(f"Error writing trash entry to {trash_filepath}: {str(e)}", exc_info=True)
+
 
