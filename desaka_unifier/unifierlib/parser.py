@@ -2831,6 +2831,10 @@ class ProductParser:
             'VALUE': value
         })
 
+        # Debug output to show trash entry was added
+        print(f"\n🗑️  DEBUG: Added to trash - {memory_prefix}: KEY='{product_key}', VALUE='{value}'")
+        print(f"    Total trash entries in {memory_prefix}: {len(self.trash_entries[memory_prefix])}\n")
+
     def save_trash_files(self, memory_dir: str):
         """
         Save all trash entries to trash files.
@@ -2840,13 +2844,20 @@ class ProductParser:
         Args:
             memory_dir: Path to Memory directory (Trash will be created next to it)
         """
+        print(f"\n🗑️  DEBUG save_trash_files: Called with memory_dir='{memory_dir}'")
+        print(f"    Total trash entry types: {len(self.trash_entries)}")
+        for prefix, entries in self.trash_entries.items():
+            print(f"    - {prefix}: {len(entries)} entries")
+
         if not self.trash_entries:
             logging.debug("No trash entries to save from parser")
+            print("    No trash entries to save - returning\n")
             return
 
         from shared.file_ops import load_csv_file, save_csv_file
 
         trash_dir = os.path.join(os.path.dirname(memory_dir), "Trash")
+        print(f"    Trash directory: {trash_dir}")
         os.makedirs(trash_dir, exist_ok=True)
 
         logging.info(f"Saving {len(self.trash_entries)} trash entry types from parser...")
