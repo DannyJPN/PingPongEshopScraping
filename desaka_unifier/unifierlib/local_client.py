@@ -1,9 +1,19 @@
 """
-Generic Local Models client module for desaka_unifier project.
+Generic Local Multimodal Models client module for desaka_unifier project.
 
-This module provides generic methods for communicating with local LLM models
-via multiple backends: Ollama, LM Studio, and Hugging Face.
+This module provides generic methods for communicating with local MULTIMODAL LLM models
+(text + vision) via multiple backends: Ollama, LM Studio, and Hugging Face.
 Includes automatic backend detection, model download, and management.
+
+IMPORTANT: This module uses ONLY multimodal models capable of processing both text and images.
+This enables product image analysis, OCR, visual product detection, and image-based categorization
+for e-commerce applications.
+
+Supported multimodal models:
+- LLaVA (Large Language and Vision Assistant) - Popular vision model
+- Qwen2-VL - Multimodal version of Qwen with vision capabilities
+- MiniCPM-V - Efficient Chinese multimodal model
+- Moondream - Small efficient vision model
 """
 
 import os
@@ -26,9 +36,22 @@ class LocalBackend(Enum):
 
 class LocalClient:
     """
-    Generic client for local LLM models with multi-backend support.
-    Supports: Ollama, LM Studio, Hugging Face (local & API).
-    Provides automatic backend detection and model management.
+    Generic client for local MULTIMODAL LLM models with multi-backend support.
+
+    MULTIMODAL ONLY: This client exclusively uses multimodal models (text + vision)
+    for e-commerce product analysis, including image recognition, OCR, and visual categorization.
+
+    Supported backends:
+    - Ollama: LLaVA, Qwen2-VL, MiniCPM-V, Moondream
+    - LM Studio: Any loaded multimodal model (auto-detected)
+    - Hugging Face (local & API): LLaVA, Qwen2-VL, MiniCPM-V, Moondream
+
+    Features:
+    - Automatic backend detection and initialization
+    - Automatic model download (Ollama)
+    - Disk space verification before download
+    - Multimodal model filtering (LM Studio)
+    - Lazy model loading (Hugging Face)
     """
 
     def __init__(self, use_fine_tuned_models: bool = False, fine_tuned_models: Optional[Dict[str, str]] = None,
@@ -76,16 +99,19 @@ class LocalClient:
             if not self._init_backend(preferred_backend):
                 raise RuntimeError(f"Preferred backend '{preferred_backend}' is not available")
         else:
-            logging.info("Auto-detecting available local model backend...")
+            logging.info("Auto-detecting available local multimodal model backend...")
             if not self._auto_detect_backend():
                 raise RuntimeError(
-                    "No local model backend available. Please install one of:\n"
-                    "- Ollama: https://ollama.ai/download\n"
-                    "- LM Studio: https://lmstudio.ai\n"
-                    "- Hugging Face: pip install transformers torch"
+                    "No local multimodal model backend available. Please install one of:\n"
+                    "- Ollama: https://ollama.ai/download (then: ollama pull llava:13b)\n"
+                    "- LM Studio: https://lmstudio.ai (load a multimodal model like LLaVA or Qwen2-VL)\n"
+                    "- Hugging Face: pip install transformers torch (supports LLaVA, Qwen2-VL, MiniCPM-V, Moondream)\n"
+                    "\n"
+                    "IMPORTANT: Only multimodal (text + vision) models are supported for product image analysis."
                 )
 
-        logging.info(f"Using backend: {self.backend.value}")
+        logging.info(f"Using multimodal backend: {self.backend.value}")
+        logging.info(f"Backend info: {self.backend_info}")
 
         # Define available models based on backend
         self._init_model_catalog()
@@ -264,31 +290,49 @@ class LocalClient:
             return False
 
     def _init_model_catalog(self):
-        """Initialize model catalog based on backend."""
+        """Initialize model catalog based on backend - MULTIMODAL MODELS ONLY (text + vision)."""
         if self.backend == LocalBackend.OLLAMA:
+            # Ollama - multimodal vision models for product image analysis
             self.models = {
-                'flagship': 'qwen2.5:72b',
-                'efficient': 'qwen2.5:14b',
-                'reasoning': 'qwen2.5:72b',
-                'creative': 'qwen2.5:72b',
-                'tiny': 'qwen2.5:7b',
-                'medium': 'qwen2.5:32b',
+                'flagship': 'llava:34b',           # Best multimodal model
+                'efficient': 'llava:13b',          # Good balance for vision tasks
+                'reasoning': 'llava:34b',          # Complex vision reasoning
+                'creative': 'llava:34b',           # Creative image analysis
+                'tiny': 'moondream',               # Smallest efficient vision model (~1.6B params)
+                'medium': 'minicpm-v:8b',          # Medium-sized multimodal (MiniCPM-V)
+                'vision_flagship': 'qwen2-vl:72b', # Qwen2-VL flagship for complex vision
+                'vision_efficient': 'qwen2-vl:7b', # Qwen2-VL efficient
+                'vision_tiny': 'llava:7b',         # LLaVA small
             }
             self.model_sizes = {
-                'qwen2.5:7b': 4.7,
-                'qwen2.5:14b': 9.0,
-                'qwen2.5:32b': 20.0,
-                'qwen2.5:72b': 43.0,
+                'moondream': 1.6,           # ~1.6GB - very efficient
+                'llava:7b': 4.5,           # ~4.5GB
+                'qwen2-vl:7b': 4.7,        # ~4.7GB
+                'minicpm-v:8b': 5.2,       # ~5.2GB
+                'llava:13b': 7.3,          # ~7.3GB
+                'llava:34b': 19.0,         # ~19GB
+                'qwen2-vl:72b': 43.0,      # ~43GB
             }
 
         elif self.backend == LocalBackend.LM_STUDIO:
-            # LM Studio - get available models from server
+            # LM Studio - get available multimodal models from server
             try:
                 models_list = self.client.models.list()
                 available = [m.id for m in models_list.data]
 
-                # Use first available model as default for all tasks
-                default_model = available[0] if available else None
+                # Filter for multimodal models (llava, vision, vl, minicpm-v, moondream, qwen-vl)
+                multimodal_keywords = ['llava', 'vision', '-vl', 'minicpm-v', 'moondream', 'qwen-vl', 'qwen2-vl']
+                multimodal_models = [
+                    m for m in available
+                    if any(keyword in m.lower() for keyword in multimodal_keywords)
+                ]
+
+                # Use first available multimodal model as default for all tasks
+                default_model = multimodal_models[0] if multimodal_models else (available[0] if available else None)
+
+                if not multimodal_models and available:
+                    logging.warning(f"No multimodal models detected in LM Studio. Available: {available}")
+                    logging.warning("Please load a multimodal model (LLaVA, Qwen2-VL, MiniCPM-V, Moondream)")
 
                 self.models = {
                     'flagship': default_model,
@@ -300,7 +344,8 @@ class LocalClient:
                 }
                 self.model_sizes = {}  # LM Studio manages models externally
 
-                logging.info(f"LM Studio available models: {available}")
+                logging.info(f"LM Studio multimodal models: {multimodal_models if multimodal_models else 'none'}")
+                logging.info(f"LM Studio using model: {default_model}")
 
             except Exception as e:
                 logging.error(f"Failed to get LM Studio models: {str(e)}")
@@ -308,31 +353,37 @@ class LocalClient:
                 self.model_sizes = {}
 
         elif self.backend == LocalBackend.HUGGINGFACE_LOCAL:
-            # Hugging Face local - Czech-friendly models
+            # Hugging Face local - multimodal vision models (Czech-friendly)
             self.models = {
-                'flagship': 'Qwen/Qwen2.5-72B-Instruct',  # Best but huge
-                'efficient': 'Qwen/Qwen2.5-14B-Instruct',  # Good balance
-                'reasoning': 'Qwen/Qwen2.5-72B-Instruct',
-                'creative': 'Qwen/Qwen2.5-72B-Instruct',
-                'tiny': 'Qwen/Qwen2.5-7B-Instruct',  # Smallest
-                'medium': 'Qwen/Qwen2.5-32B-Instruct',
+                'flagship': 'Qwen/Qwen2-VL-72B-Instruct',          # Best multimodal
+                'efficient': 'Qwen/Qwen2-VL-7B-Instruct',          # Efficient vision
+                'reasoning': 'Qwen/Qwen2-VL-72B-Instruct',         # Complex reasoning
+                'creative': 'liuhaotian/llava-v1.6-vicuna-13b',    # Creative LLaVA
+                'tiny': 'openbmb/MiniCPM-V-2_6',                   # Tiny but powerful (~8B)
+                'medium': 'liuhaotian/llava-v1.6-vicuna-13b',      # Medium LLaVA
+                'vision_tiny': 'vikhyatk/moondream2',              # Moondream 2 (~1.6B)
+                'vision_efficient': 'Qwen/Qwen2-VL-7B-Instruct',   # Qwen2-VL small
+                'vision_flagship': 'Qwen/Qwen2-VL-72B-Instruct',   # Qwen2-VL large
             }
             self.model_sizes = {
-                'Qwen/Qwen2.5-7B-Instruct': 15.0,   # ~15GB with weights
-                'Qwen/Qwen2.5-14B-Instruct': 30.0,
-                'Qwen/Qwen2.5-32B-Instruct': 65.0,
-                'Qwen/Qwen2.5-72B-Instruct': 145.0,
+                'vikhyatk/moondream2': 3.5,                       # ~3.5GB with weights
+                'openbmb/MiniCPM-V-2_6': 18.0,                    # ~18GB (8B params)
+                'Qwen/Qwen2-VL-7B-Instruct': 16.0,                # ~16GB
+                'liuhaotian/llava-v1.6-vicuna-13b': 28.0,         # ~28GB
+                'Qwen/Qwen2-VL-72B-Instruct': 150.0,              # ~150GB
             }
 
         elif self.backend == LocalBackend.HUGGINGFACE_API:
-            # Hugging Face API - use smaller models for faster inference
+            # Hugging Face API - multimodal models via inference API
             self.models = {
-                'flagship': 'Qwen/Qwen2.5-72B-Instruct',
-                'efficient': 'Qwen/Qwen2.5-7B-Instruct',  # Faster via API
-                'reasoning': 'Qwen/Qwen2.5-72B-Instruct',
-                'creative': 'Qwen/Qwen2.5-14B-Instruct',
-                'tiny': 'Qwen/Qwen2.5-7B-Instruct',
-                'medium': 'Qwen/Qwen2.5-14B-Instruct',
+                'flagship': 'Qwen/Qwen2-VL-72B-Instruct',          # Best via API
+                'efficient': 'Qwen/Qwen2-VL-7B-Instruct',          # Faster multimodal
+                'reasoning': 'Qwen/Qwen2-VL-72B-Instruct',         # Complex tasks
+                'creative': 'liuhaotian/llava-v1.6-vicuna-13b',    # Creative vision
+                'tiny': 'openbmb/MiniCPM-V-2_6',                   # Small efficient
+                'medium': 'liuhaotian/llava-v1.6-vicuna-13b',      # Medium size
+                'vision_tiny': 'vikhyatk/moondream2',              # Moondream API
+                'vision_efficient': 'Qwen/Qwen2-VL-7B-Instruct',   # Qwen2-VL API
             }
             self.model_sizes = {}  # API doesn't download models
 
