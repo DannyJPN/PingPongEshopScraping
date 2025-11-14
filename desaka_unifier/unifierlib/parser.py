@@ -841,7 +841,7 @@ class ProductParser:
         print("\n🔍 CATEGORY DETECTION:")
         print("  (Heuristic analysis disabled for categories)")
 
-        user_category = self._ask_user_for_product_value("category", downloaded, heuristic_match=single_match)
+        user_category = self._ask_user_for_product_value("category", downloaded, heuristic_match=single_match, memory_prefix=CATEGORY_MEMORY_PREFIX)
         if user_category:
             # Find the key for this category value
             category_key = self._find_category_key_by_value(user_category)
@@ -954,7 +954,7 @@ class ProductParser:
         else:
             print("  No matches found in product text")
 
-        user_brand = self._ask_user_for_product_value("Brand", downloaded, heuristic_match=single_match)
+        user_brand = self._ask_user_for_product_value("Brand", downloaded, heuristic_match=single_match, memory_prefix=PRODUCT_BRAND_MEMORY_PREFIX)
         if user_brand:
             # Save to memory
             if memory_key not in self.memory:
@@ -1045,7 +1045,7 @@ class ProductParser:
         else:
             print("  No matches found in product text")
 
-        user_type = self._ask_user_for_product_value("Product Type", downloaded, heuristic_match=single_match)
+        user_type = self._ask_user_for_product_value("Product Type", downloaded, heuristic_match=single_match, memory_prefix=PRODUCT_TYPE_MEMORY_PREFIX)
         if user_type:
             # Save to memory
             if memory_key not in self.memory:
@@ -1128,7 +1128,7 @@ class ProductParser:
         else:
             print("  No matches found in product text")
 
-        user_model = self._ask_user_for_product_value("Product Model", downloaded, heuristic_match=single_match)
+        user_model = self._ask_user_for_product_value("Product Model", downloaded, heuristic_match=single_match, memory_prefix=PRODUCT_MODEL_MEMORY_PREFIX)
         if user_model:
             # Save to memory
             if memory_key not in self.memory:
@@ -1473,8 +1473,20 @@ class ProductParser:
         except KeyboardInterrupt:
             return ai_suggestion.strip() if ai_suggestion else ""
 
-    def _ask_user_for_product_value(self, property_name: str, downloaded: DownloadedProduct, current_value: str = "", heuristic_match: str = None) -> str:
-        """Ask user for product property value with detailed product information display."""
+    def _ask_user_for_product_value(self, property_name: str, downloaded: DownloadedProduct, current_value: str = "", heuristic_match: str = None, memory_prefix: str = None) -> str:
+        """
+        Ask user for product property value with detailed product information display.
+
+        Args:
+            property_name: Name of the property being requested
+            downloaded: DownloadedProduct object for context
+            current_value: Current value if any
+            heuristic_match: Single heuristic match found (if any)
+            memory_prefix: Memory file prefix for trash writing (if heuristic_match changed)
+
+        Returns:
+            User's input or heuristic_match if accepted
+        """
         try:
             # Create a more readable display format similar to AI confirmation
             print("\n" + "=" * 80)
@@ -1519,6 +1531,9 @@ class ProductParser:
             # Adjust prompt based on whether heuristic match exists
             if heuristic_match:
                 response = input(f"✏️  Press Enter to use '{heuristic_match}' or type new value: ").strip()
+                # If user changed heuristic match, write old value to trash
+                if response and response.lower() != heuristic_match.lower() and memory_prefix and downloaded.name:
+                    self._add_to_trash(memory_prefix, downloaded.name, heuristic_match)
                 return response if response else heuristic_match
             else:
                 response = input(f"✏️  Please enter {property_name}: ").strip()
