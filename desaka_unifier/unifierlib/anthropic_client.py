@@ -1,8 +1,8 @@
 """
-Generic OpenAI client module for desaka_unifier project.
+Generic Anthropic Claude client module for desaka_unifier project.
 
-This module provides generic methods for communicating with OpenAI API.
-Contains only general methods that OpenAI API supports.
+This module provides generic methods for communicating with Anthropic Claude API.
+Contains only general methods that Anthropic API supports.
 """
 
 import os
@@ -10,39 +10,39 @@ import json
 import time
 import logging
 from typing import Dict, Any, Optional, List
-from unifierlib.constants import DEFAULT_MAX_TOKENS, API_KEY_OPENAI
+from unifierlib.constants import DEFAULT_MAX_TOKENS, API_KEY_ANTHROPIC
 
 
-class OpenAIClient:
+class AnthropicClient:
     """
-    Generic client for OpenAI API communication.
-    Provides basic methods for chat completions and other OpenAI services.
+    Generic client for Anthropic Claude API communication.
+    Provides basic methods for chat completions and other Anthropic services.
     """
-    
+
     def __init__(self, use_fine_tuned_models: bool = False, fine_tuned_models: Optional[Dict[str, str]] = None):
-        """Initialize OpenAI client with API key from environment."""
-        api_key = os.getenv(API_KEY_OPENAI)
+        """Initialize Anthropic client with API key from environment."""
+        api_key = os.getenv(API_KEY_ANTHROPIC)
         if not api_key:
-            raise ValueError("OPENAI_API_KEY environment variable is not set")
+            raise ValueError("ANTHROPIC_API_KEY environment variable is not set")
 
-        # Try to import openai
+        # Try to import anthropic
         try:
-            import openai
-            self.client = openai.OpenAI(api_key=api_key,timeout=1200.0)
+            import anthropic
+            self.client = anthropic.Anthropic(api_key=api_key, timeout=1200.0)
         except ImportError:
-            logging.error("OpenAI library not installed. Install with: pip install openai")
+            logging.error("Anthropic library not installed. Install with: pip install anthropic")
             raise
 
         # Define latest available models
         self.models = {
-            'flagship': 'gpt-4o',  # Latest flagship model for complex tasks
-            'efficient': 'gpt-4o-mini',  # Cost-efficient model for simpler tasks
-            'reasoning': 'gpt-4o',  # Best for reasoning and analysis
-            'creative': 'gpt-4o',  # Best for creative tasks
-            'fine_tuning': 'gpt-4o-mini'  # Model for fine-tuning
+            'flagship': 'claude-3-5-sonnet-20241022',  # Latest flagship model
+            'efficient': 'claude-3-5-haiku-20241022',  # Cost-efficient model
+            'reasoning': 'claude-3-5-sonnet-20241022',  # Best for reasoning
+            'creative': 'claude-3-5-sonnet-20241022',  # Best for creative tasks
+            'powerful': 'claude-3-opus-20240229'  # Most powerful model
         }
 
-        # Fine-tuned model settings
+        # Fine-tuned model settings (Anthropic doesn't support fine-tuning yet)
         self.use_fine_tuned_models = use_fine_tuned_models
         self.fine_tuned_models = fine_tuned_models or {}
 
@@ -51,12 +51,12 @@ class OpenAIClient:
         Get the appropriate model for a specific task type.
 
         Args:
-            task_type (str): Type of task ('general', 'complex', 'simple', 'reasoning', 'creative', 'fine_tuning')
+            task_type (str): Type of task ('general', 'complex', 'simple', 'reasoning', 'creative')
 
         Returns:
             str: Model name to use
         """
-        # Check if we should use fine-tuned models and if one exists for this task
+        # Check if we should use fine-tuned models (not supported by Anthropic yet)
         if self.use_fine_tuned_models and task_type in self.fine_tuned_models:
             fine_tuned_model = self.fine_tuned_models[task_type]
             if fine_tuned_model:
@@ -69,17 +69,16 @@ class OpenAIClient:
             'simple': self.models['efficient'],
             'reasoning': self.models['reasoning'],
             'creative': self.models['creative'],
-            'fine_tuning': self.models['fine_tuning'],
             'category_mapping': self.models['flagship'],
-            'product_analysis': self.models['flagship'],  # Complex analysis
-            'text_generation': self.models['flagship'],  # Simple text tasks
-            'translation': self.models['flagship'],  # Translation tasks
-            'name_generation': self.models['flagship'],  # Product name generation
-            'description_translation': self.models['flagship'],  # Description translation
-            'brand_detection': self.models['efficient'],  # Brand detection
-            'type_detection': self.models['efficient'],  # Type detection
-            'model_detection': self.models['efficient'],  # Model detection
-            'keyword_generation': self.models['efficient']  # Keyword generation
+            'product_analysis': self.models['flagship'],
+            'text_generation': self.models['flagship'],
+            'translation': self.models['flagship'],
+            'name_generation': self.models['flagship'],
+            'description_translation': self.models['flagship'],
+            'brand_detection': self.models['efficient'],
+            'type_detection': self.models['efficient'],
+            'model_detection': self.models['efficient'],
+            'keyword_generation': self.models['efficient']
         }
 
         return task_model_mapping.get(task_type, self.models['efficient'])
@@ -88,12 +87,12 @@ class OpenAIClient:
                        temperature: float = 0.4, max_tokens: Optional[int] = None,
                        task_type: str = 'general') -> Optional[str]:
         """
-        Send chat completion request to OpenAI.
+        Send chat completion request to Anthropic Claude.
 
         Args:
             messages (List[Dict[str, str]]): List of messages with 'role' and 'content'
             model (str): Model to use (if None, will be selected based on task_type)
-            temperature (float): Temperature for response randomness (default: 0.1)
+            temperature (float): Temperature for response randomness (default: 0.4)
             max_tokens (Optional[int]): Maximum tokens in response
             task_type (str): Type of task to determine appropriate model
 
@@ -109,28 +108,48 @@ class OpenAIClient:
             max_tokens = DEFAULT_MAX_TOKENS
 
         try:
-            logging.debug(f"OpenAI API call - Model: {model}, Temperature: {temperature}, Max tokens: {max_tokens}")
-            logging.debug(f"OpenAI API call - Messages: {len(messages)} messages")
-            time.sleep(10)
-            response = self.client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens
-            )
+            # Convert messages format from OpenAI to Anthropic
+            # Anthropic requires system message separate from conversation
+            system_message = None
+            conversation_messages = []
 
-            if response.choices and len(response.choices) > 0:
-                response_content = response.choices[0].message.content.strip()
-                logging.debug(f"OpenAI API response received - Length: {len(response_content)} characters")
+            for msg in messages:
+                if msg['role'] == 'system':
+                    system_message = msg['content']
+                else:
+                    conversation_messages.append({
+                        'role': msg['role'],
+                        'content': msg['content']
+                    })
+
+            logging.debug(f"Anthropic API call - Model: {model}, Temperature: {temperature}, Max tokens: {max_tokens}")
+            logging.debug(f"Anthropic API call - Messages: {len(conversation_messages)} messages")
+            time.sleep(10)
+
+            kwargs = {
+                "model": model,
+                "messages": conversation_messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens
+            }
+
+            if system_message:
+                kwargs["system"] = system_message
+
+            response = self.client.messages.create(**kwargs)
+
+            if response.content and len(response.content) > 0:
+                response_content = response.content[0].text.strip()
+                logging.debug(f"Anthropic API response received - Length: {len(response_content)} characters")
                 return response_content
             else:
-                logging.error("No response choices returned from OpenAI")
+                logging.error("No response content returned from Anthropic")
                 return None
 
         except Exception as e:
-            logging.error(f"Error in OpenAI chat completion: {str(e)}", exc_info=True)
+            logging.error(f"Error in Anthropic chat completion: {str(e)}", exc_info=True)
             return None
-    
+
     def json_completion(self, messages: List[Dict[str, str]], model: str = None,
                        temperature: float = 0.4, max_tokens: Optional[int] = None,
                        task_type: str = 'general') -> Optional[Dict[str, Any]]:
@@ -140,7 +159,7 @@ class OpenAIClient:
         Args:
             messages (List[Dict[str, str]]): List of messages with 'role' and 'content'
             model (str): Model to use (if None, will be selected based on task_type)
-            temperature (float): Temperature for response randomness (default: 0.1)
+            temperature (float): Temperature for response randomness (default: 0.4)
             max_tokens (Optional[int]): Maximum tokens in response
             task_type (str): Type of task to determine appropriate model
 
@@ -160,7 +179,7 @@ class OpenAIClient:
 
         try:
             # Try to parse JSON from response
-            # Sometimes OpenAI wraps JSON in markdown code blocks
+            # Sometimes Claude wraps JSON in markdown code blocks
             if response_text.startswith('```json'):
                 response_text = response_text.replace('```json', '').replace('```', '').strip()
             elif response_text.startswith('```'):
@@ -169,10 +188,10 @@ class OpenAIClient:
             return json.loads(response_text)
 
         except json.JSONDecodeError as e:
-            logging.error(f"Failed to parse JSON from OpenAI response: {str(e)}")
+            logging.error(f"Failed to parse JSON from Anthropic response: {str(e)}")
             logging.error(f"Response was: {response_text}")
             return None
-    
+
     def simple_completion(self, prompt: str, model: str = None,
                          temperature: float = 0.4, max_tokens: Optional[int] = None,
                          task_type: str = 'general') -> Optional[str]:
@@ -182,7 +201,7 @@ class OpenAIClient:
         Args:
             prompt (str): The prompt to send
             model (str): Model to use (if None, will be selected based on task_type)
-            temperature (float): Temperature for response randomness (default: 0.1)
+            temperature (float): Temperature for response randomness (default: 0.4)
             max_tokens (Optional[int]): Maximum tokens in response
             task_type (str): Type of task to determine appropriate model
 
@@ -208,7 +227,7 @@ class OpenAIClient:
         Args:
             prompt (str): The prompt to send
             model (str): Model to use (if None, will be selected based on task_type)
-            temperature (float): Temperature for response randomness (default: 0.1)
+            temperature (float): Temperature for response randomness (default: 0.4)
             max_tokens (Optional[int]): Maximum tokens in response
             task_type (str): Type of task to determine appropriate model
 
@@ -220,7 +239,7 @@ class OpenAIClient:
         ]
 
         return self.json_completion(messages, model, temperature, max_tokens, task_type)
-    
+
     def validate_api_key(self) -> bool:
         """
         Validate that API key is working by making a simple request.
@@ -240,62 +259,40 @@ class OpenAIClient:
         """
         Create a fine-tuning job.
 
+        Note: Anthropic does not support fine-tuning via API yet.
+
         Args:
             training_file_id (str): ID of the uploaded training file
-            model (str): Base model to fine-tune (if None, uses fine_tuning model)
+            model (str): Base model to fine-tune
             suffix (str): Suffix for the fine-tuned model name
             hyperparameters (Optional[Dict[str, Any]]): Training hyperparameters
 
         Returns:
             Optional[str]: Fine-tuning job ID or None if error
         """
-        if model is None:
-            model = self.models['fine_tuning']
-
-        try:
-            job_params = {
-                "training_file": training_file_id,
-                "model": model
-            }
-
-            if suffix:
-                job_params["suffix"] = suffix
-
-            if hyperparameters:
-                job_params["hyperparameters"] = hyperparameters
-
-            response = self.client.fine_tuning.jobs.create(**job_params)
-            return response.id
-
-        except Exception as e:
-            logging.error(f"Error creating fine-tuning job: {str(e)}", exc_info=True)
-            return None
+        logging.warning("Anthropic does not support fine-tuning via API yet")
+        return None
 
     def upload_training_file(self, file_path: str) -> Optional[str]:
         """
         Upload a training file for fine-tuning.
 
+        Note: Anthropic does not support fine-tuning via API yet.
+
         Args:
-            file_path (str): Path to the training file (JSONL format)
+            file_path (str): Path to the training file
 
         Returns:
             Optional[str]: File ID or None if error
         """
-        try:
-            with open(file_path, 'rb') as file:
-                response = self.client.files.create(
-                    file=file,
-                    purpose='fine-tune'
-                )
-            return response.id
-
-        except Exception as e:
-            logging.error(f"Error uploading training file: {str(e)}", exc_info=True)
-            return None
+        logging.warning("Anthropic does not support fine-tuning via API yet")
+        return None
 
     def get_fine_tuning_job_status(self, job_id: str) -> Optional[Dict[str, Any]]:
         """
         Get the status of a fine-tuning job.
+
+        Note: Anthropic does not support fine-tuning via API yet.
 
         Args:
             job_id (str): Fine-tuning job ID
@@ -303,18 +300,5 @@ class OpenAIClient:
         Returns:
             Optional[Dict[str, Any]]: Job status information or None if error
         """
-        try:
-            response = self.client.fine_tuning.jobs.retrieve(job_id)
-            return {
-                'id': response.id,
-                'status': response.status,
-                'model': response.model,
-                'fine_tuned_model': response.fine_tuned_model,
-                'created_at': response.created_at,
-                'finished_at': response.finished_at,
-                'error': response.error
-            }
-
-        except Exception as e:
-            logging.error(f"Error getting fine-tuning job status: {str(e)}", exc_info=True)
-            return None
+        logging.warning("Anthropic does not support fine-tuning via API yet")
+        return None

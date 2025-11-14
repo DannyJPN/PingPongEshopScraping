@@ -1,8 +1,8 @@
 """
-Generic OpenAI client module for desaka_unifier project.
+Generic Google Gemini client module for desaka_unifier project.
 
-This module provides generic methods for communicating with OpenAI API.
-Contains only general methods that OpenAI API supports.
+This module provides generic methods for communicating with Google Gemini API.
+Contains only general methods that Google Gemini API supports.
 """
 
 import os
@@ -10,36 +10,37 @@ import json
 import time
 import logging
 from typing import Dict, Any, Optional, List
-from unifierlib.constants import DEFAULT_MAX_TOKENS, API_KEY_OPENAI
+from unifierlib.constants import DEFAULT_MAX_TOKENS, API_KEY_GOOGLE
 
 
-class OpenAIClient:
+class GoogleClient:
     """
-    Generic client for OpenAI API communication.
-    Provides basic methods for chat completions and other OpenAI services.
+    Generic client for Google Gemini API communication.
+    Provides basic methods for chat completions and other Google services.
     """
-    
+
     def __init__(self, use_fine_tuned_models: bool = False, fine_tuned_models: Optional[Dict[str, str]] = None):
-        """Initialize OpenAI client with API key from environment."""
-        api_key = os.getenv(API_KEY_OPENAI)
+        """Initialize Google Gemini client with API key from environment."""
+        api_key = os.getenv(API_KEY_GOOGLE)
         if not api_key:
-            raise ValueError("OPENAI_API_KEY environment variable is not set")
+            raise ValueError("GOOGLE_API_KEY environment variable is not set")
 
-        # Try to import openai
+        # Try to import google.generativeai
         try:
-            import openai
-            self.client = openai.OpenAI(api_key=api_key,timeout=1200.0)
+            import google.generativeai as genai
+            genai.configure(api_key=api_key)
+            self.genai = genai
         except ImportError:
-            logging.error("OpenAI library not installed. Install with: pip install openai")
+            logging.error("Google Generative AI library not installed. Install with: pip install google-generativeai")
             raise
 
         # Define latest available models
         self.models = {
-            'flagship': 'gpt-4o',  # Latest flagship model for complex tasks
-            'efficient': 'gpt-4o-mini',  # Cost-efficient model for simpler tasks
-            'reasoning': 'gpt-4o',  # Best for reasoning and analysis
-            'creative': 'gpt-4o',  # Best for creative tasks
-            'fine_tuning': 'gpt-4o-mini'  # Model for fine-tuning
+            'flagship': 'gemini-1.5-pro',  # Flagship model with long context
+            'efficient': 'gemini-2.0-flash-exp',  # Ultra-efficient latest model
+            'reasoning': 'gemini-1.5-pro',  # Best for reasoning
+            'creative': 'gemini-1.5-pro',  # Best for creative tasks
+            'flash': 'gemini-1.5-flash'  # Fast and efficient
         }
 
         # Fine-tuned model settings
@@ -51,12 +52,11 @@ class OpenAIClient:
         Get the appropriate model for a specific task type.
 
         Args:
-            task_type (str): Type of task ('general', 'complex', 'simple', 'reasoning', 'creative', 'fine_tuning')
+            task_type (str): Type of task
 
         Returns:
             str: Model name to use
         """
-        # Check if we should use fine-tuned models and if one exists for this task
         if self.use_fine_tuned_models and task_type in self.fine_tuned_models:
             fine_tuned_model = self.fine_tuned_models[task_type]
             if fine_tuned_model:
@@ -69,17 +69,16 @@ class OpenAIClient:
             'simple': self.models['efficient'],
             'reasoning': self.models['reasoning'],
             'creative': self.models['creative'],
-            'fine_tuning': self.models['fine_tuning'],
             'category_mapping': self.models['flagship'],
-            'product_analysis': self.models['flagship'],  # Complex analysis
-            'text_generation': self.models['flagship'],  # Simple text tasks
-            'translation': self.models['flagship'],  # Translation tasks
-            'name_generation': self.models['flagship'],  # Product name generation
-            'description_translation': self.models['flagship'],  # Description translation
-            'brand_detection': self.models['efficient'],  # Brand detection
-            'type_detection': self.models['efficient'],  # Type detection
-            'model_detection': self.models['efficient'],  # Model detection
-            'keyword_generation': self.models['efficient']  # Keyword generation
+            'product_analysis': self.models['flagship'],
+            'text_generation': self.models['flagship'],
+            'translation': self.models['flagship'],
+            'name_generation': self.models['flagship'],
+            'description_translation': self.models['flagship'],
+            'brand_detection': self.models['efficient'],
+            'type_detection': self.models['efficient'],
+            'model_detection': self.models['efficient'],
+            'keyword_generation': self.models['efficient']
         }
 
         return task_model_mapping.get(task_type, self.models['efficient'])
@@ -88,49 +87,75 @@ class OpenAIClient:
                        temperature: float = 0.4, max_tokens: Optional[int] = None,
                        task_type: str = 'general') -> Optional[str]:
         """
-        Send chat completion request to OpenAI.
+        Send chat completion request to Google Gemini.
 
         Args:
             messages (List[Dict[str, str]]): List of messages with 'role' and 'content'
             model (str): Model to use (if None, will be selected based on task_type)
-            temperature (float): Temperature for response randomness (default: 0.1)
+            temperature (float): Temperature for response randomness (default: 0.4)
             max_tokens (Optional[int]): Maximum tokens in response
             task_type (str): Type of task to determine appropriate model
 
         Returns:
             Optional[str]: Response content or None if error
         """
-        # Select model if not provided
         if model is None:
             model = self.get_model_for_task(task_type)
 
-        # Ensure max_tokens is always a number, never None
         if max_tokens is None:
             max_tokens = DEFAULT_MAX_TOKENS
 
         try:
-            logging.debug(f"OpenAI API call - Model: {model}, Temperature: {temperature}, Max tokens: {max_tokens}")
-            logging.debug(f"OpenAI API call - Messages: {len(messages)} messages")
+            # Convert messages to Gemini format
+            # Gemini uses 'user' and 'model' roles, and system instructions separately
+            system_instruction = None
+            chat_history = []
+            user_message = None
+
+            for msg in messages:
+                if msg['role'] == 'system':
+                    system_instruction = msg['content']
+                elif msg['role'] == 'user':
+                    user_message = msg['content']
+                elif msg['role'] == 'assistant':
+                    # Gemini calls it 'model' not 'assistant'
+                    chat_history.append({'role': 'model', 'parts': [msg['content']]})
+
+            logging.debug(f"Google Gemini API call - Model: {model}, Temperature: {temperature}, Max tokens: {max_tokens}")
             time.sleep(10)
-            response = self.client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens
+
+            # Configure generation
+            generation_config = {
+                'temperature': temperature,
+                'max_output_tokens': max_tokens,
+            }
+
+            # Create model
+            gemini_model = self.genai.GenerativeModel(
+                model_name=model,
+                generation_config=generation_config,
+                system_instruction=system_instruction
             )
 
-            if response.choices and len(response.choices) > 0:
-                response_content = response.choices[0].message.content.strip()
-                logging.debug(f"OpenAI API response received - Length: {len(response_content)} characters")
+            # Generate response
+            if chat_history:
+                chat = gemini_model.start_chat(history=chat_history)
+                response = chat.send_message(user_message)
+            else:
+                response = gemini_model.generate_content(user_message)
+
+            if response and response.text:
+                response_content = response.text.strip()
+                logging.debug(f"Google Gemini API response received - Length: {len(response_content)} characters")
                 return response_content
             else:
-                logging.error("No response choices returned from OpenAI")
+                logging.error("No response text returned from Google Gemini")
                 return None
 
         except Exception as e:
-            logging.error(f"Error in OpenAI chat completion: {str(e)}", exc_info=True)
+            logging.error(f"Error in Google Gemini chat completion: {str(e)}", exc_info=True)
             return None
-    
+
     def json_completion(self, messages: List[Dict[str, str]], model: str = None,
                        temperature: float = 0.4, max_tokens: Optional[int] = None,
                        task_type: str = 'general') -> Optional[Dict[str, Any]]:
@@ -140,14 +165,13 @@ class OpenAIClient:
         Args:
             messages (List[Dict[str, str]]): List of messages with 'role' and 'content'
             model (str): Model to use (if None, will be selected based on task_type)
-            temperature (float): Temperature for response randomness (default: 0.1)
+            temperature (float): Temperature for response randomness (default: 0.4)
             max_tokens (Optional[int]): Maximum tokens in response
             task_type (str): Type of task to determine appropriate model
 
         Returns:
             Optional[Dict[str, Any]]: Parsed JSON response or None if error
         """
-        # Add JSON format instruction to the last message
         if messages and len(messages) > 0:
             last_message = messages[-1]
             if last_message.get('role') == 'user':
@@ -159,8 +183,6 @@ class OpenAIClient:
             return None
 
         try:
-            # Try to parse JSON from response
-            # Sometimes OpenAI wraps JSON in markdown code blocks
             if response_text.startswith('```json'):
                 response_text = response_text.replace('```json', '').replace('```', '').strip()
             elif response_text.startswith('```'):
@@ -169,10 +191,10 @@ class OpenAIClient:
             return json.loads(response_text)
 
         except json.JSONDecodeError as e:
-            logging.error(f"Failed to parse JSON from OpenAI response: {str(e)}")
+            logging.error(f"Failed to parse JSON from Google Gemini response: {str(e)}")
             logging.error(f"Response was: {response_text}")
             return None
-    
+
     def simple_completion(self, prompt: str, model: str = None,
                          temperature: float = 0.4, max_tokens: Optional[int] = None,
                          task_type: str = 'general') -> Optional[str]:
@@ -182,14 +204,13 @@ class OpenAIClient:
         Args:
             prompt (str): The prompt to send
             model (str): Model to use (if None, will be selected based on task_type)
-            temperature (float): Temperature for response randomness (default: 0.1)
+            temperature (float): Temperature for response randomness (default: 0.4)
             max_tokens (Optional[int]): Maximum tokens in response
             task_type (str): Type of task to determine appropriate model
 
         Returns:
             Optional[str]: Response content or None if error
         """
-        # Ensure max_tokens is always a number, never None
         if max_tokens is None:
             max_tokens = DEFAULT_MAX_TOKENS
 
@@ -208,7 +229,7 @@ class OpenAIClient:
         Args:
             prompt (str): The prompt to send
             model (str): Model to use (if None, will be selected based on task_type)
-            temperature (float): Temperature for response randomness (default: 0.1)
+            temperature (float): Temperature for response randomness (default: 0.4)
             max_tokens (Optional[int]): Maximum tokens in response
             task_type (str): Type of task to determine appropriate model
 
@@ -220,7 +241,7 @@ class OpenAIClient:
         ]
 
         return self.json_completion(messages, model, temperature, max_tokens, task_type)
-    
+
     def validate_api_key(self) -> bool:
         """
         Validate that API key is working by making a simple request.
@@ -240,62 +261,40 @@ class OpenAIClient:
         """
         Create a fine-tuning job.
 
+        Note: Google Gemini fine-tuning is done through AI Studio, not this API.
+
         Args:
             training_file_id (str): ID of the uploaded training file
-            model (str): Base model to fine-tune (if None, uses fine_tuning model)
+            model (str): Base model to fine-tune
             suffix (str): Suffix for the fine-tuned model name
             hyperparameters (Optional[Dict[str, Any]]): Training hyperparameters
 
         Returns:
             Optional[str]: Fine-tuning job ID or None if error
         """
-        if model is None:
-            model = self.models['fine_tuning']
-
-        try:
-            job_params = {
-                "training_file": training_file_id,
-                "model": model
-            }
-
-            if suffix:
-                job_params["suffix"] = suffix
-
-            if hyperparameters:
-                job_params["hyperparameters"] = hyperparameters
-
-            response = self.client.fine_tuning.jobs.create(**job_params)
-            return response.id
-
-        except Exception as e:
-            logging.error(f"Error creating fine-tuning job: {str(e)}", exc_info=True)
-            return None
+        logging.warning("Google Gemini fine-tuning is done through AI Studio, not via this API")
+        return None
 
     def upload_training_file(self, file_path: str) -> Optional[str]:
         """
         Upload a training file for fine-tuning.
 
+        Note: Google Gemini fine-tuning is done through AI Studio, not this API.
+
         Args:
-            file_path (str): Path to the training file (JSONL format)
+            file_path (str): Path to the training file
 
         Returns:
             Optional[str]: File ID or None if error
         """
-        try:
-            with open(file_path, 'rb') as file:
-                response = self.client.files.create(
-                    file=file,
-                    purpose='fine-tune'
-                )
-            return response.id
-
-        except Exception as e:
-            logging.error(f"Error uploading training file: {str(e)}", exc_info=True)
-            return None
+        logging.warning("Google Gemini fine-tuning is done through AI Studio, not via this API")
+        return None
 
     def get_fine_tuning_job_status(self, job_id: str) -> Optional[Dict[str, Any]]:
         """
         Get the status of a fine-tuning job.
+
+        Note: Google Gemini fine-tuning is done through AI Studio, not this API.
 
         Args:
             job_id (str): Fine-tuning job ID
@@ -303,18 +302,5 @@ class OpenAIClient:
         Returns:
             Optional[Dict[str, Any]]: Job status information or None if error
         """
-        try:
-            response = self.client.fine_tuning.jobs.retrieve(job_id)
-            return {
-                'id': response.id,
-                'status': response.status,
-                'model': response.model,
-                'fine_tuned_model': response.fine_tuned_model,
-                'created_at': response.created_at,
-                'finished_at': response.finished_at,
-                'error': response.error
-            }
-
-        except Exception as e:
-            logging.error(f"Error getting fine-tuning job status: {str(e)}", exc_info=True)
-            return None
+        logging.warning("Google Gemini fine-tuning is done through AI Studio, not via this API")
+        return None
