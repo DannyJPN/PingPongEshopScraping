@@ -72,6 +72,10 @@ class ProductParser:
         self.assigned_codes = set()
         self.assigned_variant_codes = set()
 
+        # Map (base_code, product_name) -> full_code to track which code belongs to which product
+        # This prevents assigning different codes to products with the same name
+        self.product_name_codes = {}  # {(base_code, product_name): full_code}
+
         # Initialize assigned codes from existing products
         self._initialize_assigned_codes()
 
@@ -92,6 +96,13 @@ class ProductParser:
         for product in self.export_products:
             if hasattr(product, 'kod') and product.kod:
                 self.assigned_codes.add(product.kod)
+
+                # Extract base_code (first 7 chars: 3 brand + 2 category + 2 subcategory)
+                # and map it to product name
+                if hasattr(product, 'nazev') and product.nazev and len(product.kod) >= 11:
+                    base_code = product.kod[:7]
+                    self.product_name_codes[(base_code, product.nazev)] = product.kod
+
             if hasattr(product, 'variantcode') and product.variantcode:
                 self.assigned_variant_codes.add(product.variantcode)
 
@@ -99,6 +110,12 @@ class ProductParser:
         for product in self.repaired_products:
             if hasattr(product, 'code') and product.code:
                 self.assigned_codes.add(product.code)
+
+                # Extract base_code and map it to product name
+                if hasattr(product, 'name') and product.name and len(product.code) >= 11:
+                    base_code = product.code[:7]
+                    self.product_name_codes[(base_code, product.name)] = product.code
+
             if hasattr(product, 'variantcode') and product.variantcode:
                 self.assigned_variant_codes.add(product.variantcode)
             # Also check variant codes in Variants
@@ -1295,14 +1312,36 @@ class ProductParser:
 
         final_code = base_code + f"{product_index:04d}"
 
-        # Remember this code
+        # Remember this code and map it to the product name
         self.assigned_codes.add(final_code)
+        self.product_name_codes[(base_code, product_name)] = final_code
 
         return final_code
 
     def _get_next_product_index(self, base_code: str, product_name: str) -> int:
-        """Get next available product index efficiently."""
-        # First check if this exact product already exists
+        """
+        Get product index for the given base_code and product_name.
+
+        Logic:
+        1. If we already assigned a code to this exact product (base_code + name), return its index
+        2. If this product exists in export_products with this base_code, return its index
+        3. Otherwise, find the first unused index
+
+        This ensures that:
+        - Multiple variants of the same product get the same index
+        - We don't create duplicate codes for the same product
+        - We avoid conflicts with existing products
+        """
+        # 1. Check if we already assigned a code for this exact product (base_code, name)
+        if (base_code, product_name) in self.product_name_codes:
+            existing_code = self.product_name_codes[(base_code, product_name)]
+            if len(existing_code) >= len(base_code) + 4:
+                try:
+                    return int(existing_code[-4:])
+                except (ValueError, TypeError):
+                    pass
+
+        # 2. Check if this product already exists in export_products
         for product in self.export_products:
             if (hasattr(product, 'nazev') and product.nazev == product_name and
                 hasattr(product, 'kod') and product.kod and
@@ -1312,24 +1351,14 @@ class ProductParser:
                 except (ValueError, TypeError):
                     pass
 
-        # Collect all used indices efficiently using a set
+        # 3. Find first unused index - collect all used indices for this base_code
         used_indices = set()
 
-        # Check assigned codes
+        # Check all assigned codes with this base_code
         for code in self.assigned_codes:
             if code and code.startswith(base_code) and len(code) >= len(base_code) + 4:
                 try:
                     index = int(code[-4:])
-                    used_indices.add(index)
-                except (ValueError, TypeError):
-                    pass
-
-        # Check existing export products
-        for product in self.export_products:
-            if (hasattr(product, 'kod') and product.kod and
-                product.kod.startswith(base_code) and len(product.kod) >= len(base_code) + 4):
-                try:
-                    index = int(product.kod[-4:])
                     used_indices.add(index)
                 except (ValueError, TypeError):
                     pass
