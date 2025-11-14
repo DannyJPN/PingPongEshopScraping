@@ -564,7 +564,6 @@ def main():
 Příklady použití:
   python filter_memory.py --language CS
   python filter_memory.py --language SK --dry-run
-  python filter_memory.py -l CS --save-trash
 
 Skript provádí kaskádové filtrování:
 1. Načte CategoryNameMemory a najde neúplné kategorie (pouze zdrojový soubor, nemodifikuje se)
@@ -579,11 +578,12 @@ Skript provádí kaskádové filtrování:
 Poznámka: CategoryNameMemory a BrandCodeList jsou pouze zdrojové soubory
           pro detekci pravidel - nejsou modifikovány ani ukládány.
 
-Trash režim (--save-trash):
-  Všechny smazané záznamy jsou přidány do desaka_unifier/Trash/
+Trash soubory:
+  Všechny smazané záznamy jsou automaticky přidány do desaka_unifier/Trash/
   do persistentních souborů (např. CategoryMemory_CS_trash.csv).
   Každý záznam obsahuje KEY a VALUE (bez REASON).
   Záznamy se PŘIDÁVAJÍ (append), kontroluje se unikátnost celého řádku.
+  Tyto soubory slouží pro fine-tuning AI modelů.
         """
     )
 
@@ -591,24 +591,18 @@ Trash režim (--save-trash):
                        help='Jazyk (CS nebo SK, default: CS)')
     parser.add_argument('--dry-run', action='store_true',
                        help='Suchý běh - pouze spočítá změny, neuloží')
-    parser.add_argument('--save-trash', action='store_true',
-                       help='Uloží smazané záznamy do trash souborů pro kontrolu')
 
     args = parser.parse_args()
 
     try:
         language = args.language.upper()
         dry_run = args.dry_run
-        save_trash = args.save_trash
 
-        # Slovník pro ukládání smazaných záznamů
+        # Slovník pro ukládání smazaných záznamů (automaticky se ukládají pro fine-tuning)
         all_trash_data: Dict[str, TrashData] = {}
 
         if dry_run:
             print("\n⚠️  SUCHÝ BĚH - změny nebudou uloženy")
-
-        if save_trash:
-            print("📦 TRASH režim - smazané záznamy budou uloženy pro kontrolu")
 
         print(f"\n{'='*80}")
         print(f"FILTROVÁNÍ MEMORY SOUBORŮ - {language}")
@@ -788,7 +782,8 @@ Trash režim (--save-trash):
             print(f"💡 Spusťte bez --dry-run pro aplikování změn")
 
         # ===== Uložení trash souborů =====
-        if save_trash and not dry_run:
+        # Trash soubory se ukládají VŽDY (pokud není dry_run) - jsou součást fine-tuning systému
+        if not dry_run and all_trash_data:
             print("\n" + "="*80)
             print("UKLÁDÁNÍ TRASH SOUBORŮ")
             print("="*80)
