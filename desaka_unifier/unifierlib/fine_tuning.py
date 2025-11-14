@@ -914,3 +914,210 @@ Please return your response as valid JSON only."""
             self.save_fine_tuned_models(models, script_dir)
 
         return status_report
+
+
+def main():
+    """
+    Main function for standalone fine-tuning script execution.
+    Can be run independently or called by unifier.py as subprocess.
+    """
+    import argparse
+    import sys
+
+    # Setup argument parser
+    parser = argparse.ArgumentParser(
+        description='Fine-tune AI models for product processing tasks',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Run fine-tuning for all tasks
+  python fine_tuning.py --language CS --memory_dir Memory
+
+  # Run fine-tuning for specific tasks
+  python fine_tuning.py --language CS --tasks name_generation brand_detection
+
+  # Check status of existing fine-tuning jobs
+  python fine_tuning.py --check_status --job_ids_file fine_tuning_jobs.json
+        """
+    )
+
+    parser.add_argument('--language', type=str, default='CS',
+                       help='Language code (CS or SK, default: CS)')
+    parser.add_argument('--memory_dir', type=str, default=None,
+                       help='Path to Memory directory with training data')
+    parser.add_argument('--trash_dir', type=str, default=None,
+                       help='Path to Trash directory with negative examples')
+    parser.add_argument('--tasks', nargs='+', default=None,
+                       help='Specific tasks to fine-tune (default: all tasks)')
+    parser.add_argument('--check_status', action='store_true',
+                       help='Check status of existing fine-tuning jobs')
+    parser.add_argument('--job_ids_file', type=str, default='fine_tuning_jobs.json',
+                       help='File to store/load job IDs (default: fine_tuning_jobs.json)')
+    parser.add_argument('--output_dir', type=str, default=None,
+                       help='Directory for training files (default: script_dir/training_data)')
+    parser.add_argument('--debug', action='store_true',
+                       help='Enable debug logging')
+
+    args = parser.parse_args()
+
+    # Setup logging
+    log_level = logging.DEBUG if args.debug else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+
+    # Get script directory
+    script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    # Set default memory directory
+    if args.memory_dir is None:
+        args.memory_dir = os.path.join(script_dir, 'Memory')
+
+    # Set default output directory
+    if args.output_dir is None:
+        args.output_dir = os.path.join(script_dir, 'training_data')
+
+    ensure_directory_exists(args.output_dir)
+
+    # Check status mode
+    if args.check_status:
+        logging.info("Checking fine-tuning job status...")
+        job_ids_path = os.path.join(script_dir, args.job_ids_file)
+
+        if not os.path.exists(job_ids_path):
+            logging.error(f"Job IDs file not found: {job_ids_path}")
+            sys.exit(1)
+
+        job_ids = load_json_file(job_ids_path)
+        if not job_ids:
+            logging.error("No job IDs found in file")
+            sys.exit(1)
+
+        # Create manager and check status
+        manager = FineTuningManager(language=args.language, trash_dir=args.trash_dir)
+        status_report = manager.check_fine_tuning_status(job_ids, script_dir)
+
+        logging.info("\n=== Fine-tuning Status Report ===")
+        for task_type, status in status_report.items():
+            logging.info(f"{task_type}: {status}")
+
+        sys.exit(0)
+
+    # Load memory data
+    logging.info(f"Loading memory data from: {args.memory_dir}")
+    memory_data = {}
+
+    try:
+        # Load all memory CSV files
+        memory_files = [
+            f'BrandMemory_{args.language}.csv',
+            f'CategoryMemory_{args.language}.csv',
+            f'NameMemory_{args.language}.csv',
+            f'ProductBrandMemory_{args.language}.csv',
+            f'ProductTypeMemory_{args.language}.csv',
+            f'KeywordsGoogle_{args.language}.csv',
+            f'KeywordsZbozi_{args.language}.csv'
+        ]
+
+        for filename in memory_files:
+            filepath = os.path.join(args.memory_dir, filename)
+            if os.path.exists(filepath):
+                memory_key = filename.replace(f'_{args.language}.csv', '')
+                memory_data[memory_key] = {}
+
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    reader = csv.reader(f)
+                    header = next(reader, None)
+                    for row in reader:
+                        if len(row) >= 2:
+                            memory_data[memory_key][row[0]] = row[1]
+
+                logging.info(f"Loaded {len(memory_data[memory_key])} entries from {filename}")
+            else:
+                logging.warning(f"Memory file not found: {filepath}")
+
+    except Exception as e:
+        logging.error(f"Error loading memory data: {str(e)}", exc_info=True)
+        sys.exit(1)
+
+    # Create fine-tuning manager
+    logging.info("Initializing fine-tuning manager...")
+    manager = FineTuningManager(
+        memory_data=memory_data,
+        language=args.language,
+        trash_dir=args.trash_dir
+    )
+
+    # Determine which tasks to process
+    if args.tasks:
+        tasks_to_process = {k: v for k, v in manager.task_types.items() if k in args.tasks}
+        if not tasks_to_process:
+            logging.error(f"No valid tasks found. Available tasks: {list(manager.task_types.keys())}")
+            sys.exit(1)
+    else:
+        tasks_to_process = manager.task_types
+
+    logging.info(f"Processing {len(tasks_to_process)} tasks: {list(tasks_to_process.keys())}")
+
+    # Prepare training data and create jobs
+    job_ids = {}
+
+    for task_type, task_config in tasks_to_process.items():
+        try:
+            logging.info(f"\n=== Processing task: {task_type} ===")
+
+            # Prepare training data
+            training_data = manager.prepare_training_data(task_type)
+            if not training_data:
+                logging.warning(f"No training data generated for {task_type}")
+                continue
+
+            logging.info(f"Generated {len(training_data)} training examples")
+
+            # Save training file
+            training_filename = f"{task_type}_training_{args.language}.jsonl"
+            training_filepath = os.path.join(args.output_dir, training_filename)
+            save_jsonl_file(training_filepath, training_data)
+            logging.info(f"Saved training data to: {training_filepath}")
+
+            # Upload training file
+            file_id = manager.upload_training_file(training_filepath)
+            if not file_id:
+                logging.error(f"Failed to upload training file for {task_type}")
+                continue
+
+            logging.info(f"Uploaded training file: {file_id}")
+
+            # Create fine-tuning job
+            job_id = manager.create_fine_tuning_job(
+                task_type=task_type,
+                training_file_id=file_id
+            )
+
+            if job_id:
+                job_ids[task_type] = job_id
+                logging.info(f"Created fine-tuning job: {job_id}")
+            else:
+                logging.error(f"Failed to create fine-tuning job for {task_type}")
+
+        except Exception as e:
+            logging.error(f"Error processing task {task_type}: {str(e)}", exc_info=True)
+            continue
+
+    # Save job IDs
+    if job_ids:
+        job_ids_path = os.path.join(script_dir, args.job_ids_file)
+        save_json_file(job_ids_path, job_ids)
+        logging.info(f"\n=== Fine-tuning jobs created ===")
+        logging.info(f"Job IDs saved to: {job_ids_path}")
+        for task_type, job_id in job_ids.items():
+            logging.info(f"{task_type}: {job_id}")
+        logging.info("\nUse --check_status to monitor job progress")
+    else:
+        logging.warning("No fine-tuning jobs were created")
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

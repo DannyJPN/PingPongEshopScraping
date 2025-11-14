@@ -98,14 +98,10 @@ LOG_DIR = DEFAULT_LOG_DIR
 # Script execution settings
 PROGRESS_BAR_UPDATE_INTERVAL = 0.1  # Update progress bar every 0.1 seconds
 
-# Local model storage settings (multi-backend support)
+# Local model storage settings (Ollama only)
 LOCAL_MODEL_STORAGE_PATH_OLLAMA = "G:/LLM/Ollama"  # Ollama storage
-LOCAL_MODEL_STORAGE_PATH_LMSTUDIO = "G:/LLM/LMStudio"  # LM Studio storage
-LOCAL_MODEL_STORAGE_PATH_HUGGINGFACE = "G:/LLM/HuggingFace"  # Hugging Face storage
 
 # API key environment variable names
 API_KEY_OPENAI = "OPENAI_API_KEY"
 API_KEY_GOOGLE = "GOOGLE_API_KEY"
 API_KEY_MISTRAL = "MISTRAL_API_KEY"
-API_KEY_HUGGINGFACE = "HUGGINGFACE_API_KEY"
-API_KEY_HUGGINGFACE_ALT = "HF_TOKEN"  # Alternative HF token name

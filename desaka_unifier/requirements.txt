@@ -11,10 +11,17 @@ mistralai>=0.1.0  # Mistral AI
 
 # Local models support
 ollama>=0.1.0  # Ollama backend
-transformers>=4.35.0  # Hugging Face transformers (local inference)
-torch>=2.0.0  # PyTorch for local model inference
-accelerate>=0.24.0  # Efficient loading of large models
-sentencepiece>=0.1.99  # Tokenizer support for some models
+
+# Fine-tuning dependencies (optional - only needed for local fine-tuning)
+# Uncomment if you want to use local fine-tuning:
+# unsloth>=2024.1  # Efficient fine-tuning with QLoRA
+# peft>=0.7.0  # Parameter-Efficient Fine-Tuning
+# datasets>=2.14.0  # Training data handling
+# trl>=0.7.0  # Transformer Reinforcement Learning
+# transformers>=4.35.0  # Hugging Face transformers
+# torch>=2.0.0  # PyTorch for model training
+# accelerate>=0.24.0  # Efficient loading and training
+# bitsandbytes>=0.41.0  # 4-bit quantization for QLoRA
 
 # HTTP requests (if needed for web scraping)
 requests>=2.28.0
