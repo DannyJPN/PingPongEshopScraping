@@ -137,6 +137,10 @@ class FineTuningManager:
         brand_memory = self.memory.get(brand_memory_key, {})
         model_memory = self.memory.get(model_memory_key, {})
 
+        # Get target language name
+        from unifierlib.memory_manager import get_language_name
+        target_language = get_language_name(self.language)
+
         # Note: Trash handling for name generation is covered by individual
         # type/brand/model detection methods since the output consists of these components
 
@@ -159,7 +163,7 @@ I respectfully ask you to:
 2. Check pincesobchod.cz for how they structure table tennis product names
 3. Analyze the product information carefully
 4. Extract three DISTINCT components: type, brand, and model
-5. If the text is not in Czech, translate 'type' and 'model' to Czech while preserving table tennis-specific vocabulary
+5. If the text is not in {target_language}, translate 'type' and 'model' to {target_language} using proper table tennis terminology (e.g., "rubber" = "potah", "blade" = "dřevo", not literal translations)
 6. Keep 'brand' in original language (manufacturer name)
 7. Ensure these three sections DO NOT overlap - each word should belong to only one category
 8. TYPE: General product category (e.g., "Rubber", "Blade", "Ball", "Paddle")
@@ -194,6 +198,10 @@ Please return your response as valid JSON only."""
         desc_memory_key = f"DescMemory_{self.language}"
         desc_memory = self.memory.get(desc_memory_key, {})
 
+        # Get target language name
+        from unifierlib.memory_manager import get_language_name
+        target_language = get_language_name(self.language)
+
         # Load trash data (rejected descriptions)
         trash_data = self._load_trash_file("DescMemory")
 
@@ -208,15 +216,23 @@ Original description: {translated_desc}
 I respectfully ask you to:
 1. Search the internet for current table tennis terminology and product descriptions
 2. Check pincesobchod.cz for how they describe similar table tennis products
-3. If the text is not in Czech, translate it to Czech while preserving table tennis-specific vocabulary (e.g., "rubber", "blade", "paddle", "spin", "speed", "control")
+3. If the text is not in {target_language}, translate it to {target_language} using proper table tennis SLANG and terminology - prioritize table tennis industry terms over literal translations:
+   • "rubber" = "potah" (NEVER "guma")
+   • "blade" = "dřevo" (NEVER "čepel")
+   • "paddle/racket" = "pálka"
+   • "spin" = "rotace" or "točení"
+   • "speed" = "rychlost"
+   • "control" = "kontrola"
+   • "sponge" = "houba"
+   • "topsheet" = "povrch"
 4. Remove any external website links and replace them with their text content
 5. Preserve and correct HTML formatting - DO NOT remove HTML tags, only fix syntax errors
 6. Keep the original meaning and structure intact
 7. Maintain all HTML formatting including <p>, <br>, <strong>, <em>, <ul>, <li> tags
-8. Use current industry-standard terminology that customers would understand
+8. Use current table tennis industry terminology that customers would understand
 9. Return the result as JSON with the property "description"
 
-IMPORTANT: HTML must be preserved and corrected, not removed.
+CRITICAL: Use table tennis slang, not literal translations. HTML must be preserved and corrected, not removed.
 
 Please return your response as valid JSON only."""
 
@@ -242,15 +258,23 @@ Original description: {correct_desc}
 I respectfully ask you to:
 1. Search the internet for current table tennis terminology and product descriptions
 2. Check pincesobchod.cz for how they describe similar table tennis products
-3. If the text is not in Czech, translate it to Czech while preserving table tennis-specific vocabulary (e.g., "rubber", "blade", "paddle", "spin", "speed", "control")
+3. If the text is not in {target_language}, translate it to {target_language} using proper table tennis SLANG and terminology - prioritize table tennis industry terms over literal translations:
+   • "rubber" = "potah" (NEVER "guma")
+   • "blade" = "dřevo" (NEVER "čepel")
+   • "paddle/racket" = "pálka"
+   • "spin" = "rotace" or "točení"
+   • "speed" = "rychlost"
+   • "control" = "kontrola"
+   • "sponge" = "houba"
+   • "topsheet" = "povrch"
 4. Remove any external website links and replace them with their text content
 5. Preserve and correct HTML formatting - DO NOT remove HTML tags, only fix syntax errors
 6. Keep the original meaning and structure intact
 7. Maintain all HTML formatting including <p>, <br>, <strong>, <em>, <ul>, <li> tags
-8. Use current industry-standard terminology that customers would understand
+8. Use current table tennis industry terminology that customers would understand
 9. Return the result as JSON with the property "description"
 
-IMPORTANT: HTML must be preserved and corrected, not removed.
+CRITICAL: Use table tennis slang, not literal translations. HTML must be preserved and corrected, not removed.
 
 Please return your response as valid JSON only."""
 
@@ -270,6 +294,10 @@ Please return your response as valid JSON only."""
     def _prepare_category_mapping_data(self) -> List[Dict[str, Any]]:
         """Prepare training data for category mapping using actual production prompts."""
         examples = []
+
+        # Get target language name
+        from unifierlib.memory_manager import get_language_name
+        target_language = get_language_name(self.language)
 
         platforms = ['Glami', 'Google', 'Heureka', 'Zbozi']
 
@@ -306,9 +334,10 @@ I respectfully ask you to:
 5. Consider the target platform's category structure and naming conventions
 6. Draw inspiration from existing mappings in memory for consistency
 7. Suggest the most appropriate {platform} category mapping
-8. Use Czech language if applicable for the platform
-9. Ensure the mapping follows {platform}'s actual category structure
-10. Return the result as JSON with the property "mapping"
+8. Translate the mapping to {target_language} if applicable for the platform
+9. Use proper table tennis terminology in {target_language} (e.g., "rubber" = "potah", "blade" = "dřevo", not literal translations)
+10. Ensure the mapping follows {platform}'s actual category structure
+11. Return the result as JSON with the property "mapping"
 
 Please return your response as valid JSON only."""
 
@@ -340,9 +369,10 @@ I respectfully ask you to:
 5. Consider the target platform's category structure and naming conventions
 6. Draw inspiration from existing mappings in memory for consistency
 7. Suggest the most appropriate {platform} category mapping
-8. Use Czech language if applicable for the platform
-9. Ensure the mapping follows {platform}'s actual category structure
-10. Return the result as JSON with the property "mapping"
+8. Translate the mapping to {target_language} if applicable for the platform
+9. Use proper table tennis terminology in {target_language} (e.g., "rubber" = "potah", "blade" = "dřevo", not literal translations)
+10. Ensure the mapping follows {platform}'s actual category structure
+11. Return the result as JSON with the property "mapping"
 
 Please return your response as valid JSON only."""
 
@@ -365,6 +395,10 @@ Please return your response as valid JSON only."""
 
         brand_memory_key = f"ProductBrandMemory_{self.language}"
         brand_memory = self.memory.get(brand_memory_key, {})
+
+        # Get target language name
+        from unifierlib.memory_manager import get_language_name
+        target_language = get_language_name(self.language)
 
         # Load trash data (rejected brand values)
         trash_data = self._load_trash_file("ProductBrandMemory")
@@ -393,8 +427,10 @@ I respectfully ask you to:
 3. Carefully analyze the product information
 4. Select EXACTLY ONE brand from the list above
 5. The brand must be chosen strictly from the provided list
-6. Use your knowledge of current table tennis brand landscape
-7. Return the result as JSON with the property "brand"
+6. Keep brand names in their original language (manufacturer names should not be translated)
+7. If any explanatory text is needed, translate it to {target_language} using proper table tennis terminology (e.g., "rubber" = "potah", "blade" = "dřevo", not literal translations)
+8. Use your knowledge of current table tennis brand landscape
+9. Return the result as JSON with the property "brand"
 
 Please return your response as valid JSON only."""
 
@@ -430,8 +466,10 @@ I respectfully ask you to:
 3. Carefully analyze the product information
 4. Select EXACTLY ONE brand from the list above
 5. The brand must be chosen strictly from the provided list
-6. Use your knowledge of current table tennis brand landscape
-7. Return the result as JSON with the property "brand"
+6. Keep brand names in their original language (manufacturer names should not be translated)
+7. If any explanatory text is needed, translate it to {target_language} using proper table tennis terminology (e.g., "rubber" = "potah", "blade" = "dřevo", not literal translations)
+8. Use your knowledge of current table tennis brand landscape
+9. Return the result as JSON with the property "brand"
 
 Please return your response as valid JSON only."""
 
@@ -455,6 +493,10 @@ Please return your response as valid JSON only."""
         type_memory_key = f"ProductTypeMemory_{self.language}"
         type_memory = self.memory.get(type_memory_key, {})
 
+        # Get target language name
+        from unifierlib.memory_manager import get_language_name
+        target_language = get_language_name(self.language)
+
         # Load trash data (rejected type values)
         trash_data = self._load_trash_file("ProductTypeMemory")
 
@@ -472,9 +514,11 @@ Product information:
 I respectfully ask you to:
 1. Analyze the product information carefully
 2. Determine the general product type (e.g., "Laptop", "Shirt", "Ball", "Racket")
-3. Use Czech language for the type
+3. Translate the product type to {target_language} using proper table tennis terminology (e.g., "rubber" = "potah", "blade" = "dřevo", not literal translations)
 4. Keep it concise and general (not specific model)
-5. Return the result as JSON with the property "type"
+5. Use {target_language} language for the type
+6. Return the result as JSON with the property "type"
+7. Always begin the response with capital letter
 
 Please return your response as valid JSON only."""
 
@@ -503,9 +547,11 @@ Product information:
 I respectfully ask you to:
 1. Analyze the product information carefully
 2. Determine the general product type (e.g., "Laptop", "Shirt", "Ball", "Racket")
-3. Use Czech language for the type
+3. Translate the product type to {target_language} using proper table tennis terminology (e.g., "rubber" = "potah", "blade" = "dřevo", not literal translations)
 4. Keep it concise and general (not specific model)
-5. Return the result as JSON with the property "type"
+5. Use {target_language} language for the type
+6. Return the result as JSON with the property "type"
+7. Always begin the response with capital letter
 
 Please return your response as valid JSON only."""
 
@@ -529,6 +575,10 @@ Please return your response as valid JSON only."""
         model_memory_key = f"ProductModelMemory_{self.language}"
         model_memory = self.memory.get(model_memory_key, {})
 
+        # Get target language name
+        from unifierlib.memory_manager import get_language_name
+        target_language = get_language_name(self.language)
+
         # Load trash data (rejected model values)
         trash_data = self._load_trash_file("ProductModelMemory")
 
@@ -538,17 +588,18 @@ Please return your response as valid JSON only."""
                 # Use actual production prompt from openai_unifier.py
                 product_json = f'{{"name": "{product_name}", "description": "", "short_description": "", "url": ""}}'
 
-                prompt = f"""I humbly request your assistance in identifying the product model. Please help me determine the specific model of this product.
+                prompt = f"""I humbly request your help in identifying the product model. Please assist me in determining the specific model of this product.
 
 Product information:
 {product_json}
 
 I respectfully ask you to:
-1. Analyze the product information carefully
-2. Determine the specific product model (e.g., "Tenergy 05", "Clipper Wood", "Premium 3-Star")
-3. Use Czech language for the model if applicable
-4. Keep it specific to the model, not general type or brand
-5. Return the result as JSON with the property "model"
+1. Analyze the product information thoroughly
+2. Extract the specific model name/number (e.g., "ROG Strix", "Air Max 90", "Pro V1")
+3. If the model name is not in {target_language}, translate descriptive parts to {target_language} using proper table tennis terminology (e.g., "rubber" = "potah", "blade" = "dřevo", not literal translations)
+4. Keep brand-specific model names in their original form when appropriate
+5. Keep it concise and specific to the model
+6. Return the result as JSON with the property "model"
 
 Please return your response as valid JSON only."""
 
@@ -569,17 +620,18 @@ Please return your response as valid JSON only."""
                 if correct_model:
                     product_json = f'{{"name": "{product_name}", "description": "", "short_description": "", "url": ""}}'
 
-                    prompt = f"""I humbly request your assistance in identifying the product model. Please help me determine the specific model of this product.
+                    prompt = f"""I humbly request your help in identifying the product model. Please assist me in determining the specific model of this product.
 
 Product information:
 {product_json}
 
 I respectfully ask you to:
-1. Analyze the product information carefully
-2. Determine the specific product model (e.g., "Tenergy 05", "Clipper Wood", "Premium 3-Star")
-3. Use Czech language for the model if applicable
-4. Keep it specific to the model, not general type or brand
-5. Return the result as JSON with the property "model"
+1. Analyze the product information thoroughly
+2. Extract the specific model name/number (e.g., "ROG Strix", "Air Max 90", "Pro V1")
+3. If the model name is not in {target_language}, translate descriptive parts to {target_language} using proper table tennis terminology (e.g., "rubber" = "potah", "blade" = "dřevo", not literal translations)
+4. Keep brand-specific model names in their original form when appropriate
+5. Keep it concise and specific to the model
+6. Return the result as JSON with the property "model"
 
 Please return your response as valid JSON only."""
 
@@ -599,6 +651,10 @@ Please return your response as valid JSON only."""
     def _prepare_keyword_generation_data(self) -> List[Dict[str, Any]]:
         """Prepare training data for keyword generation using actual production prompts."""
         examples = []
+
+        # Get target language name
+        from unifierlib.memory_manager import get_language_name
+        target_language = get_language_name(self.language)
 
         platforms = ['Google', 'Zbozi']
 
@@ -625,12 +681,13 @@ I respectfully ask you to:
 1. Search the internet for similar products and current market trends
 2. Check pincesobchod.cz for table tennis product terminology and keywords
 3. Analyze the product information thoroughly
-4. Generate exactly 5 relevant keywords
+4. Generate exactly 5 relevant keywords in {target_language}
 5. Keywords should be suitable for Google advertising
 6. Draw inspiration from existing keywords in memory for consistency
-7. Use current market terminology and popular search terms
-8. Return the result as JSON with the property "keywords"
-9. Format as a single string with keywords separated by commas
+7. Use current market terminology and popular search terms in {target_language}
+8. Use proper table tennis terminology in {target_language} (e.g., "rubber" = "potah", "blade" = "dřevo", not literal translations)
+9. Return the result as JSON with the property "keywords"
+10. Format as a single string with keywords separated by commas
 
 Please return your response as valid JSON only."""
                     else:  # Zbozi
@@ -644,13 +701,14 @@ I respectfully ask you to:
 2. Check pincesobchod.cz for table tennis product terminology in Czech
 3. Research Zbozi.cz platform to understand their keyword structure
 4. Analyze the product information carefully
-5. Generate exactly 2 relevant keywords
+5. Generate exactly 2 relevant keywords in {target_language}
 6. Keywords should be suitable for Zbozi.cz platform
 7. Preferably extract from product name but not exclusively
 8. Draw inspiration from existing keywords in memory for consistency
-9. Use Czech terminology that Czech customers would search for
-10. Return the result as JSON with the property "keywords"
-11. Format as a single string with 2 keywords separated by comma
+9. Use {target_language} terminology that customers would search for
+10. Use proper table tennis terminology in {target_language} (e.g., "rubber" = "potah", "blade" = "dřevo", not literal translations)
+11. Return the result as JSON with the property "keywords"
+12. Format as a single string with 2 keywords separated by comma
 
 Please return your response as valid JSON only."""
 
@@ -681,12 +739,13 @@ I respectfully ask you to:
 1. Search the internet for similar products and current market trends
 2. Check pincesobchod.cz for table tennis product terminology and keywords
 3. Analyze the product information thoroughly
-4. Generate exactly 5 relevant keywords
+4. Generate exactly 5 relevant keywords in {target_language}
 5. Keywords should be suitable for Google advertising
 6. Draw inspiration from existing keywords in memory for consistency
-7. Use current market terminology and popular search terms
-8. Return the result as JSON with the property "keywords"
-9. Format as a single string with keywords separated by commas
+7. Use current market terminology and popular search terms in {target_language}
+8. Use proper table tennis terminology in {target_language} (e.g., "rubber" = "potah", "blade" = "dřevo", not literal translations)
+9. Return the result as JSON with the property "keywords"
+10. Format as a single string with keywords separated by commas
 
 Please return your response as valid JSON only."""
                         else:  # Zbozi
@@ -700,13 +759,14 @@ I respectfully ask you to:
 2. Check pincesobchod.cz for table tennis product terminology in Czech
 3. Research Zbozi.cz platform to understand their keyword structure
 4. Analyze the product information carefully
-5. Generate exactly 2 relevant keywords
+5. Generate exactly 2 relevant keywords in {target_language}
 6. Keywords should be suitable for Zbozi.cz platform
 7. Preferably extract from product name but not exclusively
 8. Draw inspiration from existing keywords in memory for consistency
-9. Use Czech terminology that Czech customers would search for
-10. Return the result as JSON with the property "keywords"
-11. Format as a single string with 2 keywords separated by comma
+9. Use {target_language} terminology that customers would search for
+10. Use proper table tennis terminology in {target_language} (e.g., "rubber" = "potah", "blade" = "dřevo", not literal translations)
+11. Return the result as JSON with the property "keywords"
+12. Format as a single string with 2 keywords separated by comma
 
 Please return your response as valid JSON only."""
 
