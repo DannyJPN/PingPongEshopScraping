@@ -26,7 +26,11 @@ from unifierlib.constants import (
     MEMORY_KEY_VARIANT_VALUE_MEMORY, MEMORY_KEY_CATEGORY_MAPPING_GLAMI, MEMORY_KEY_CATEGORY_MAPPING_GOOGLE,
     MEMORY_KEY_CATEGORY_MAPPING_HEUREKA, MEMORY_KEY_CATEGORY_MAPPING_ZBOZI, MEMORY_KEY_DEFAULT_EXPORT_PRODUCT_VALUES,
     PRODUCT_BRAND_MEMORY_PREFIX, PRODUCT_TYPE_MEMORY_PREFIX, PRODUCT_MODEL_MEMORY_PREFIX,
-    CATEGORY_MEMORY_PREFIX, DESC_MEMORY_PREFIX, SHORT_DESC_MEMORY_PREFIX
+    CATEGORY_MEMORY_PREFIX, DESC_MEMORY_PREFIX, SHORT_DESC_MEMORY_PREFIX,
+    VARIANT_NAME_MEMORY_PREFIX, VARIANT_VALUE_MEMORY_PREFIX, STOCK_STATUS_MEMORY_PREFIX,
+    CATEGORY_MAPPING_GLAMI_PREFIX, CATEGORY_MAPPING_GOOGLE_PREFIX,
+    CATEGORY_MAPPING_HEUREKA_PREFIX, CATEGORY_MAPPING_ZBOZI_PREFIX,
+    KEYWORDS_GOOGLE_PREFIX, KEYWORDS_ZBOZI_PREFIX
 )
 
 
@@ -1622,6 +1626,15 @@ class ProductParser:
             if category in mapping:
                 return mapping[category]
 
+        # Map platform to memory prefix for trash tracking
+        platform_to_prefix = {
+            'Glami': CATEGORY_MAPPING_GLAMI_PREFIX,
+            'Google': CATEGORY_MAPPING_GOOGLE_PREFIX,
+            'Heureka': CATEGORY_MAPPING_HEUREKA_PREFIX,
+            'Zbozi': CATEGORY_MAPPING_ZBOZI_PREFIX
+        }
+        memory_prefix = platform_to_prefix.get(platform)
+
         # Use OpenAI with memory content
         if self.openai:
             # Get current memory content to include in prompt
@@ -1630,7 +1643,8 @@ class ProductParser:
             if suggested_mapping:
                 # Confirm with user if needed
                 confirmed_mapping = self._confirm_ai_result(
-                    f"{platform} Category Mapping", "", suggested_mapping, downloaded.name, downloaded.url
+                    f"{platform} Category Mapping", "", suggested_mapping, downloaded.name, downloaded.url,
+                    None, memory_prefix, category
                 )
                 if confirmed_mapping:
                     # Save to memory only after confirmation
@@ -1688,7 +1702,8 @@ class ProductParser:
             if keywords:
                 # Confirm with user if needed
                 confirmed_keywords = self._confirm_ai_result(
-                    "Google Keywords", "", keywords, downloaded.name, downloaded.url
+                    "Google Keywords", "", keywords, downloaded.name, downloaded.url,
+                    None, KEYWORDS_GOOGLE_PREFIX, downloaded.name
                 )
                 if confirmed_keywords:
                     # Save to memory only after confirmation
@@ -2110,7 +2125,8 @@ class ProductParser:
             if standardized:
                 # Confirm with user if needed
                 confirmed_name = self._confirm_ai_result(
-                    "Variant Name", name, standardized, downloaded.name, downloaded.url
+                    "Variant Name", name, standardized, downloaded.name, downloaded.url,
+                    None, VARIANT_NAME_MEMORY_PREFIX, name
                 )
                 if confirmed_name:
                     # Save to memory only after confirmation
@@ -2169,7 +2185,8 @@ class ProductParser:
             if standardized:
                 # Confirm with user if needed
                 confirmed_value = self._confirm_ai_result(
-                    "Variant Value", value, standardized, downloaded.name, downloaded.url
+                    "Variant Value", value, standardized, downloaded.name, downloaded.url,
+                    None, VARIANT_VALUE_MEMORY_PREFIX, value
                 )
                 if confirmed_value:
                     # Save to memory only after confirmation
@@ -2228,7 +2245,8 @@ class ProductParser:
             if keywords:
                 # Confirm with user if needed
                 confirmed_keywords = self._confirm_ai_result(
-                    "Zbozi Keywords", "", keywords, downloaded.name, downloaded.url
+                    "Zbozi Keywords", "", keywords, downloaded.name, downloaded.url,
+                    None, KEYWORDS_ZBOZI_PREFIX, downloaded.name
                 )
                 if confirmed_keywords:
                     # Save to memory only after confirmation
@@ -2767,7 +2785,8 @@ class ProductParser:
                 # Confirm with user if needed
                 confirmed_value = self._confirm_ai_result(
                     "Stock Status", stock_status, standardized,
-                    f"Stock status: {stock_status}", ""
+                    f"Stock status: {stock_status}", "",
+                    None, STOCK_STATUS_MEMORY_PREFIX, stock_status
                 )
                 if confirmed_value:
                     # Save to memory
