@@ -258,18 +258,12 @@ def load_csv_file(filepath):
 
 def save_csv_file(csv_data, filepath):
     """
-    Save data to a CSV file in UTF-8 format with atomic write and backup creation.
+    Save data to a CSV file in UTF-8 format with backup creation.
 
-    Uses atomic write pattern: write to temp file, then rename.
-    This prevents corruption if the write fails partway through.
-    Backup provides additional safety in case of errors.
+    Creates backup of existing file before overwriting.
     """
     import csv
     import shutil
-    import tempfile
-
-    temp_fd = None
-    temp_path = None
 
     try:
         # Create backup of existing file
@@ -289,28 +283,8 @@ def save_csv_file(csv_data, filepath):
         logging.debug(f"Data being saved: {df.head()}")
         logging.debug(f"Saving CSV with UTF-8 encoding to: {filepath}")
 
-        # Atomic write: write to temporary file first
-        temp_fd, temp_path = tempfile.mkstemp(
-            dir=parent_dir if parent_dir else '.',
-            prefix='.tmp_',
-            suffix='.csv'
-        )
-
-        try:
-            # Write to temp file via pandas
-            df.to_csv(temp_path, index=False, quotechar='"', quoting=csv.QUOTE_ALL, encoding='utf-8')
-
-            # Ensure data is written to disk
-            os.fsync(temp_fd)
-
-        finally:
-            os.close(temp_fd)
-            temp_fd = None
-
-        # Atomic rename: replace original file with temp file
-        # This is atomic on POSIX systems and safe on Windows
-        shutil.move(temp_path, filepath)
-        temp_path = None
+        # Direct write to target file
+        df.to_csv(filepath, index=False, quotechar='"', quoting=csv.QUOTE_ALL, encoding='utf-8')
 
         logging.debug(f"CSV file saved successfully in UTF-8 format: {filepath}")
 
@@ -326,19 +300,6 @@ def save_csv_file(csv_data, filepath):
     except Exception as e:
         logging.error(f"Error saving CSV file {filepath}. Error: {str(e)}", exc_info=True)
         raise
-    finally:
-        # Cleanup: remove temp file if it exists
-        if temp_fd is not None:
-            try:
-                os.close(temp_fd)
-            except:
-                pass
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-                logging.debug(f"Cleaned up temp file: {temp_path}")
-            except:
-                pass
 
 
 def save_json_file(data: Dict[str, Any], filepath: str) -> None:
