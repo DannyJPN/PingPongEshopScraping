@@ -62,10 +62,9 @@ def add_to_trash(memory_filename: str, language: str, product_key: str, value: s
     try:
         # Load existing trash file to check for duplicates
         existing_rows = set()
-        all_entries = []
         if trash_filepath.exists():
-            all_entries = load_csv_file(str(trash_filepath))
-            for entry in all_entries:
+            existing_entries = load_csv_file(str(trash_filepath))
+            for entry in existing_entries:
                 row_id = (entry.get('KEY', ''), entry.get('VALUE', ''))
                 existing_rows.add(row_id)
 
@@ -74,12 +73,10 @@ def add_to_trash(memory_filename: str, language: str, product_key: str, value: s
         if new_row_id in existing_rows:
             return  # Already in trash
 
-        # Append new entry
+        # Append new entry (no backup, true append mode)
+        from shared.file_ops import append_to_csv_file
         new_entry = {'KEY': product_key, 'VALUE': value}
-        all_entries.append(new_entry)
-
-        # Save immediately (fire-and-forget)
-        save_csv_file(all_entries, str(trash_filepath))
+        append_to_csv_file(str(trash_filepath), new_entry)
 
         print(f"    🗑️  Trash: {memory_filename} - KEY='{product_key}', VALUE='{value}'")
 

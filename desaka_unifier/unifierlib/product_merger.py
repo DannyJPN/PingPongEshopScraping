@@ -695,10 +695,9 @@ class ProductMerger:
 
             # Load existing trash file to check for duplicates
             existing_rows = set()
-            all_entries = []
             if os.path.exists(trash_filepath):
-                all_entries = load_csv_file(trash_filepath)
-                for entry in all_entries:
+                existing_entries = load_csv_file(trash_filepath)
+                for entry in existing_entries:
                     row_id = (entry.get('KEY', ''), entry.get('VALUE', ''))
                     existing_rows.add(row_id)
 
@@ -708,12 +707,10 @@ class ProductMerger:
                 logging.debug(f"Trash entry already exists: {memory_prefix} - KEY='{product_key}', VALUE='{value}'")
                 return
 
-            # Append new entry
+            # Append new entry (no backup, true append mode)
+            from shared.file_ops import append_to_csv_file
             new_entry = {'KEY': product_key, 'VALUE': value}
-            all_entries.append(new_entry)
-
-            # Save immediately (fire-and-forget)
-            save_csv_file(all_entries, trash_filepath)
+            append_to_csv_file(trash_filepath, new_entry)
 
             logging.debug(f"🗑️  Trash: {memory_prefix} - KEY='{product_key}', VALUE='{value}'")
 
