@@ -27,7 +27,7 @@ from tqdm import tqdm
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from shared.file_ops import load_csv_file, save_csv_file
 
-# Type alias for removed records: List of (KEY, VALUE, REASON)
+# Type alias for removed records: List of (KEY, VALUE)
 TrashData = List[Dict[str, str]]
 
 
@@ -92,7 +92,8 @@ def save_memory_dict(data: Dict[str, str], filepath: Path, dry_run: bool = False
 
 def save_trash_data(trash_data: Dict[str, TrashData], language: str, dry_run: bool = False):
     """
-    Uloží smazaná data do trash souborů.
+    Přidá smazaná data do trash souborů (append mode).
+    Kontroluje unikátnost celých řádků (KEY+VALUE), ne jen klíčů.
 
     Args:
         trash_data: Slovník {memory_name: list of trash records}
@@ -102,23 +103,48 @@ def save_trash_data(trash_data: Dict[str, TrashData], language: str, dry_run: bo
     if dry_run:
         return
 
-    # Vytvoř trash složku s timestampem
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    trash_dir = Path(__file__).parent / 'trash' / f"{language}_{timestamp}"
+    # Trash složka je vedle Memory složky
+    trash_dir = Path(__file__).parent.parent / 'Trash'
     trash_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"\n📦 Ukládání smazaných záznamů do: {trash_dir}")
+    print(f"\n📦 Přidávání smazaných záznamů do: {trash_dir}")
 
-    # Ulož každý trash soubor
+    # Přidej do každého trash souboru (append mode)
     for memory_name, records in trash_data.items():
         if not records:
             continue
 
         trash_filepath = trash_dir / f"{memory_name}_{language}_trash.csv"
-        save_csv_file(records, str(trash_filepath))
-        print(f"   ✓ {memory_name}: {len(records)} smazaných záznamů")
 
-    print(f"✅ Trash soubory uloženy do: {trash_dir}")
+        # Build set of existing unique rows (KEY+VALUE)
+        existing_rows = set()
+        if trash_filepath.exists():
+            existing_records = load_csv_file(str(trash_filepath))
+            for rec in existing_records:
+                row_id = (rec.get('KEY', ''), rec.get('VALUE', ''))
+                existing_rows.add(row_id)
+
+        # Filter out duplicate rows
+        unique_new_records = []
+        for rec in records:
+            row_id = (rec.get('KEY', ''), rec.get('VALUE', ''))
+            if row_id not in existing_rows:
+                unique_new_records.append(rec)
+                existing_rows.add(row_id)
+
+        # Append unique records
+        if unique_new_records:
+            from shared.file_ops import append_to_csv_file
+            # Use append mode - no backups
+            append_to_csv_file(str(trash_filepath), unique_new_records)
+
+            # Count total for reporting
+            total_count = len(load_csv_file(str(trash_filepath)))
+            print(f"   ✓ {memory_name}: přidáno {len(unique_new_records)} unikátních záznamů (celkem: {total_count})")
+        else:
+            print(f"   ○ {memory_name}: žádné nové unikátní záznamy")
+
+    print(f"✅ Trash soubory aktualizovány v: {trash_dir}")
 
 
 def filter_incomplete_categories(category_name_memory: Dict[str, str]) -> Set[str]:
@@ -180,10 +206,10 @@ def filter_category_memory(
     with tqdm(total=len(category_memory), desc="Filtrování CategoryMemory", unit="záznam") as pbar:
         for key, value in category_memory.items():
             if value in incomplete_categories:
-                trash.append({'KEY': key, 'VALUE': value, 'REASON': 'Neúplná kategorie (je podstringem jiné)'})
+                trash.append({'KEY': key, 'VALUE': value})
                 removed_incomplete += 1
             elif value not in valid_categories:
-                trash.append({'KEY': key, 'VALUE': value, 'REASON': 'Neexistující kategorie (není v CategoryNameMemory)'})
+                trash.append({'KEY': key, 'VALUE': value})
                 removed_nonexistent += 1
             else:
                 filtered[key] = value
@@ -234,7 +260,7 @@ def filter_brand_memory(
             if value in valid_brands:
                 filtered[key] = value
             else:
-                trash.append({'KEY': key, 'VALUE': value, 'REASON': 'Neznámá značka (není v BrandCodeList)'})
+                trash.append({'KEY': key, 'VALUE': value})
                 removed_count += 1
             pbar.update(1)
 
@@ -279,7 +305,7 @@ def filter_contains_brand(
             if not contains_brand:
                 filtered[key] = value
             else:
-                trash.append({'KEY': key, 'VALUE': value, 'REASON': f'Obsahuje značku: {found_brand}'})
+                trash.append({'KEY': key, 'VALUE': value})
                 removed_count += 1
 
             pbar.update(1)
@@ -325,7 +351,7 @@ def filter_types_containing_models(
             if not contains_model:
                 filtered[key] = value
             else:
-                trash.append({'KEY': key, 'VALUE': value, 'REASON': f'Obsahuje model: {found_model}'})
+                trash.append({'KEY': key, 'VALUE': value})
                 removed_count += 1
 
             pbar.update(1)
@@ -376,7 +402,7 @@ def filter_models_containing_type_words(
             if not contains_type_word:
                 filtered[key] = value
             else:
-                trash.append({'KEY': key, 'VALUE': value, 'REASON': f'Obsahuje slova z typů: {", ".join(found_words)}'})
+                trash.append({'KEY': key, 'VALUE': value})
                 removed_count += 1
 
             pbar.update(1)
@@ -424,7 +450,7 @@ def filter_models_containing_variant_values(
             if not contains_variant:
                 filtered[key] = value
             else:
-                trash.append({'KEY': key, 'VALUE': value, 'REASON': f'Obsahuje variantní hodnotu: {found_variant}'})
+                trash.append({'KEY': key, 'VALUE': value})
                 removed_count += 1
 
             pbar.update(1)
@@ -468,9 +494,7 @@ def filter_invalid_characters(
             if czech_pattern.match(value):
                 filtered[key] = value
             else:
-                # Najdi nepovolené znaky
-                invalid_chars = set(c for c in value if not czech_pattern.match(c))
-                trash.append({'KEY': key, 'VALUE': value, 'REASON': f'Obsahuje nepovolené znaky: {", ".join(sorted(invalid_chars))}'})
+                trash.append({'KEY': key, 'VALUE': value})
                 removed_count += 1
 
             pbar.update(1)
@@ -519,7 +543,7 @@ def filter_name_memory(
             if not missing:
                 filtered[key] = value
             else:
-                trash.append({'KEY': key, 'VALUE': value, 'REASON': f'Chybí klíč v: {", ".join(missing)}'})
+                trash.append({'KEY': key, 'VALUE': value})
                 removed_count += 1
 
             pbar.update(1)
@@ -539,7 +563,6 @@ def main():
 Příklady použití:
   python filter_memory.py --language CS
   python filter_memory.py --language SK --dry-run
-  python filter_memory.py -l CS --save-trash
 
 Skript provádí kaskádové filtrování:
 1. Načte CategoryNameMemory a najde neúplné kategorie (pouze zdrojový soubor, nemodifikuje se)
@@ -554,10 +577,12 @@ Skript provádí kaskádové filtrování:
 Poznámka: CategoryNameMemory a BrandCodeList jsou pouze zdrojové soubory
           pro detekci pravidel - nejsou modifikovány ani ukládány.
 
-Trash režim (--save-trash):
-  Všechny smazané záznamy jsou uloženy do memory_tests/trash/
-  ve složce s timestampem pro pozdější kontrolu. Každý záznam obsahuje
-  KEY, VALUE a REASON (důvod smazání).
+Trash soubory:
+  Všechny smazané záznamy jsou automaticky přidány do desaka_unifier/Trash/
+  do persistentních souborů (např. CategoryMemory_CS_trash.csv).
+  Každý záznam obsahuje KEY a VALUE (bez REASON).
+  Záznamy se PŘIDÁVAJÍ (append), kontroluje se unikátnost celého řádku.
+  Tyto soubory slouží pro fine-tuning AI modelů.
         """
     )
 
@@ -565,24 +590,18 @@ Trash režim (--save-trash):
                        help='Jazyk (CS nebo SK, default: CS)')
     parser.add_argument('--dry-run', action='store_true',
                        help='Suchý běh - pouze spočítá změny, neuloží')
-    parser.add_argument('--save-trash', action='store_true',
-                       help='Uloží smazané záznamy do trash souborů pro kontrolu')
 
     args = parser.parse_args()
 
     try:
         language = args.language.upper()
         dry_run = args.dry_run
-        save_trash = args.save_trash
 
-        # Slovník pro ukládání smazaných záznamů
+        # Slovník pro ukládání smazaných záznamů (automaticky se ukládají pro fine-tuning)
         all_trash_data: Dict[str, TrashData] = {}
 
         if dry_run:
             print("\n⚠️  SUCHÝ BĚH - změny nebudou uloženy")
-
-        if save_trash:
-            print("📦 TRASH režim - smazané záznamy budou uloženy pro kontrolu")
 
         print(f"\n{'='*80}")
         print(f"FILTROVÁNÍ MEMORY SOUBORŮ - {language}")
@@ -762,7 +781,8 @@ Trash režim (--save-trash):
             print(f"💡 Spusťte bez --dry-run pro aplikování změn")
 
         # ===== Uložení trash souborů =====
-        if save_trash and not dry_run:
+        # Trash soubory se ukládají VŽDY (pokud není dry_run) - jsou součást fine-tuning systému
+        if not dry_run and all_trash_data:
             print("\n" + "="*80)
             print("UKLÁDÁNÍ TRASH SOUBORŮ")
             print("="*80)

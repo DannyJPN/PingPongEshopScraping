@@ -40,6 +40,50 @@ FILE_ALIASES = {
 PAGE_SIZE = 40
 
 
+def add_to_trash(memory_filename: str, language: str, product_key: str, value: str):
+    """
+    Immediately append deleted entry to trash file (fire-and-forget).
+
+    Args:
+        memory_filename: Memory file prefix (e.g., "ProductBrandMemory")
+        language: Language code (e.g., "CS", "SK")
+        product_key: Product key (KEY column)
+        value: The value to trash (VALUE column)
+    """
+    if not memory_filename or not product_key:
+        return
+
+    # Determine trash directory and file path
+    trash_dir = Path(__file__).parent.parent / 'Trash'
+    trash_dir.mkdir(parents=True, exist_ok=True)
+
+    trash_filepath = trash_dir / f"{memory_filename}_{language}_trash.csv"
+
+    try:
+        # Load existing trash file to check for duplicates
+        existing_rows = set()
+        if trash_filepath.exists():
+            existing_entries = load_csv_file(str(trash_filepath))
+            for entry in existing_entries:
+                row_id = (entry.get('KEY', ''), entry.get('VALUE', ''))
+                existing_rows.add(row_id)
+
+        # Check if this exact row already exists
+        new_row_id = (product_key, value)
+        if new_row_id in existing_rows:
+            return  # Already in trash
+
+        # Append new entry (no backup, true append mode)
+        from shared.file_ops import append_to_csv_file
+        new_entry = {'KEY': product_key, 'VALUE': value}
+        append_to_csv_file(str(trash_filepath), new_entry)
+
+        print(f"    🗑️  Trash: {memory_filename} - KEY='{product_key}', VALUE='{value}'")
+
+    except Exception as e:
+        print(f"    ⚠️  Error writing trash entry: {e}")
+
+
 def get_memory_filepath(alias: str, language: str) -> Path:
     """
     Převede alias na plnou cestu k memory souboru.
@@ -520,6 +564,9 @@ Dostupné aliasy souborů:
     args = parser.parse_args()
 
     try:
+        # Get memory filename for trash writing
+        memory_filename = FILE_ALIASES[args.file.lower()]
+
         # Load memory file
         filepath = get_memory_filepath(args.file, args.language)
         print(f"\n📂 Načítám: {filepath.name}")
@@ -575,9 +622,11 @@ Dostupné aliasy souborů:
                 confirm = input("💾 Potvrdit a smazat? (y/n, default: y): ").strip().lower()
 
                 if confirm in ['y', '']:
-                    # Delete marked keys immediately
+                    # Delete marked keys immediately (write to trash first)
                     keys_to_remove = [keys[i] for i in indices]
                     for key in keys_to_remove:
+                        # Write to trash before deleting
+                        add_to_trash(memory_filename, args.language, key, original_data[key])
                         del original_data[key]
 
                     # Save file immediately
@@ -607,9 +656,11 @@ Dostupné aliasy souborů:
                             confirm_similar = input("\n💾 Smazat i tyto podobné KEYs? (y/n, default: y): ").strip().lower()
 
                             if confirm_similar in ['y', '']:
-                                # Smazat podobné klíče
+                                # Smazat podobné klíče (write to trash first)
                                 for sim_key in similar_keys:
                                     if sim_key in original_data:
+                                        # Write to trash before deleting
+                                        add_to_trash(memory_filename, args.language, sim_key, original_data[sim_key])
                                         del original_data[sim_key]
 
                                 # Uložit soubor

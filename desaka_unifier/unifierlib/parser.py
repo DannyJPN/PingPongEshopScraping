@@ -24,7 +24,13 @@ from unifierlib.constants import (
     MEMORY_KEY_NAME_MEMORY, MEMORY_KEY_PRODUCT_BRAND_MEMORY, MEMORY_KEY_PRODUCT_MODEL_MEMORY,
     MEMORY_KEY_PRODUCT_TYPE_MEMORY, MEMORY_KEY_SHORT_DESC_MEMORY, MEMORY_KEY_VARIANT_NAME_MEMORY,
     MEMORY_KEY_VARIANT_VALUE_MEMORY, MEMORY_KEY_CATEGORY_MAPPING_GLAMI, MEMORY_KEY_CATEGORY_MAPPING_GOOGLE,
-    MEMORY_KEY_CATEGORY_MAPPING_HEUREKA, MEMORY_KEY_CATEGORY_MAPPING_ZBOZI, MEMORY_KEY_DEFAULT_EXPORT_PRODUCT_VALUES
+    MEMORY_KEY_CATEGORY_MAPPING_HEUREKA, MEMORY_KEY_CATEGORY_MAPPING_ZBOZI, MEMORY_KEY_DEFAULT_EXPORT_PRODUCT_VALUES,
+    PRODUCT_BRAND_MEMORY_PREFIX, PRODUCT_TYPE_MEMORY_PREFIX, PRODUCT_MODEL_MEMORY_PREFIX,
+    CATEGORY_MEMORY_PREFIX, DESC_MEMORY_PREFIX, SHORT_DESC_MEMORY_PREFIX,
+    VARIANT_NAME_MEMORY_PREFIX, VARIANT_VALUE_MEMORY_PREFIX, STOCK_STATUS_MEMORY_PREFIX,
+    CATEGORY_MAPPING_GLAMI_PREFIX, CATEGORY_MAPPING_GOOGLE_PREFIX,
+    CATEGORY_MAPPING_HEUREKA_PREFIX, CATEGORY_MAPPING_ZBOZI_PREFIX,
+    KEYWORDS_GOOGLE_PREFIX, KEYWORDS_ZBOZI_PREFIX
 )
 
 
@@ -38,7 +44,7 @@ class ProductParser:
                  export_products: Optional[List[Any]] = None, repaired_products: Optional[List[Any]] = None,
                  confirm_ai_results: bool = False, use_fine_tuned_models: bool = False,
                  fine_tuned_models: Optional[Dict[str, str]] = None, supported_languages_data: Optional[list] = None,
-                 skip_ai: bool = False):
+                 skip_ai: bool = False, memory_dir: Optional[str] = None):
         """
         Initialize parser with optional memory data, language, export products and AI confirmation setting.
 
@@ -52,6 +58,7 @@ class ProductParser:
             fine_tuned_models (Optional[Dict[str, str]]): Dictionary mapping task types to model IDs
             supported_languages_data (Optional[list]): Pre-loaded supported languages data
             skip_ai (bool): Whether to skip using AI for property evaluation (default: False)
+            memory_dir (Optional[str]): Path to Memory directory (for trash file writing)
         """
         self.memory = memory_data or {}
         self.language = language or 'CS'
@@ -59,6 +66,7 @@ class ProductParser:
         self.repaired_products = repaired_products or []
         self.confirm_ai_results = confirm_ai_results
         self.supported_languages_data = supported_languages_data
+        self.memory_dir = memory_dir
 
         # Track assigned codes to avoid duplicates
         self.assigned_codes = set()
@@ -812,7 +820,8 @@ class ProductParser:
             if category:
                 # Confirm with user if needed
                 confirmed_category = self._confirm_ai_result(
-                    "Category", "", category, downloaded.name, downloaded.url, all_matches
+                    "Category", "", category, downloaded.name, downloaded.url, all_matches,
+                    CATEGORY_MEMORY_PREFIX, downloaded.name
                 )
                 if confirmed_category:
                     # Find the key for this category value
@@ -832,7 +841,7 @@ class ProductParser:
         print("\n🔍 CATEGORY DETECTION:")
         print("  (Heuristic analysis disabled for categories)")
 
-        user_category = self._ask_user_for_product_value("category", downloaded, heuristic_match=single_match)
+        user_category = self._ask_user_for_product_value("category", downloaded, heuristic_match=single_match, memory_prefix=CATEGORY_MEMORY_PREFIX)
         if user_category:
             # Find the key for this category value
             category_key = self._find_category_key_by_value(user_category)
@@ -924,7 +933,8 @@ class ProductParser:
             if brand:
                 # Confirm with user if needed
                 confirmed_brand = self._confirm_ai_result(
-                    "Brand", "", brand, downloaded.name, downloaded.url, all_matches
+                    "Brand", "", brand, downloaded.name, downloaded.url, all_matches,
+                    PRODUCT_BRAND_MEMORY_PREFIX, downloaded.name
                 )
                 if confirmed_brand:
                     # Save to memory
@@ -944,7 +954,7 @@ class ProductParser:
         else:
             print("  No matches found in product text")
 
-        user_brand = self._ask_user_for_product_value("Brand", downloaded, heuristic_match=single_match)
+        user_brand = self._ask_user_for_product_value("Brand", downloaded, heuristic_match=single_match, memory_prefix=PRODUCT_BRAND_MEMORY_PREFIX)
         if user_brand:
             # Save to memory
             if memory_key not in self.memory:
@@ -1017,7 +1027,8 @@ class ProductParser:
             if product_type:
                 # Confirm with user if needed
                 confirmed_type = self._confirm_ai_result(
-                    "Product Type", "", product_type, downloaded.name, downloaded.url, all_matches
+                    "Product Type", "", product_type, downloaded.name, downloaded.url, all_matches,
+                    PRODUCT_TYPE_MEMORY_PREFIX, downloaded.name
                 )
                 if confirmed_type:
                     # Save to memory
@@ -1034,7 +1045,7 @@ class ProductParser:
         else:
             print("  No matches found in product text")
 
-        user_type = self._ask_user_for_product_value("Product Type", downloaded, heuristic_match=single_match)
+        user_type = self._ask_user_for_product_value("Product Type", downloaded, heuristic_match=single_match, memory_prefix=PRODUCT_TYPE_MEMORY_PREFIX)
         if user_type:
             # Save to memory
             if memory_key not in self.memory:
@@ -1099,7 +1110,8 @@ class ProductParser:
             if product_model:
                 # Confirm with user if needed
                 confirmed_model = self._confirm_ai_result(
-                    "Product Model", "", product_model, downloaded.name, downloaded.url, all_matches
+                    "Product Model", "", product_model, downloaded.name, downloaded.url, all_matches,
+                    PRODUCT_MODEL_MEMORY_PREFIX, downloaded.name
                 )
                 if confirmed_model:
                     # Save to memory
@@ -1116,7 +1128,7 @@ class ProductParser:
         else:
             print("  No matches found in product text")
 
-        user_model = self._ask_user_for_product_value("Product Model", downloaded, heuristic_match=single_match)
+        user_model = self._ask_user_for_product_value("Product Model", downloaded, heuristic_match=single_match, memory_prefix=PRODUCT_MODEL_MEMORY_PREFIX)
         if user_model:
             # Save to memory
             if memory_key not in self.memory:
@@ -1380,8 +1392,20 @@ class ProductParser:
         except KeyboardInterrupt:
             return None
 
-    def _confirm_ai_result(self, property_name: str, current_value: str, ai_suggestion: str, product_name: str, product_url: str = "", heuristic_matches: List[str] = None) -> str:
-        """Confirm AI result with user or return suggestion if auto-confirm is enabled."""
+    def _confirm_ai_result(self, property_name: str, current_value: str, ai_suggestion: str, product_name: str, product_url: str = "", heuristic_matches: List[str] = None, memory_prefix: str = None, product_key: str = None) -> str:
+        """Confirm AI result with user or return suggestion if auto-confirm is enabled.
+        If user changes the value, the original AI suggestion is written to trash.
+
+        Args:
+            property_name: Display name of the property (e.g., "Brand", "Product Type")
+            current_value: Current value of the property
+            ai_suggestion: AI's suggested value
+            product_name: Product name for display
+            product_url: Product URL for display
+            heuristic_matches: Heuristic matches found
+            memory_prefix: Memory file prefix (e.g., "ProductBrandMemory") for trash tracking
+            product_key: Product key (usually downloaded.name) for trash tracking
+        """
         if self.confirm_ai_results:
             return ai_suggestion.strip() if ai_suggestion else ""
 
@@ -1432,12 +1456,37 @@ class ProductParser:
 
             print("=" * 80)
             response = input(f"✅ Press Enter to confirm AI suggestion or type new value: ").strip()
+
+            # If user provided input (not just Enter to accept), check if it differs from AI suggestion
+            if response and memory_prefix and product_key:
+                # Normalize for comparison
+                ai_normalized = (ai_suggestion or "").strip()
+                response_normalized = response.strip()
+
+                # If user's value differs from AI suggestion, write AI suggestion to trash
+                # This includes cases where AI returned None/"" (incorrect) or wrong value
+                if ai_normalized != response_normalized:
+                    # Write AI suggestion to trash (even if empty - that's an incorrect example)
+                    self._add_to_trash(memory_prefix, product_key, ai_normalized)
+
             return response if response else ai_suggestion.strip() if ai_suggestion else ""
         except KeyboardInterrupt:
             return ai_suggestion.strip() if ai_suggestion else ""
 
-    def _ask_user_for_product_value(self, property_name: str, downloaded: DownloadedProduct, current_value: str = "", heuristic_match: str = None) -> str:
-        """Ask user for product property value with detailed product information display."""
+    def _ask_user_for_product_value(self, property_name: str, downloaded: DownloadedProduct, current_value: str = "", heuristic_match: str = None, memory_prefix: str = None) -> str:
+        """
+        Ask user for product property value with detailed product information display.
+
+        Args:
+            property_name: Name of the property being requested
+            downloaded: DownloadedProduct object for context
+            current_value: Current value if any
+            heuristic_match: Single heuristic match found (if any)
+            memory_prefix: Memory file prefix for trash writing (if heuristic_match changed)
+
+        Returns:
+            User's input or heuristic_match if accepted
+        """
         try:
             # Create a more readable display format similar to AI confirmation
             print("\n" + "=" * 80)
@@ -1482,6 +1531,9 @@ class ProductParser:
             # Adjust prompt based on whether heuristic match exists
             if heuristic_match:
                 response = input(f"✏️  Press Enter to use '{heuristic_match}' or type new value: ").strip()
+                # If user changed heuristic match, write old value to trash
+                if response and response.lower() != heuristic_match.lower() and memory_prefix and downloaded.name:
+                    self._add_to_trash(memory_prefix, downloaded.name, heuristic_match)
                 return response if response else heuristic_match
             else:
                 response = input(f"✏️  Please enter {property_name}: ").strip()
@@ -1556,7 +1608,8 @@ class ProductParser:
             if description:
                 # Confirm with user if needed
                 confirmed_description = self._confirm_ai_result(
-                    "Description", downloaded.description, description, downloaded.name, downloaded.url
+                    "Description", downloaded.description, description, downloaded.name, downloaded.url,
+                    None, DESC_MEMORY_PREFIX, downloaded.name
                 )
                 if confirmed_description:
                     # Save to memory
@@ -1587,6 +1640,15 @@ class ProductParser:
             if category in mapping:
                 return mapping[category]
 
+        # Map platform to memory prefix for trash tracking
+        platform_to_prefix = {
+            'Glami': CATEGORY_MAPPING_GLAMI_PREFIX,
+            'Google': CATEGORY_MAPPING_GOOGLE_PREFIX,
+            'Heureka': CATEGORY_MAPPING_HEUREKA_PREFIX,
+            'Zbozi': CATEGORY_MAPPING_ZBOZI_PREFIX
+        }
+        memory_prefix = platform_to_prefix.get(platform)
+
         # Use OpenAI with memory content
         if self.openai:
             # Get current memory content to include in prompt
@@ -1595,7 +1657,8 @@ class ProductParser:
             if suggested_mapping:
                 # Confirm with user if needed
                 confirmed_mapping = self._confirm_ai_result(
-                    f"{platform} Category Mapping", "", suggested_mapping, downloaded.name, downloaded.url
+                    f"{platform} Category Mapping", "", suggested_mapping, downloaded.name, downloaded.url,
+                    None, memory_prefix, category
                 )
                 if confirmed_mapping:
                     # Save to memory only after confirmation
@@ -1653,7 +1716,8 @@ class ProductParser:
             if keywords:
                 # Confirm with user if needed
                 confirmed_keywords = self._confirm_ai_result(
-                    "Google Keywords", "", keywords, downloaded.name, downloaded.url
+                    "Google Keywords", "", keywords, downloaded.name, downloaded.url,
+                    None, KEYWORDS_GOOGLE_PREFIX, downloaded.name
                 )
                 if confirmed_keywords:
                     # Save to memory only after confirmation
@@ -1877,7 +1941,8 @@ class ProductParser:
 
                 # Confirm with user if needed
                 confirmed_shortdesc = self._confirm_ai_result(
-                    "Short Description", current_value, shortdesc, downloaded.name, downloaded.url
+                    "Short Description", current_value, shortdesc, downloaded.name, downloaded.url,
+                    None, SHORT_DESC_MEMORY_PREFIX, downloaded.name
                 )
                 if confirmed_shortdesc:
                     # Save to memory
@@ -2074,7 +2139,8 @@ class ProductParser:
             if standardized:
                 # Confirm with user if needed
                 confirmed_name = self._confirm_ai_result(
-                    "Variant Name", name, standardized, downloaded.name, downloaded.url
+                    "Variant Name", name, standardized, downloaded.name, downloaded.url,
+                    None, VARIANT_NAME_MEMORY_PREFIX, name
                 )
                 if confirmed_name:
                     # Save to memory only after confirmation
@@ -2133,7 +2199,8 @@ class ProductParser:
             if standardized:
                 # Confirm with user if needed
                 confirmed_value = self._confirm_ai_result(
-                    "Variant Value", value, standardized, downloaded.name, downloaded.url
+                    "Variant Value", value, standardized, downloaded.name, downloaded.url,
+                    None, VARIANT_VALUE_MEMORY_PREFIX, value
                 )
                 if confirmed_value:
                     # Save to memory only after confirmation
@@ -2192,7 +2259,8 @@ class ProductParser:
             if keywords:
                 # Confirm with user if needed
                 confirmed_keywords = self._confirm_ai_result(
-                    "Zbozi Keywords", "", keywords, downloaded.name, downloaded.url
+                    "Zbozi Keywords", "", keywords, downloaded.name, downloaded.url,
+                    None, KEYWORDS_ZBOZI_PREFIX, downloaded.name
                 )
                 if confirmed_keywords:
                     # Save to memory only after confirmation
@@ -2731,7 +2799,8 @@ class ProductParser:
                 # Confirm with user if needed
                 confirmed_value = self._confirm_ai_result(
                     "Stock Status", stock_status, standardized,
-                    f"Stock status: {stock_status}", ""
+                    f"Stock status: {stock_status}", "",
+                    None, STOCK_STATUS_MEMORY_PREFIX, stock_status
                 )
                 if confirmed_value:
                     # Save to memory
@@ -2753,4 +2822,50 @@ class ProductParser:
             return user_value
 
         return stock_status
+
+    def _add_to_trash(self, memory_prefix: str, product_key: str, value: str):
+        """
+        Immediately append entry to trash file (fire-and-forget).
+
+        Args:
+            memory_prefix: Memory file prefix (e.g., "ProductBrandMemory")
+            product_key: Product key (usually downloaded.name)
+            value: The incorrect value to trash (can be empty string)
+        """
+        if not memory_prefix or not product_key or not self.memory_dir:
+            return
+
+        from shared.file_ops import load_csv_file, append_to_csv_file
+
+        # Determine trash directory and file path
+        trash_dir = os.path.join(os.path.dirname(self.memory_dir), "Trash")
+        os.makedirs(trash_dir, exist_ok=True)
+
+        trash_filepath = os.path.join(trash_dir, f"{memory_prefix}_{self.language}_trash.csv")
+
+        try:
+            # Load existing trash file to check for duplicates
+            existing_rows = set()
+            if os.path.exists(trash_filepath):
+                existing_entries = load_csv_file(trash_filepath)
+                for entry in existing_entries:
+                    row_id = (entry.get('KEY', ''), entry.get('VALUE', ''))
+                    existing_rows.add(row_id)
+
+            # Check if this exact row already exists
+            new_row_id = (product_key, value)
+            if new_row_id in existing_rows:
+                logging.debug(f"Trash entry already exists: {memory_prefix} - KEY='{product_key}', VALUE='{value}'")
+                return
+
+            # Append new entry (no backup, true append mode)
+            new_entry = {'KEY': product_key, 'VALUE': value}
+            append_to_csv_file(trash_filepath, new_entry)
+
+            print(f"\n🗑️  Trash: {memory_prefix} - KEY='{product_key}', VALUE='{value}' → {trash_filepath}")
+            logging.debug(f"Added trash entry to {trash_filepath}")
+
+        except Exception as e:
+            logging.error(f"Error writing trash entry to {trash_filepath}: {str(e)}", exc_info=True)
+
 

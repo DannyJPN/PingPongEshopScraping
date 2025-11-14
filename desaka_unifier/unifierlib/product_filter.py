@@ -86,7 +86,7 @@ class ProductFilter:
     
     def save_rejected_products_to_wrongs(self, rejected_products: List[RepairedProduct], wrongs_file_path: str = None):
         """
-        Save rejected products to Wrongs.txt file.
+        Save rejected products to Wrongs.txt file in Memory folder.
 
         Args:
             rejected_products (List[RepairedProduct]): List of rejected products

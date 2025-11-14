@@ -51,6 +51,7 @@ class ProductMerger:
         """
         self.language = language
         self.memory_dir = memory_dir
+        self.trash_dir = os.path.join(os.path.dirname(memory_dir), "Trash")
         # LRU cache: OrderedDict maintains insertion order, we'll move accessed items to end
         self.memory_cache: OrderedDict[str, Dict[str, str]] = OrderedDict()
         self.memory_dirty = set()  # Track which memory files have been modified
@@ -673,10 +674,54 @@ class ProductMerger:
 
         logging.info(f"All dirty memory files saved successfully")
 
+    def _add_to_trash(self, memory_prefix: str, product_key: str, value: str):
+        """
+        Immediately append entry to trash file (fire-and-forget).
+
+        Args:
+            memory_prefix: Memory file prefix (e.g., "ProductBrandMemory")
+            product_key: Product key (usually product.original_name)
+            value: The incorrect value to trash (can be empty string)
+        """
+        if not memory_prefix or not product_key:
+            return
+
+        # Determine trash file path
+        trash_filepath = os.path.join(self.trash_dir, f"{memory_prefix}_{self.language}_trash.csv")
+
+        try:
+            # Ensure trash directory exists
+            os.makedirs(self.trash_dir, exist_ok=True)
+
+            # Load existing trash file to check for duplicates
+            existing_rows = set()
+            if os.path.exists(trash_filepath):
+                existing_entries = load_csv_file(trash_filepath)
+                for entry in existing_entries:
+                    row_id = (entry.get('KEY', ''), entry.get('VALUE', ''))
+                    existing_rows.add(row_id)
+
+            # Check if this exact row already exists
+            new_row_id = (product_key, value)
+            if new_row_id in existing_rows:
+                logging.debug(f"Trash entry already exists: {memory_prefix} - KEY='{product_key}', VALUE='{value}'")
+                return
+
+            # Append new entry (no backup, true append mode)
+            from shared.file_ops import append_to_csv_file
+            new_entry = {'KEY': product_key, 'VALUE': value}
+            append_to_csv_file(trash_filepath, new_entry)
+
+            logging.debug(f"🗑️  Trash: {memory_prefix} - KEY='{product_key}', VALUE='{value}'")
+
+        except Exception as e:
+            logging.error(f"Error writing trash entry to {trash_filepath}: {str(e)}", exc_info=True)
+
     def _update_memory_for_field(self, field_name: str, products: List[RepairedProduct],
                                   new_value: str):
         """
         Update memory file for a given field with the chosen value.
+        Also write incorrect (non-chosen) values to trash file.
 
         Args:
             field_name: Field name (e.g., 'type', 'brand', 'category')
@@ -693,8 +738,16 @@ class ProductMerger:
         memory_dict = self._load_memory_file(memory_prefix)
 
         # Update all original_names from products to point to new value
+        # Write incorrect (non-chosen) values to trash immediately (fire-and-forget)
         for product in products:
             if product.original_name:
+                old_value = getattr(product, field_name, '')
+
+                # If old value differs from chosen value, write to trash immediately
+                if old_value and old_value.strip() and old_value.strip().lower() != new_value.strip().lower():
+                    self._add_to_trash(memory_prefix, product.original_name, old_value)
+
+                # Update memory with correct value
                 memory_dict[product.original_name] = new_value
 
         # Update cache
