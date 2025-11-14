@@ -275,7 +275,21 @@ When working on downloaders, note the shared pattern:
 
 ## Git Operations and Dropbox
 
-**CRITICAL**: This repository is in a Dropbox folder. Dropbox locks files in `.git/` directory causing "Permission denied" errors during git operations.
+**CRITICAL**: This repository is in a Dropbox folder. Dropbox can lock files causing "Permission denied" errors.
+
+### Regular File Operations (Memory CSV, Logs, etc.)
+
+**NO ACTION NEEDED** - All file operation functions in `desaka_unifier/shared/file_ops.py` now include **automatic retry logic with exponential backoff** (2s, 4s, 8s, 16s delays up to 4 retries). This handles temporary Dropbox file locks gracefully:
+
+- `save_csv_file()` - Atomic write with retry
+- `append_to_csv_file()` - Append with retry
+- `append_to_txt_file()` - Text append with retry
+
+The system will automatically wait and retry if Dropbox locks a file during normal unifier operations.
+
+### Git Operations (commit/push)
+
+**ACTION REQUIRED** - Dropbox locks files in `.git/` directory require manual intervention.
 
 **ALWAYS follow this procedure before git commit/push:**
 

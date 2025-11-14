@@ -78,37 +78,64 @@ def append_to_txt_file(file_path: str, lines: List[str]) -> None:
     """
     Append lines to a text file in UTF-8 format.
 
+    Implements retry logic with exponential backoff for file locking issues (e.g., Dropbox sync).
+
     Args:
         file_path (str): Path to the text file
         lines (List[str]): Lines to append to the file
     """
-    try:
-        logging.debug(f"Appending {len(lines)} lines to text file: {file_path}")
+    import time
 
-        # Ensure the parent directory exists
-        parent_dir = os.path.dirname(file_path)
-        if parent_dir and not os.path.exists(parent_dir):
-            ensure_directory_exists(parent_dir)
+    max_retries = 4
+    retry_delays = [2, 4, 8, 16]  # Exponential backoff in seconds
 
-        # Append with UTF-8 encoding
-        with open(file_path, 'a', encoding='utf-8') as f:
-            for line in lines:
-                f.write(f"{line}\n")
+    # Ensure the parent directory exists
+    parent_dir = os.path.dirname(file_path)
+    if parent_dir and not os.path.exists(parent_dir):
+        ensure_directory_exists(parent_dir)
 
-        logging.debug(f"Successfully appended {len(lines)} lines to: {file_path}")
+    for attempt in range(max_retries + 1):
+        try:
+            logging.debug(f"Appending {len(lines)} lines to text file: {file_path}")
 
-    except PermissionError as e:
-        logging.error(f"Permission denied while appending to file {file_path}. Error: {str(e)}", exc_info=True)
-        raise
-    except OSError as e:
-        if e.errno == 28:  # ENOSPC - No space left on device
-            logging.error(f"Disk full while appending to file {file_path}. Error: {str(e)}", exc_info=True)
-        else:
-            logging.error(f"OS error while appending to file {file_path}. Error: {str(e)}", exc_info=True)
-        raise
-    except Exception as e:
-        logging.error(f"Error appending to text file {file_path}. Error: {str(e)}", exc_info=True)
-        raise
+            # Append with UTF-8 encoding
+            with open(file_path, 'a', encoding='utf-8') as f:
+                for line in lines:
+                    f.write(f"{line}\n")
+
+            logging.debug(f"Successfully appended {len(lines)} lines to: {file_path}")
+            return  # Success - exit function
+
+        except (PermissionError, OSError) as e:
+            # Check if it's a file locking error that we should retry
+            is_lock_error = (
+                isinstance(e, PermissionError) or
+                (isinstance(e, OSError) and e.errno in [32, 13])  # errno 32 = file in use, 13 = permission denied
+            )
+
+            if is_lock_error and attempt < max_retries:
+                delay = retry_delays[attempt]
+                logging.warning(
+                    f"File locked (attempt {attempt + 1}/{max_retries + 1}): {file_path}. "
+                    f"Retrying in {delay}s... Error: {str(e)}"
+                )
+                time.sleep(delay)
+                continue  # Retry
+            elif e.errno == 28:  # ENOSPC - No space left on device
+                logging.error(f"Disk full while appending to file {file_path}. Error: {str(e)}", exc_info=True)
+                raise
+            else:
+                # Final attempt failed or non-retryable error
+                logging.error(
+                    f"{'Final attempt failed' if is_lock_error else 'Non-retryable error'} "
+                    f"while appending to file {file_path}. Error: {str(e)}",
+                    exc_info=True
+                )
+                raise
+
+        except Exception as e:
+            logging.error(f"Error appending to text file {file_path}. Error: {str(e)}", exc_info=True)
+            raise
 
 
 def append_to_csv_file(file_path: str, data: Any) -> None:
@@ -116,63 +143,89 @@ def append_to_csv_file(file_path: str, data: Any) -> None:
     Append data to a CSV file in UTF-8 format.
     Creates file with header if it doesn't exist.
 
+    Implements retry logic with exponential backoff for file locking issues (e.g., Dropbox sync).
+
     Args:
         file_path (str): Path to the CSV file
         data: Dictionary or list of dictionaries to append
     """
     import csv
+    import time
 
-    try:
-        # Normalize data to list of dicts
-        if isinstance(data, dict):
-            rows = [data]
-        elif isinstance(data, list):
-            rows = data
-        else:
-            raise ValueError(f"Data must be dict or list of dicts, got {type(data)}")
+    max_retries = 4
+    retry_delays = [2, 4, 8, 16]  # Exponential backoff in seconds
 
-        if not rows:
-            return
+    # Normalize data to list of dicts
+    if isinstance(data, dict):
+        rows = [data]
+    elif isinstance(data, list):
+        rows = data
+    else:
+        raise ValueError(f"Data must be dict or list of dicts, got {type(data)}")
 
-        # Ensure the parent directory exists
-        parent_dir = os.path.dirname(file_path)
-        if parent_dir and not os.path.exists(parent_dir):
-            ensure_directory_exists(parent_dir)
+    if not rows:
+        return
 
-        # Get fieldnames from first row
-        fieldnames = list(rows[0].keys())
+    # Ensure the parent directory exists
+    parent_dir = os.path.dirname(file_path)
+    if parent_dir and not os.path.exists(parent_dir):
+        ensure_directory_exists(parent_dir)
 
-        # Check if file exists to determine if we need to write header
-        file_exists = os.path.exists(file_path)
+    # Get fieldnames from first row
+    fieldnames = list(rows[0].keys())
 
-        logging.debug(f"Appending {len(rows)} row(s) to CSV file: {file_path}")
+    for attempt in range(max_retries + 1):
+        try:
+            # Check if file exists to determine if we need to write header
+            file_exists = os.path.exists(file_path)
 
-        # Append with UTF-8 encoding
-        with open(file_path, 'a', newline='', encoding='utf-8') as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames, quotechar='"', quoting=csv.QUOTE_ALL)
+            logging.debug(f"Appending {len(rows)} row(s) to CSV file: {file_path}")
 
-            # Write header only if file is new
-            if not file_exists:
-                writer.writeheader()
-                logging.debug(f"Created new CSV file with header: {file_path}")
+            # Append with UTF-8 encoding
+            with open(file_path, 'a', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames, quotechar='"', quoting=csv.QUOTE_ALL)
 
-            # Write data rows
-            writer.writerows(rows)
+                # Write header only if file is new
+                if not file_exists:
+                    writer.writeheader()
+                    logging.debug(f"Created new CSV file with header: {file_path}")
 
-        logging.debug(f"Successfully appended {len(rows)} row(s) to: {file_path}")
+                # Write data rows
+                writer.writerows(rows)
 
-    except PermissionError as e:
-        logging.error(f"Permission denied while appending to CSV file {file_path}. Error: {str(e)}", exc_info=True)
-        raise
-    except OSError as e:
-        if e.errno == 28:  # ENOSPC - No space left on device
-            logging.error(f"Disk full while appending to CSV file {file_path}. Error: {str(e)}", exc_info=True)
-        else:
-            logging.error(f"OS error while appending to CSV file {file_path}. Error: {str(e)}", exc_info=True)
-        raise
-    except Exception as e:
-        logging.error(f"Error appending to CSV file {file_path}. Error: {str(e)}", exc_info=True)
-        raise
+            logging.debug(f"Successfully appended {len(rows)} row(s) to: {file_path}")
+            return  # Success - exit function
+
+        except (PermissionError, OSError) as e:
+            # Check if it's a file locking error that we should retry
+            is_lock_error = (
+                isinstance(e, PermissionError) or
+                (isinstance(e, OSError) and e.errno in [32, 13])  # errno 32 = file in use, 13 = permission denied
+            )
+
+            if is_lock_error and attempt < max_retries:
+                delay = retry_delays[attempt]
+                logging.warning(
+                    f"File locked (attempt {attempt + 1}/{max_retries + 1}): {file_path}. "
+                    f"Retrying in {delay}s... Error: {str(e)}"
+                )
+                time.sleep(delay)
+                continue  # Retry
+            elif e.errno == 28:  # ENOSPC - No space left on device
+                logging.error(f"Disk full while appending to CSV file {file_path}. Error: {str(e)}", exc_info=True)
+                raise
+            else:
+                # Final attempt failed or non-retryable error
+                logging.error(
+                    f"{'Final attempt failed' if is_lock_error else 'Non-retryable error'} "
+                    f"while appending to CSV file {file_path}. Error: {str(e)}",
+                    exc_info=True
+                )
+                raise
+
+        except Exception as e:
+            logging.error(f"Error appending to CSV file {file_path}. Error: {str(e)}", exc_info=True)
+            raise
 
 
 
@@ -263,82 +316,109 @@ def save_csv_file(csv_data, filepath):
     Uses atomic write pattern: write to temp file, then rename.
     This prevents corruption if the write fails partway through.
     Backup provides additional safety in case of errors.
+
+    Implements retry logic with exponential backoff for file locking issues (e.g., Dropbox sync).
     """
     import csv
     import shutil
     import tempfile
+    import time
 
-    temp_fd = None
-    temp_path = None
+    max_retries = 4
+    retry_delays = [2, 4, 8, 16]  # Exponential backoff in seconds
 
-    try:
-        # Create backup of existing file
-        if os.path.exists(filepath):
-            backup_filepath = f"{filepath}.{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv_old"
-            shutil.copy(filepath, backup_filepath)
-            logging.debug(f"Backup of the original file created: {backup_filepath}")
-
-        # Ensure parent directory exists
-        parent_dir = os.path.dirname(filepath)
-        if parent_dir and not os.path.exists(parent_dir):
-            ensure_directory_exists(parent_dir)
-
-        df = pd.DataFrame(csv_data)
-
-        # Log the first few rows of the DataFrame to verify data integrity
-        logging.debug(f"Data being saved: {df.head()}")
-        logging.debug(f"Saving CSV with UTF-8 encoding to: {filepath}")
-
-        # Atomic write: write to temporary file first
-        temp_fd, temp_path = tempfile.mkstemp(
-            dir=parent_dir if parent_dir else '.',
-            prefix='.tmp_',
-            suffix='.csv'
-        )
-
-        try:
-            # Write to temp file via pandas
-            df.to_csv(temp_path, index=False, quotechar='"', quoting=csv.QUOTE_ALL, encoding='utf-8')
-
-            # Ensure data is written to disk
-            os.fsync(temp_fd)
-
-        finally:
-            os.close(temp_fd)
-            temp_fd = None
-
-        # Atomic rename: replace original file with temp file
-        # This is atomic on POSIX systems and safe on Windows
-        shutil.move(temp_path, filepath)
+    for attempt in range(max_retries + 1):
+        temp_fd = None
         temp_path = None
 
-        logging.debug(f"CSV file saved successfully in UTF-8 format: {filepath}")
+        try:
+            # Create backup of existing file
+            if os.path.exists(filepath):
+                backup_filepath = f"{filepath}.{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv_old"
+                shutil.copy(filepath, backup_filepath)
+                logging.debug(f"Backup of the original file created: {backup_filepath}")
 
-    except PermissionError as e:
-        logging.error(f"Permission denied while saving file {filepath}. Error: {str(e)}", exc_info=True)
-        raise
-    except OSError as e:
-        if e.errno == 28:  # ENOSPC - No space left on device
-            logging.error(f"Disk full while saving file {filepath}. Error: {str(e)}", exc_info=True)
-        else:
-            logging.error(f"OS error while saving file {filepath}. Error: {str(e)}", exc_info=True)
-        raise
-    except Exception as e:
-        logging.error(f"Error saving CSV file {filepath}. Error: {str(e)}", exc_info=True)
-        raise
-    finally:
-        # Cleanup: remove temp file if it exists
-        if temp_fd is not None:
+            # Ensure parent directory exists
+            parent_dir = os.path.dirname(filepath)
+            if parent_dir and not os.path.exists(parent_dir):
+                ensure_directory_exists(parent_dir)
+
+            df = pd.DataFrame(csv_data)
+
+            # Log the first few rows of the DataFrame to verify data integrity
+            logging.debug(f"Data being saved: {df.head()}")
+            logging.debug(f"Saving CSV with UTF-8 encoding to: {filepath}")
+
+            # Atomic write: write to temporary file first
+            temp_fd, temp_path = tempfile.mkstemp(
+                dir=parent_dir if parent_dir else '.',
+                prefix='.tmp_',
+                suffix='.csv'
+            )
+
             try:
+                # Write to temp file via pandas
+                df.to_csv(temp_path, index=False, quotechar='"', quoting=csv.QUOTE_ALL, encoding='utf-8')
+
+                # Ensure data is written to disk
+                os.fsync(temp_fd)
+
+            finally:
                 os.close(temp_fd)
-            except:
-                pass
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-                logging.debug(f"Cleaned up temp file: {temp_path}")
-            except:
-                pass
+                temp_fd = None
+
+            # Atomic rename: replace original file with temp file
+            # This is atomic on POSIX systems and safe on Windows
+            shutil.move(temp_path, filepath)
+            temp_path = None
+
+            logging.debug(f"CSV file saved successfully in UTF-8 format: {filepath}")
+            return  # Success - exit function
+
+        except (PermissionError, OSError) as e:
+            # Check if it's a file locking error that we should retry
+            is_lock_error = (
+                isinstance(e, PermissionError) or
+                (isinstance(e, OSError) and e.errno in [32, 13])  # errno 32 = file in use, 13 = permission denied
+            )
+
+            if is_lock_error and attempt < max_retries:
+                delay = retry_delays[attempt]
+                logging.warning(
+                    f"File locked (attempt {attempt + 1}/{max_retries + 1}): {filepath}. "
+                    f"Retrying in {delay}s... Error: {str(e)}"
+                )
+                time.sleep(delay)
+                continue  # Retry
+            elif e.errno == 28:  # ENOSPC - No space left on device
+                logging.error(f"Disk full while saving file {filepath}. Error: {str(e)}", exc_info=True)
+                raise
+            else:
+                # Final attempt failed or non-retryable error
+                logging.error(
+                    f"{'Final attempt failed' if is_lock_error else 'Non-retryable error'} "
+                    f"while saving file {filepath}. Error: {str(e)}",
+                    exc_info=True
+                )
+                raise
+
+        except Exception as e:
+            logging.error(f"Error saving CSV file {filepath}. Error: {str(e)}", exc_info=True)
+            raise
+
+        finally:
+            # Cleanup: remove temp file if it exists
+            if temp_fd is not None:
+                try:
+                    os.close(temp_fd)
+                except:
+                    pass
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                    logging.debug(f"Cleaned up temp file: {temp_path}")
+                except:
+                    pass
 
 
 def save_json_file(data: Dict[str, Any], filepath: str) -> None:
