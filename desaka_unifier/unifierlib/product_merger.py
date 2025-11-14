@@ -20,6 +20,7 @@ import json
 from tqdm import tqdm
 from .repaired_product import RepairedProduct
 from .variant import Variant
+from .openai_unifier import OpenAIUnifier
 from shared.file_ops import load_csv_file, save_csv_file
 from .constants import (
     PRODUCT_TYPE_MEMORY_PREFIX,
@@ -41,20 +42,42 @@ class ProductMerger:
     # Maximum number of memory files to keep in cache (LRU eviction)
     MAX_CACHE_SIZE = 10
 
-    def __init__(self, language: str, memory_dir: str):
+    def __init__(self, language: str, memory_dir: str, confirm_ai_results: bool = False,
+                 skip_ai: bool = False, use_fine_tuned_models: bool = False,
+                 fine_tuned_models: Optional[Dict[str, str]] = None,
+                 supported_languages_data: Optional[list] = None):
         """
         Initialize the ProductMerger.
 
         Args:
             language: Language code (e.g., 'CS', 'SK')
             memory_dir: Path to Memory directory
+            confirm_ai_results: Whether to automatically confirm AI results (default: False)
+            skip_ai: Whether to skip AI processing (default: False)
+            use_fine_tuned_models: Whether to use fine-tuned models (default: False)
+            fine_tuned_models: Dictionary mapping task types to model IDs
+            supported_languages_data: Pre-loaded supported languages data
         """
         self.language = language
         self.memory_dir = memory_dir
         self.trash_dir = os.path.join(os.path.dirname(memory_dir), "Trash")
+        self.confirm_ai_results = confirm_ai_results
+        self.skip_ai = skip_ai
         # LRU cache: OrderedDict maintains insertion order, we'll move accessed items to end
         self.memory_cache: OrderedDict[str, Dict[str, str]] = OrderedDict()
         self.memory_dirty = set()  # Track which memory files have been modified
+
+        # Initialize OpenAI only if AI is not skipped
+        self.openai = None
+        if not skip_ai:
+            try:
+                self.openai = OpenAIUnifier(use_fine_tuned_models, fine_tuned_models, supported_languages_data)
+                logging.info("OpenAI integration enabled for merge conflict resolution")
+            except (ValueError, ImportError) as e:
+                logging.warning(f"OpenAI not available for merge conflict resolution: {str(e)}")
+                self.openai = None
+        else:
+            logging.info("AI usage is disabled for merge conflict resolution (--SkipAI flag)")
     
     def merge_products(self, repaired_products: List[RepairedProduct]) -> List[RepairedProduct]:
         """
@@ -295,16 +318,34 @@ class ProductMerger:
             # For original_name, combine all unique values
             return '|'.join(sorted(set(valid_values)))
 
-        # For all other fields, ask user to resolve conflict
-        logging.warning(f"Conflict detected in field '{field_name}' - asking user to resolve")
+        # For all other fields, resolve conflict (AI or user)
+        logging.warning(f"Conflict detected in field '{field_name}'")
 
-        # Ask user interactively
-        chosen_value = self._ask_user_for_conflict_resolution(field_name, products)
+        # Try AI resolution first if available
+        ai_suggestion = None
+        if self.openai and not self.skip_ai:
+            logging.info(f"Attempting AI resolution for field '{field_name}'")
+            ai_suggestion = self._resolve_conflict_with_ai(field_name, products)
+
+        # Handle AI result based on confirm_ai_results flag
+        if ai_suggestion:
+            if self.confirm_ai_results:
+                # Auto-confirm AI suggestion
+                logging.info(f"Auto-confirming AI suggestion for '{field_name}': {ai_suggestion}")
+                chosen_value = ai_suggestion
+            else:
+                # Show AI suggestion to user for confirmation
+                logging.info(f"Showing AI suggestion to user for field '{field_name}'")
+                chosen_value = self._confirm_ai_suggestion(field_name, ai_suggestion, products)
+        else:
+            # No AI available or AI failed - ask user directly
+            logging.warning(f"AI not available for '{field_name}' - asking user to resolve")
+            chosen_value = self._ask_user_for_conflict_resolution(field_name, products)
 
         # Update memory file for this field
         self._update_memory_for_field(field_name, products, chosen_value)
 
-        logging.info(f"User resolved conflict for field '{field_name}': chose '{chosen_value}'")
+        logging.info(f"Conflict resolved for field '{field_name}': chose '{chosen_value}'")
 
         return chosen_value
 
@@ -408,6 +449,262 @@ class ProductMerger:
                 raise ValueError(f"Category/Type value too long ({len(value)} chars). Maximum 500 characters.")
 
         return value
+
+    def _resolve_conflict_with_ai(self, field_name: str, products: List[RepairedProduct]) -> Optional[str]:
+        """
+        Use AI to resolve merge conflict by analyzing all product variants and selecting the best value.
+        For Pincesobchod products, also analyzes the product page to make better decisions.
+
+        Args:
+            field_name: Name of the conflicting field
+            products: List of products with conflicting values
+
+        Returns:
+            Optional[str]: AI-suggested value, or None if AI is unavailable
+        """
+        if not self.openai:
+            return None
+
+        try:
+            # Get all unique values for this field
+            values_with_context = []
+            for product in products:
+                value = getattr(product, field_name, '')
+                if value and value.strip():
+                    values_with_context.append({
+                        'value': value,
+                        'original_name': product.original_name,
+                        'brand': product.brand,
+                        'type': product.type,
+                        'model': product.model,
+                        'url': product.url,
+                        'category': product.category
+                    })
+
+            if not values_with_context:
+                return None
+
+            # Check if any product is from Pincesobchod (domain analysis)
+            pincesobchod_analysis = None
+            for item in values_with_context:
+                url = item.get('url', '')
+                if url and 'pincesobchod' in url.lower():
+                    # Fetch and analyze Pincesobchod product page
+                    pincesobchod_analysis = self._analyze_pincesobchod_product(url, field_name)
+                    if pincesobchod_analysis:
+                        logging.info(f"Retrieved Pincesobchod analysis for conflict resolution: {url}")
+                        break
+
+            # Build AI prompt
+            prompt = self._build_conflict_resolution_prompt(
+                field_name, values_with_context, pincesobchod_analysis
+            )
+
+            # Call AI
+            logging.info(f"Requesting AI to resolve conflict for field '{field_name}'")
+            messages = [
+                {"role": "system", "content": "You are an expert in e-commerce product data standardization. Your task is to analyze conflicting product field values and select the most appropriate one."},
+                {"role": "user", "content": prompt}
+            ]
+
+            ai_response = self.openai.client.chat_completion(
+                messages=messages,
+                task_type='complex',
+                temperature=0.3
+            )
+
+            if ai_response:
+                # Extract the chosen value from AI response
+                ai_suggestion = ai_response.strip()
+                logging.info(f"AI suggested value for '{field_name}': {ai_suggestion}")
+                return ai_suggestion
+
+            return None
+
+        except Exception as e:
+            logging.error(f"Error using AI to resolve conflict: {str(e)}", exc_info=True)
+            return None
+
+    def _build_conflict_resolution_prompt(self, field_name: str,
+                                          values_with_context: List[Dict[str, str]],
+                                          pincesobchod_analysis: Optional[str] = None) -> str:
+        """
+        Build prompt for AI conflict resolution.
+
+        Args:
+            field_name: Name of the conflicting field
+            values_with_context: List of values with product context
+            pincesobchod_analysis: Optional analysis from Pincesobchod product page
+
+        Returns:
+            str: Formatted prompt for AI
+        """
+        prompt = f"""I have multiple products being merged with conflicting values for the field '{field_name}'.
+I need you to select the MOST APPROPRIATE value based on the context.
+
+Product being merged: {values_with_context[0]['original_name']}
+
+Conflicting values:
+"""
+
+        for i, item in enumerate(values_with_context, 1):
+            prompt += f"\n{i}. Value: '{item['value']}'"
+            prompt += f"\n   Source: {item['original_name']}"
+            if item.get('brand'):
+                prompt += f"\n   Brand: {item['brand']}"
+            if item.get('type'):
+                prompt += f"\n   Type: {item['type']}"
+            if item.get('model'):
+                prompt += f"\n   Model: {item['model']}"
+            if item.get('category'):
+                prompt += f"\n   Category: {item['category']}"
+            if item.get('url'):
+                prompt += f"\n   URL: {item['url']}"
+            prompt += "\n"
+
+        if pincesobchod_analysis:
+            prompt += f"\nAdditional context from Pincesobchod product page:\n{pincesobchod_analysis}\n"
+
+        prompt += f"""\nBased on the above information, which value is most appropriate for the '{field_name}' field?
+
+IMPORTANT: Return ONLY the exact value (without option number or explanation).
+If none of the values are appropriate, you may suggest a better value, but prefer selecting from the given options.
+"""
+
+        return prompt
+
+    def _analyze_pincesobchod_product(self, url: str, field_name: str) -> Optional[str]:
+        """
+        Fetch and analyze Pincesobchod product page to help with conflict resolution.
+
+        Args:
+            url: Pincesobchod product URL
+            field_name: Field name being resolved (for focused analysis)
+
+        Returns:
+            Optional[str]: Analysis text, or None if unavailable
+        """
+        try:
+            import requests
+            from bs4 import BeautifulSoup
+
+            logging.info(f"Fetching Pincesobchod product page: {url}")
+
+            # Fetch the page
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+
+            # Parse HTML
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            # Extract relevant information based on field_name
+            analysis_parts = []
+
+            # Product title
+            title_elem = soup.find('h1')
+            if title_elem:
+                analysis_parts.append(f"Product title: {title_elem.get_text(strip=True)}")
+
+            # Product description
+            desc_elem = soup.find('div', class_='product-description') or soup.find('div', class_='description')
+            if desc_elem:
+                desc_text = desc_elem.get_text(strip=True)[:500]  # Limit length
+                analysis_parts.append(f"Description excerpt: {desc_text}")
+
+            # Product parameters/specifications
+            params_table = soup.find('table', class_='parameters') or soup.find('div', class_='parameters')
+            if params_table:
+                params = []
+                for row in params_table.find_all('tr')[:10]:  # Limit to first 10 parameters
+                    cells = row.find_all(['td', 'th'])
+                    if len(cells) >= 2:
+                        param_name = cells[0].get_text(strip=True)
+                        param_value = cells[1].get_text(strip=True)
+                        params.append(f"{param_name}: {param_value}")
+                if params:
+                    analysis_parts.append(f"Product parameters:\n" + "\n".join(params))
+
+            # Category breadcrumbs
+            breadcrumbs = soup.find('nav', class_='breadcrumb') or soup.find('ul', class_='breadcrumb')
+            if breadcrumbs:
+                categories = [elem.get_text(strip=True) for elem in breadcrumbs.find_all('a')]
+                if categories:
+                    analysis_parts.append(f"Category path: {' > '.join(categories)}")
+
+            if analysis_parts:
+                return "\n".join(analysis_parts)
+
+            return None
+
+        except requests.exceptions.RequestException as e:
+            logging.warning(f"Failed to fetch Pincesobchod page {url}: {str(e)}")
+            return None
+        except Exception as e:
+            logging.warning(f"Error analyzing Pincesobchod page {url}: {str(e)}", exc_info=True)
+            return None
+
+    def _confirm_ai_suggestion(self, field_name: str, ai_suggestion: str,
+                                products: List[RepairedProduct]) -> str:
+        """
+        Show AI suggestion to user for confirmation or modification.
+
+        Args:
+            field_name: Name of the conflicting field
+            ai_suggestion: AI's suggested value
+            products: List of products with conflicting values
+
+        Returns:
+            str: User-confirmed or user-modified value
+        """
+        print(f"\n{'='*80}")
+        print(f"🤖 AI SUGGESTION FOR MERGE CONFLICT: Field '{field_name}'")
+        print(f"{'='*80}")
+
+        # Display product context
+        print(f"\nProduct name: {products[0].name}")
+        print(f"\nOriginal conflicting values:")
+        for i, product in enumerate(products, 1):
+            value = getattr(product, field_name, '')
+            if value and value.strip():
+                print(f"  [{i}] {value}")
+                print(f"      (from original_name: '{product.original_name}')")
+                if hasattr(product, 'url') and product.url:
+                    print(f"      (URL: {product.url})")
+
+        # Display AI suggestion
+        print(f"\n{'='*80}")
+        print(f"🎯 AI Suggests: {ai_suggestion}")
+        print(f"{'='*80}")
+
+        try:
+            response = input(f"✅ Press Enter to confirm AI suggestion or type new value: ").strip()
+
+            # If user provided input (not just Enter to accept)
+            if response:
+                # User wants to use different value
+                try:
+                    sanitized = self._sanitize_user_input(response, field_name)
+                    # Write AI suggestion to trash if user changed it
+                    memory_prefix = self._get_memory_file_for_field(field_name)
+                    if memory_prefix:
+                        for product in products:
+                            if product.original_name and ai_suggestion.strip().lower() != sanitized.strip().lower():
+                                self._add_to_trash(memory_prefix, product.original_name, ai_suggestion)
+                    return sanitized
+                except ValueError as e:
+                    print(f"ERROR: Invalid input - {str(e)}")
+                    print("Using AI suggestion instead.")
+                    return ai_suggestion
+            else:
+                # User accepted AI suggestion
+                return ai_suggestion
+
+        except KeyboardInterrupt:
+            # User interrupted - use AI suggestion
+            return ai_suggestion
 
     def _ask_user_for_conflict_resolution(self, field_name: str,
                                            products: List[RepairedProduct]) -> str:
