@@ -716,19 +716,335 @@ class LocalClient:
 
     def create_fine_tuning_job(self, training_file_id: str, model: str = None,
                               suffix: str = None, hyperparameters: Optional[Dict[str, Any]] = None) -> Optional[str]:
-        """Fine-tuning not supported via this API (manual process required)."""
-        logging.warning("Local model fine-tuning requires manual process")
+        """
+        Create a local fine-tuning job using QLoRA/LoRA.
+
+        Args:
+            training_file_id (str): Path to training file (JSONL format)
+            model (str): Base model to fine-tune
+            suffix (str): Suffix for the fine-tuned model adapter name
+            hyperparameters (Optional[Dict[str, Any]]): Training hyperparameters
+
+        Returns:
+            Optional[str]: Adapter name/path or None if error
+        """
+        try:
+            if self.backend not in [LocalBackend.OLLAMA, LocalBackend.HUGGINGFACE_LOCAL]:
+                logging.error("Local fine-tuning only supported for Ollama and HuggingFace Local backends")
+                return None
+
+            # Prepare training job
+            base_model = model or self.models.get('efficient')
+            adapter_name = suffix or f"finetuned_{int(__import__('time').time())}"
+
+            # Get hyperparameters
+            epochs = hyperparameters.get('epochs', 3) if hyperparameters else 3
+            learning_rate = hyperparameters.get('learning_rate', 2e-4) if hyperparameters else 2e-4
+            batch_size = hyperparameters.get('batch_size', 4) if hyperparameters else 4
+            max_seq_length = hyperparameters.get('max_seq_length', 2048) if hyperparameters else 2048
+
+            if self.backend == LocalBackend.OLLAMA:
+                # Ollama: use ollama create with Modelfile
+                return self._create_ollama_fine_tuned_model(
+                    training_file_id, base_model, adapter_name, epochs, learning_rate
+                )
+
+            elif self.backend == LocalBackend.HUGGINGFACE_LOCAL:
+                # HuggingFace: use unsloth/PEFT for QLoRA training
+                return self._create_huggingface_fine_tuned_model(
+                    training_file_id, base_model, adapter_name,
+                    epochs, learning_rate, batch_size, max_seq_length
+                )
+
+        except Exception as e:
+            logging.error(f"Error creating local fine-tuning job: {str(e)}", exc_info=True)
+            return None
+
+    def _create_ollama_fine_tuned_model(self, training_file: str, base_model: str,
+                                       adapter_name: str, epochs: int, learning_rate: float) -> Optional[str]:
+        """Create fine-tuned model using Ollama (requires ollama-finetune tool or manual Modelfile)."""
+        logging.warning("Ollama fine-tuning requires external tools like 'ollama create' with trained adapters")
+        logging.info(f"To fine-tune {base_model} with Ollama:")
+        logging.info("1. Train LoRA adapter using unsloth or similar tool")
+        logging.info("2. Convert adapter to GGUF format")
+        logging.info("3. Create Modelfile referencing the base model and adapter")
+        logging.info("4. Run: ollama create {adapter_name} -f Modelfile")
         return None
+
+    def _create_huggingface_fine_tuned_model(self, training_file: str, base_model: str,
+                                            adapter_name: str, epochs: int, learning_rate: float,
+                                            batch_size: int, max_seq_length: int) -> Optional[str]:
+        """Create fine-tuned model using HuggingFace with unsloth/PEFT."""
+        try:
+            # Try to import required libraries
+            try:
+                from unsloth import FastLanguageModel
+                use_unsloth = True
+                logging.info("Using unsloth for efficient fine-tuning")
+            except ImportError:
+                use_unsloth = False
+                logging.warning("unsloth not available, using standard PEFT (slower)")
+
+                try:
+                    from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+                    from transformers import TrainingArguments, Trainer
+                except ImportError:
+                    logging.error("PEFT/transformers not installed. Install with: pip install peft transformers accelerate")
+                    return None
+
+            # Prepare training data
+            import json
+            from datasets import Dataset
+
+            training_data = []
+            with open(training_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    example = json.loads(line)
+                    if 'messages' in example:
+                        # Format for instruction tuning
+                        text = self._format_training_example(example['messages'])
+                        training_data.append({'text': text})
+
+            dataset = Dataset.from_list(training_data)
+            logging.info(f"Loaded {len(training_data)} training examples")
+
+            # Load model and tokenizer
+            if use_unsloth:
+                model, tokenizer = FastLanguageModel.from_pretrained(
+                    model_name=base_model,
+                    max_seq_length=max_seq_length,
+                    dtype=None,  # Auto detect
+                    load_in_4bit=True,
+                    cache_dir=self.storage_paths['huggingface']
+                )
+
+                # Configure LoRA
+                model = FastLanguageModel.get_peft_model(
+                    model,
+                    r=16,  # LoRA rank
+                    target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+                    lora_alpha=16,
+                    lora_dropout=0.0,
+                    bias="none",
+                    use_gradient_checkpointing=True,
+                    random_state=3407,
+                )
+            else:
+                # Standard PEFT approach
+                from transformers import AutoModelForCausalLM, AutoTokenizer
+                import torch
+
+                tokenizer = AutoTokenizer.from_pretrained(
+                    base_model,
+                    cache_dir=self.storage_paths['huggingface']
+                )
+                model = AutoModelForCausalLM.from_pretrained(
+                    base_model,
+                    load_in_4bit=True,
+                    device_map="auto",
+                    cache_dir=self.storage_paths['huggingface']
+                )
+
+                model = prepare_model_for_kbit_training(model)
+
+                lora_config = LoraConfig(
+                    r=16,
+                    lora_alpha=16,
+                    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
+                    lora_dropout=0.0,
+                    bias="none",
+                    task_type="CAUSAL_LM"
+                )
+
+                model = get_peft_model(model, lora_config)
+
+            # Prepare training
+            output_dir = os.path.join(self.storage_paths['huggingface'], 'fine_tuned', adapter_name)
+            os.makedirs(output_dir, exist_ok=True)
+
+            if use_unsloth:
+                from trl import SFTTrainer
+                from transformers import TrainingArguments
+
+                trainer = SFTTrainer(
+                    model=model,
+                    train_dataset=dataset,
+                    dataset_text_field="text",
+                    max_seq_length=max_seq_length,
+                    tokenizer=tokenizer,
+                    args=TrainingArguments(
+                        per_device_train_batch_size=batch_size,
+                        gradient_accumulation_steps=4,
+                        warmup_steps=10,
+                        num_train_epochs=epochs,
+                        learning_rate=learning_rate,
+                        fp16=not __import__('torch').cuda.is_bf16_supported(),
+                        bf16=__import__('torch').cuda.is_bf16_supported(),
+                        logging_steps=1,
+                        output_dir=output_dir,
+                        optim="adamw_8bit",
+                        seed=3407,
+                    ),
+                )
+            else:
+                from transformers import TrainingArguments, Trainer, DataCollatorForLanguageModeling
+
+                training_args = TrainingArguments(
+                    output_dir=output_dir,
+                    per_device_train_batch_size=batch_size,
+                    num_train_epochs=epochs,
+                    learning_rate=learning_rate,
+                    logging_steps=10,
+                    save_strategy="epoch",
+                )
+
+                def tokenize_function(examples):
+                    return tokenizer(examples['text'], truncation=True, max_length=max_seq_length)
+
+                tokenized_dataset = dataset.map(tokenize_function, batched=True)
+                data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+
+                trainer = Trainer(
+                    model=model,
+                    args=training_args,
+                    train_dataset=tokenized_dataset,
+                    data_collator=data_collator,
+                )
+
+            # Train
+            logging.info(f"Starting fine-tuning of {base_model}...")
+            logging.info(f"Epochs: {epochs}, Learning rate: {learning_rate}, Batch size: {batch_size}")
+
+            # Run training in background (async)
+            # Store job info
+            job_info = {
+                'adapter_name': adapter_name,
+                'base_model': base_model,
+                'output_dir': output_dir,
+                'status': 'running',
+                'started_at': __import__('time').time()
+            }
+
+            # Save job info
+            job_file = os.path.join(output_dir, 'job_info.json')
+            with open(job_file, 'w') as f:
+                json.dump(job_info, f)
+
+            # Start training (this will block - in production use multiprocessing)
+            trainer.train()
+
+            # Save adapter
+            model.save_pretrained(output_dir)
+            tokenizer.save_pretrained(output_dir)
+
+            # Update job info
+            job_info['status'] = 'succeeded'
+            job_info['finished_at'] = __import__('time').time()
+            with open(job_file, 'w') as f:
+                json.dump(job_info, f)
+
+            logging.info(f"Fine-tuning completed! Adapter saved to: {output_dir}")
+            return adapter_name
+
+        except Exception as e:
+            logging.error(f"Error in HuggingFace fine-tuning: {str(e)}", exc_info=True)
+            return None
+
+    def _format_training_example(self, messages: List[Dict[str, str]]) -> str:
+        """Format training messages for instruction tuning."""
+        formatted = ""
+        for msg in messages:
+            role = msg['role']
+            content = msg['content']
+
+            if role == 'system':
+                formatted += f"### System:\n{content}\n\n"
+            elif role == 'user':
+                formatted += f"### User:\n{content}\n\n"
+            elif role == 'assistant':
+                formatted += f"### Assistant:\n{content}\n\n"
+
+        return formatted.strip()
 
     def upload_training_file(self, file_path: str) -> Optional[str]:
-        """Training file upload not supported (manual process required)."""
-        logging.warning("Local model fine-tuning requires manual process")
-        return None
+        """
+        Validate training file for local fine-tuning.
+
+        Args:
+            file_path (str): Path to training file (JSONL format)
+
+        Returns:
+            Optional[str]: File path if valid, None otherwise
+        """
+        try:
+            # Validate file exists
+            if not os.path.exists(file_path):
+                logging.error(f"Training file not found: {file_path}")
+                return None
+
+            # Validate JSONL format
+            import json
+            with open(file_path, 'r', encoding='utf-8') as f:
+                line_count = 0
+                for line in f:
+                    data = json.loads(line)
+                    if 'messages' not in data:
+                        logging.error(f"Invalid format: line {line_count + 1} missing 'messages' field")
+                        return None
+                    line_count += 1
+
+                if line_count == 0:
+                    logging.error("Training file is empty")
+                    return None
+
+            logging.info(f"Validated training file: {file_path} ({line_count} examples)")
+            return file_path
+
+        except Exception as e:
+            logging.error(f"Error validating training file: {str(e)}", exc_info=True)
+            return None
 
     def get_fine_tuning_job_status(self, job_id: str) -> Optional[Dict[str, Any]]:
-        """Fine-tuning status not supported (manual process required)."""
-        logging.warning("Local model fine-tuning requires manual process")
-        return None
+        """
+        Get status of local fine-tuning job.
+
+        Args:
+            job_id (str): Job ID (adapter name)
+
+        Returns:
+            Optional[Dict[str, Any]]: Job status information
+        """
+        try:
+            # Look for job info file
+            output_dir = os.path.join(self.storage_paths['huggingface'], 'fine_tuned', job_id)
+            job_file = os.path.join(output_dir, 'job_info.json')
+
+            if not os.path.exists(job_file):
+                logging.error(f"Job info not found for: {job_id}")
+                return None
+
+            import json
+            with open(job_file, 'r') as f:
+                job_info = json.load(f)
+
+            # Check if adapter files exist (indicates completion)
+            adapter_file = os.path.join(output_dir, 'adapter_model.safetensors')
+            if os.path.exists(adapter_file) and job_info['status'] == 'running':
+                job_info['status'] = 'succeeded'
+                job_info['finished_at'] = job_info.get('finished_at', __import__('time').time())
+
+            return {
+                'id': job_id,
+                'status': job_info['status'],
+                'model': job_info['base_model'],
+                'fine_tuned_model': output_dir if job_info['status'] == 'succeeded' else None,
+                'created_at': job_info['started_at'],
+                'finished_at': job_info.get('finished_at')
+            }
+
+        except Exception as e:
+            logging.error(f"Error getting local fine-tuning job status: {str(e)}", exc_info=True)
+            return None
 
     def get_backend_info(self) -> Dict[str, Any]:
         """
