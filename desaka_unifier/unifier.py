@@ -462,11 +462,23 @@ def main():
 
         # Step 12: Fine-tuning (if enabled)
         if args.enable_fine_tuning:
-            logging.info("Starting fine-tuning process...")
+            logging.info("Starting fine-tuning process with contrastive learning...")
             try:
                 from unifierlib.fine_tuning import FineTuningManager
+                from unifierlib.memory_manager import load_all_trash_files
 
-                fine_tuning_manager = FineTuningManager(memory_data, args.language)
+                # Load trash files for negative examples (contrastive learning)
+                logging.info("Loading trash files for negative examples...")
+                trash_data = load_all_trash_files(args.memory_dir, args.language)
+
+                # Initialize fine-tuning manager with both memory (positive) and trash (negative) data
+                fine_tuning_manager = FineTuningManager(
+                    memory_data=memory_data,
+                    trash_data=trash_data,
+                    language=args.language
+                )
+
+                # Start fine-tuning for all tasks
                 job_ids = fine_tuning_manager.fine_tune_all_tasks(min_examples=10)
 
                 logging.info("Fine-tuning jobs started:")
@@ -485,7 +497,7 @@ def main():
             except Exception as e:
                 logging.error(f"Error during fine-tuning: {str(e)}", exc_info=True)
         else:
-            logging.info("Fine-tuning skipped (--EnableFineTuning not set)")
+            logging.info("Fine-tuning skipped (--enable_fine_tuning not set)")
 
     except Exception as e:
         logging.error(f"Fatal error during initialization: {str(e)}", exc_info=True)

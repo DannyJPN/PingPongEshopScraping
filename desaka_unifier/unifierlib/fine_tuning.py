@@ -18,20 +18,30 @@ from shared.file_ops import ensure_directory_exists, load_json_file, save_json_f
 class FineTuningManager:
     """
     Manager for fine-tuning OpenAI models for specific product processing tasks.
+
+    Uses contrastive learning approach:
+    - Memory files: Positive examples (correct answers)
+    - Trash files: Negative examples (incorrect/rejected answers)
+
+    Each training unit consists of:
+    1. Positive example from Memory → correct assistant response
+    2. Negative example from Trash → explanation why it's wrong
     """
-    
-    def __init__(self, memory_data: Optional[Dict[str, Any]] = None, language: str = 'CS'):
+
+    def __init__(self, memory_data: Optional[Dict[str, Any]] = None, trash_data: Optional[Dict[str, Any]] = None, language: str = 'CS'):
         """
         Initialize fine-tuning manager.
-        
+
         Args:
-            memory_data (Optional[Dict[str, Any]]): Memory data for training examples
+            memory_data (Optional[Dict[str, Any]]): Memory data for positive training examples
+            trash_data (Optional[Dict[str, Any]]): Trash data for negative training examples
             language (str): Language code for training data
         """
         self.memory = memory_data or {}
+        self.trash = trash_data or {}
         self.language = language
         self.openai_client = OpenAIClient()
-        
+
         # Define task types for fine-tuning
         self.task_types = {
             'name_generation': 'Product name generation from type, brand, model',
@@ -75,10 +85,16 @@ class FineTuningManager:
         return training_examples
     
     def _prepare_name_generation_data(self) -> List[Dict[str, Any]]:
-        """Prepare training data for product name generation using actual production prompts."""
+        """
+        Prepare training data for product name generation using actual production prompts.
+
+        Combines:
+        - Positive examples from Memory files (correct type/brand/model)
+        - Negative examples from Trash files (rejected products)
+        """
         examples = []
 
-        # Get memory data
+        # === POSITIVE EXAMPLES FROM MEMORY ===
         name_memory_key = f"NameMemory_{self.language}"
         type_memory_key = f"ProductTypeMemory_{self.language}"
         brand_memory_key = f"ProductBrandMemory_{self.language}"
@@ -133,6 +149,63 @@ Please return your response as valid JSON only."""
                 }
                 examples.append(example)
 
+        # === NEGATIVE EXAMPLES FROM TRASH ===
+        name_trash_key = f"NameTrash_{self.language}"
+        type_trash_key = f"ProductTypeTrash_{self.language}"
+        brand_trash_key = f"ProductBrandTrash_{self.language}"
+        model_trash_key = f"ProductModelTrash_{self.language}"
+
+        name_trash = self.trash.get(name_trash_key, {})
+        type_trash = self.trash.get(type_trash_key, {})
+        brand_trash = self.trash.get(brand_trash_key, {})
+        model_trash = self.trash.get(model_trash_key, {})
+
+        for original_name, rejected_name in name_trash.items():
+            # If we have corresponding trash data for type/brand/model
+            if original_name in type_trash and original_name in brand_trash and original_name in model_trash:
+                rejected_type = type_trash[original_name]
+                rejected_brand = brand_trash[original_name]
+                rejected_model = model_trash[original_name]
+
+                product_json = f'{{"name": "{original_name}", "description": "", "short_description": "", "url": ""}}'
+
+                prompt = f"""I humbly request your assistance in analyzing a table tennis product name. Please help me break down the product information into three distinct, non-overlapping components.
+
+Product information:
+{product_json}
+
+I respectfully ask you to:
+1. Search the internet for table tennis product naming conventions
+2. Check pincesobchod.cz for how they structure table tennis product names
+3. Analyze the product information carefully
+4. Extract three DISTINCT components: type, brand, and model
+5. If the text is not in Czech, translate 'type' and 'model' to Czech while preserving table tennis-specific vocabulary
+6. Keep 'brand' in original language (manufacturer name)
+7. Ensure these three sections DO NOT overlap - each word should belong to only one category
+8. TYPE: General product category (e.g., "Rubber", "Blade", "Ball", "Paddle")
+9. BRAND: Manufacturer name (e.g., "Butterfly", "Stiga", "Yasaka")
+10. MODEL: Specific product model/name (e.g., "Tenergy 05", "Clipper Wood", "Premium 3-Star")
+11. Use current industry standards for product naming
+12. Return JSON with exactly three properties: "type", "brand", "model"
+
+IMPORTANT: Type, brand, and model must be completely separate - no word should appear in multiple categories.
+
+Example: "Butterfly Tenergy 05 Rubber" -> type: "Rubber", brand: "Butterfly", model: "Tenergy 05"
+
+Please return your response as valid JSON only."""
+
+                # Negative example: Return error or explanation why this is wrong
+                negative_response = f'{{"error": "REJECTED", "reason": "Product does not meet quality standards", "rejected_type": "{rejected_type}", "rejected_brand": "{rejected_brand}", "rejected_model": "{rejected_model}", "note": "This product should NOT be processed"}}'
+
+                negative_example = {
+                    "messages": [
+                        {"role": "user", "content": prompt},
+                        {"role": "assistant", "content": negative_response}
+                    ]
+                }
+                examples.append(negative_example)
+
+        logging.info(f"Prepared {len(examples)} name generation examples ({len(name_memory)} positive, {len(name_trash)} negative)")
         return examples
     
     def _prepare_description_data(self) -> List[Dict[str, Any]]:

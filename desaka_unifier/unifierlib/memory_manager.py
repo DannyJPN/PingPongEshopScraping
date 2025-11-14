@@ -214,6 +214,96 @@ def load_all_memory_files(memory_dir: str, language: str) -> Dict[str, Any]:
         return {}
 
 
+def load_all_trash_files(memory_dir: str, language: str) -> Dict[str, Any]:
+    """
+    Load all trash files (negative examples for fine-tuning) into a dictionary.
+
+    Trash files have the same structure as Memory files but contain rejected/incorrect examples.
+    File naming convention: {MemoryPrefix}Trash_{language}.csv
+
+    Args:
+        memory_dir (str): Path to the Memory directory
+        language (str): Language code (e.g., 'CS', 'SK')
+
+    Returns:
+        Dict[str, Any]: Dictionary containing all loaded trash data
+    """
+    trash_data = {}
+
+    try:
+        # Define trash files to load (parallel to memory files)
+        # Trash files are optional - they may not exist
+        trash_files = {
+            # Language-dependent trash files
+            f'{CATEGORY_MAPPING_GLAMI_PREFIX}Trash_{language}': f'{CATEGORY_MAPPING_GLAMI_PREFIX}Trash_{language}.csv',
+            f'{CATEGORY_MAPPING_GOOGLE_PREFIX}Trash_{language}': f'{CATEGORY_MAPPING_GOOGLE_PREFIX}Trash_{language}.csv',
+            f'{CATEGORY_MAPPING_HEUREKA_PREFIX}Trash_{language}': f'{CATEGORY_MAPPING_HEUREKA_PREFIX}Trash_{language}.csv',
+            f'{CATEGORY_MAPPING_ZBOZI_PREFIX}Trash_{language}': f'{CATEGORY_MAPPING_ZBOZI_PREFIX}Trash_{language}.csv',
+            f'{CATEGORY_MEMORY_PREFIX}Trash_{language}': f'{CATEGORY_MEMORY_PREFIX}Trash_{language}.csv',
+            f'{CATEGORY_NAME_MEMORY_PREFIX}Trash_{language}': f'{CATEGORY_NAME_MEMORY_PREFIX}Trash_{language}.csv',
+            f'{DESC_MEMORY_PREFIX}Trash_{language}': f'{DESC_MEMORY_PREFIX}Trash_{language}.csv',
+            f'{KEYWORDS_GOOGLE_PREFIX}Trash_{language}': f'{KEYWORDS_GOOGLE_PREFIX}Trash_{language}.csv',
+            f'{KEYWORDS_ZBOZI_PREFIX}Trash_{language}': f'{KEYWORDS_ZBOZI_PREFIX}Trash_{language}.csv',
+            f'{NAME_MEMORY_PREFIX}Trash_{language}': f'{NAME_MEMORY_PREFIX}Trash_{language}.csv',
+            f'{PRODUCT_BRAND_MEMORY_PREFIX}Trash_{language}': f'{PRODUCT_BRAND_MEMORY_PREFIX}Trash_{language}.csv',
+            f'{PRODUCT_MODEL_MEMORY_PREFIX}Trash_{language}': f'{PRODUCT_MODEL_MEMORY_PREFIX}Trash_{language}.csv',
+            f'{PRODUCT_TYPE_MEMORY_PREFIX}Trash_{language}': f'{PRODUCT_TYPE_MEMORY_PREFIX}Trash_{language}.csv',
+            f'{SHORT_DESC_MEMORY_PREFIX}Trash_{language}': f'{SHORT_DESC_MEMORY_PREFIX}Trash_{language}.csv',
+            f'{VARIANT_NAME_MEMORY_PREFIX}Trash_{language}': f'{VARIANT_NAME_MEMORY_PREFIX}Trash_{language}.csv',
+            f'{VARIANT_VALUE_MEMORY_PREFIX}Trash_{language}': f'{VARIANT_VALUE_MEMORY_PREFIX}Trash_{language}.csv',
+            f'{STOCK_STATUS_MEMORY_PREFIX}Trash_{language}': f'{STOCK_STATUS_MEMORY_PREFIX}Trash_{language}.csv',
+        }
+
+        trash_files_found = 0
+        for trash_key, filename in trash_files.items():
+            file_path = os.path.join(memory_dir, filename)
+
+            try:
+                if filename.endswith('.csv'):
+                    # Load CSV file
+                    csv_data = load_csv_file(file_path)
+
+                    # Check if CSV has KEY/VALUE structure
+                    if csv_data and len(csv_data) > 0:
+                        first_row = csv_data[0]
+                        if 'KEY' in first_row and 'VALUE' in first_row:
+                            # Convert list of dicts to simple dict for KEY/VALUE files
+                            trash_dict = {}
+                            for row in csv_data:
+                                if 'KEY' in row and 'VALUE' in row:
+                                    trash_dict[row['KEY']] = row['VALUE']
+                            trash_data[trash_key] = trash_dict
+                            trash_files_found += 1
+                        else:
+                            # Keep as list for other CSV files
+                            trash_data[trash_key] = csv_data
+                            trash_files_found += 1
+                    else:
+                        # Empty file
+                        trash_data[trash_key] = {}
+
+                logging.debug(f"Loaded trash file: {filename}")
+
+            except FileNotFoundError:
+                # Trash files are optional - don't log as warning
+                logging.debug(f"Trash file not found (optional): {file_path}")
+                trash_data[trash_key] = {}
+            except Exception as e:
+                logging.warning(f"Error loading trash file {filename}: {str(e)}")
+                trash_data[trash_key] = {}
+
+        if trash_files_found > 0:
+            logging.info(f"Loaded {trash_files_found} trash files for language {language} (for fine-tuning negative examples)")
+        else:
+            logging.info(f"No trash files found for language {language} (fine-tuning will use only positive examples)")
+
+        return trash_data
+
+    except Exception as e:
+        logging.error(f"Error loading trash files: {str(e)}", exc_info=True)
+        return {}
+
+
 def load_frequently_used_memory_files(memory_dir: str, language: str) -> Dict[str, Any]:
     """
     Load frequently used memory files that should be cached for performance.
