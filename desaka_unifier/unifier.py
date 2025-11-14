@@ -461,32 +461,56 @@ def main():
             logging.info(f"Unified products file: {export_file_path}")
         logging.info("=" * 60)
 
-        # Step 12: Fine-tuning (if enabled)
+        # Step 12: Fine-tuning (if enabled) - fire-and-forget subprocess
         if args.enable_fine_tuning:
-            logging.info("Starting fine-tuning process...")
+            logging.info("Launching fine-tuning process in background...")
             try:
-                from unifierlib.fine_tuning import FineTuningManager
+                import subprocess
 
-                fine_tuning_manager = FineTuningManager(memory_data, args.language)
-                job_ids = fine_tuning_manager.fine_tune_all_tasks(min_examples=10)
+                # Prepare command for standalone fine-tuning script
+                fine_tuning_script = os.path.join(script_dir, 'unifierlib', 'fine_tuning.py')
+                memory_dir = os.path.join(script_dir, 'Memory')
+                trash_dir = os.path.join(script_dir, 'memory_tests', 'trash')
 
-                logging.info("Fine-tuning jobs started:")
-                for task_type, job_id in job_ids.items():
-                    if job_id:
-                        logging.info(f"  - {task_type}: {job_id}")
-                    else:
-                        logging.warning(f"  - {task_type}: Failed to start")
+                cmd = [
+                    sys.executable,  # Use same Python interpreter
+                    fine_tuning_script,
+                    '--language', args.language,
+                    '--memory_dir', memory_dir,
+                    '--trash_dir', trash_dir,
+                ]
 
-                # Check status and save any completed models
-                status_report = fine_tuning_manager.check_fine_tuning_status(job_ids, script_dir)
-                logging.info("Fine-tuning status:")
-                for task_type, status in status_report.items():
-                    logging.info(f"  - {task_type}: {status}")
+                if args.debug:
+                    cmd.append('--debug')
+
+                # Launch process in fire-and-forget mode
+                # On Windows, use CREATE_NO_WINDOW flag; on Unix, use nohup-like behavior
+                if sys.platform == 'win32':
+                    # Windows: detach process
+                    subprocess.Popen(
+                        cmd,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS
+                    )
+                else:
+                    # Unix-like: redirect output and run in background
+                    log_file = os.path.join(script_dir, 'fine_tuning.log')
+                    with open(log_file, 'w') as f:
+                        subprocess.Popen(
+                            cmd,
+                            stdout=f,
+                            stderr=subprocess.STDOUT,
+                            start_new_session=True  # Detach from parent
+                        )
+
+                logging.info("Fine-tuning process started in background")
+                logging.info(f"Monitor progress: python {fine_tuning_script} --check_status")
 
             except Exception as e:
-                logging.error(f"Error during fine-tuning: {str(e)}", exc_info=True)
+                logging.error(f"Error launching fine-tuning process: {str(e)}", exc_info=True)
         else:
-            logging.info("Fine-tuning skipped (--EnableFineTuning not set)")
+            logging.info("Fine-tuning skipped (--enable_fine_tuning not set)")
 
 
     except Exception as e:

@@ -259,48 +259,145 @@ class GoogleClient:
     def create_fine_tuning_job(self, training_file_id: str, model: str = None,
                               suffix: str = None, hyperparameters: Optional[Dict[str, Any]] = None) -> Optional[str]:
         """
-        Create a fine-tuning job.
-
-        Note: Google Gemini fine-tuning is done through AI Studio, not this API.
+        Create a fine-tuning job using Google Gemini Tuning API.
 
         Args:
-            training_file_id (str): ID of the uploaded training file
-            model (str): Base model to fine-tune
-            suffix (str): Suffix for the fine-tuned model name
+            training_file_id (str): Training data (JSONL content, not file ID)
+            model (str): Base model to fine-tune (default: gemini-1.5-flash-001-tuning)
+            suffix (str): Suffix for the fine-tuned model name (display_name)
             hyperparameters (Optional[Dict[str, Any]]): Training hyperparameters
 
         Returns:
-            Optional[str]: Fine-tuning job ID or None if error
+            Optional[str]: Tuned model name or None if error
         """
-        logging.warning("Google Gemini fine-tuning is done through AI Studio, not via this API")
-        return None
+        try:
+            # Google Gemini uses tuned models API
+            base_model = model or 'models/gemini-1.5-flash-001-tuning'
+
+            # Load training data from file (training_file_id is actually file path)
+            import json
+            training_examples = []
+            with open(training_file_id, 'r', encoding='utf-8') as f:
+                for line in f:
+                    example = json.loads(line)
+                    # Convert OpenAI format to Google format
+                    if 'messages' in example:
+                        text_input = ""
+                        output = ""
+                        for msg in example['messages']:
+                            if msg['role'] == 'user':
+                                text_input += msg['content']
+                            elif msg['role'] == 'assistant':
+                                output = msg['content']
+
+                        training_examples.append({
+                            'text_input': text_input,
+                            'output': output
+                        })
+
+            # Create tuning job
+            display_name = suffix or f"tuned_model_{int(time.time())}"
+
+            # Build tuning config
+            tuning_config = {
+                'epoch_count': hyperparameters.get('epochs', 5) if hyperparameters else 5,
+                'batch_size': hyperparameters.get('batch_size', 4) if hyperparameters else 4,
+                'learning_rate': hyperparameters.get('learning_rate', 0.001) if hyperparameters else 0.001,
+            }
+
+            operation = self.genai.create_tuned_model(
+                source_model=base_model,
+                training_data=training_examples,
+                id=display_name,
+                epoch_count=tuning_config['epoch_count'],
+                batch_size=tuning_config['batch_size'],
+                learning_rate=tuning_config['learning_rate'],
+                display_name=display_name
+            )
+
+            logging.info(f"Started Google Gemini tuning job: {display_name}")
+            return display_name
+
+        except Exception as e:
+            logging.error(f"Error creating Google Gemini tuning job: {str(e)}", exc_info=True)
+            logging.warning("Note: Google Gemini fine-tuning requires specific model access and permissions")
+            return None
 
     def upload_training_file(self, file_path: str) -> Optional[str]:
         """
-        Upload a training file for fine-tuning.
+        Prepare training file for Google Gemini tuning.
 
-        Note: Google Gemini fine-tuning is done through AI Studio, not this API.
+        Note: Google Gemini doesn't require separate file upload.
+        Training data is passed directly to create_tuned_model.
+        This method returns the file path to be used in create_fine_tuning_job.
 
         Args:
-            file_path (str): Path to the training file
+            file_path (str): Path to the training file (JSONL format)
 
         Returns:
-            Optional[str]: File ID or None if error
+            Optional[str]: File path (not uploaded, just validated) or None if error
         """
-        logging.warning("Google Gemini fine-tuning is done through AI Studio, not via this API")
-        return None
+        try:
+            # Validate file exists and is readable
+            if not os.path.exists(file_path):
+                logging.error(f"Training file not found: {file_path}")
+                return None
+
+            # Validate JSONL format
+            import json
+            with open(file_path, 'r', encoding='utf-8') as f:
+                line_count = 0
+                for line in f:
+                    json.loads(line)  # Validate JSON
+                    line_count += 1
+
+                if line_count == 0:
+                    logging.error("Training file is empty")
+                    return None
+
+            logging.info(f"Validated training file: {file_path} ({line_count} examples)")
+            return file_path  # Return path, not ID
+
+        except Exception as e:
+            logging.error(f"Error validating training file: {str(e)}", exc_info=True)
+            return None
 
     def get_fine_tuning_job_status(self, job_id: str) -> Optional[Dict[str, Any]]:
         """
-        Get the status of a fine-tuning job.
-
-        Note: Google Gemini fine-tuning is done through AI Studio, not this API.
+        Get the status of a Google Gemini tuning job.
 
         Args:
-            job_id (str): Fine-tuning job ID
+            job_id (str): Tuned model name/ID
 
         Returns:
             Optional[Dict[str, Any]]: Job status information or None if error
         """
-        logging.warning("Google Gemini fine-tuning is done through AI Studio, not via this API")
-        return None
+        try:
+            # Get tuned model info
+            tuned_model = self.genai.get_tuned_model(f"tunedModels/{job_id}")
+
+            # Map Google state to OpenAI-like status
+            state_mapping = {
+                'CREATING': 'running',
+                'ACTIVE': 'succeeded',
+                'FAILED': 'failed',
+            }
+
+            status = state_mapping.get(tuned_model.state, 'unknown')
+
+            result = {
+                'id': job_id,
+                'status': status,
+                'model': tuned_model.base_model if hasattr(tuned_model, 'base_model') else None,
+                'fine_tuned_model': f"tunedModels/{job_id}" if status == 'succeeded' else None,
+                'state': tuned_model.state,
+                'created_at': tuned_model.create_time if hasattr(tuned_model, 'create_time') else None,
+                'finished_at': tuned_model.update_time if hasattr(tuned_model, 'update_time') and status != 'running' else None
+            }
+
+            logging.info(f"Google Gemini tuning job {job_id} status: {status}")
+            return result
+
+        except Exception as e:
+            logging.error(f"Error getting Google Gemini tuning job status: {str(e)}", exc_info=True)
+            return None

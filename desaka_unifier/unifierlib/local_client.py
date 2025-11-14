@@ -1,9 +1,8 @@
 """
 Generic Local Models client module for desaka_unifier project.
 
-This module provides generic methods for communicating with local LLM models
-via multiple backends: Ollama, LM Studio, and Hugging Face.
-Includes automatic backend detection, model download, and management.
+This module provides methods for communicating with local LLM models via Ollama.
+Includes automatic model download and management.
 """
 
 import os
@@ -11,135 +10,53 @@ import json
 import logging
 import subprocess
 import shutil
-from enum import Enum
+import time
 from typing import Dict, Any, Optional, List
-from unifierlib.constants import DEFAULT_MAX_TOKENS, API_KEY_HUGGINGFACE, API_KEY_HUGGINGFACE_ALT
-
-
-class LocalBackend(Enum):
-    """Supported local model backends."""
-    OLLAMA = "ollama"
-    LM_STUDIO = "lm_studio"
-    HUGGINGFACE_LOCAL = "huggingface_local"
-    HUGGINGFACE_API = "huggingface_api"
 
 
 class LocalClient:
     """
-    Generic client for local LLM models with multi-backend support.
-    Supports: Ollama, LM Studio, Hugging Face (local & API).
-    Provides automatic backend detection and model management.
+    Client for local LLM models using Ollama backend.
+    Provides automatic model management and download.
     """
 
     def __init__(self, use_fine_tuned_models: bool = False, fine_tuned_models: Optional[Dict[str, str]] = None,
-                 model_storage_path: str = None, preferred_backend: Optional[str] = None):
+                 model_storage_path: str = None):
         """
-        Initialize Local client with automatic backend detection.
+        Initialize Local client with Ollama backend.
 
         Args:
             use_fine_tuned_models: Whether to use fine-tuned models
             fine_tuned_models: Dict of fine-tuned model mappings
-            model_storage_path: Path for model storage (backend-specific)
-            preferred_backend: Force specific backend ('ollama', 'lm_studio', 'huggingface')
+            model_storage_path: Path for model storage (Ollama directory)
         """
-        # Get model storage paths from constants
+        # Get model storage path from constants
         if model_storage_path is None:
-            from unifierlib.constants import (
-                LOCAL_MODEL_STORAGE_PATH_OLLAMA,
-                LOCAL_MODEL_STORAGE_PATH_LMSTUDIO,
-                LOCAL_MODEL_STORAGE_PATH_HUGGINGFACE
-            )
-            self.storage_paths = {
-                'ollama': LOCAL_MODEL_STORAGE_PATH_OLLAMA,
-                'lm_studio': LOCAL_MODEL_STORAGE_PATH_LMSTUDIO,
-                'huggingface': LOCAL_MODEL_STORAGE_PATH_HUGGINGFACE
-            }
+            from unifierlib.constants import LOCAL_MODEL_STORAGE_PATH_OLLAMA
+            self.storage_path = LOCAL_MODEL_STORAGE_PATH_OLLAMA
         else:
-            self.storage_paths = {
-                'ollama': model_storage_path,
-                'lm_studio': model_storage_path,
-                'huggingface': model_storage_path
-            }
+            self.storage_path = model_storage_path
 
         # Fine-tuned model settings
         self.use_fine_tuned_models = use_fine_tuned_models
         self.fine_tuned_models = fine_tuned_models or {}
 
-        # Backend and client initialization
-        self.backend = None
+        # Initialize Ollama client
         self.client = None
-        self.backend_info = {}
+        self._init_ollama()
 
-        # Detect and initialize backend
-        if preferred_backend:
-            logging.info(f"Attempting to use preferred backend: {preferred_backend}")
-            if not self._init_backend(preferred_backend):
-                raise RuntimeError(f"Preferred backend '{preferred_backend}' is not available")
-        else:
-            logging.info("Auto-detecting available local model backend...")
-            if not self._auto_detect_backend():
-                raise RuntimeError(
-                    "No local model backend available. Please install one of:\n"
-                    "- Ollama: https://ollama.ai/download\n"
-                    "- LM Studio: https://lmstudio.ai\n"
-                    "- Hugging Face: pip install transformers torch"
-                )
+        logging.info("Using Ollama backend for local models")
 
-        logging.info(f"Using backend: {self.backend.value}")
-
-        # Define available models based on backend
+        # Define available models
         self._init_model_catalog()
 
-    def _auto_detect_backend(self) -> bool:
-        """
-        Auto-detect available backend in order of preference.
-
-        Returns:
-            bool: True if a backend was found and initialized
-        """
-        # Try backends in order of preference
-        backends_to_try = [
-            'ollama',      # Fastest, best UX
-            'lm_studio',   # Good UX, OpenAI-compatible
-            'huggingface'  # Most flexible, but slower
-        ]
-
-        for backend_name in backends_to_try:
-            if self._init_backend(backend_name):
-                return True
-
-        return False
-
-    def _init_backend(self, backend_name: str) -> bool:
-        """
-        Initialize specific backend.
-
-        Args:
-            backend_name: Name of backend to initialize
-
-        Returns:
-            bool: True if initialization successful
-        """
-        try:
-            if backend_name == 'ollama':
-                return self._init_ollama()
-            elif backend_name == 'lm_studio':
-                return self._init_lm_studio()
-            elif backend_name == 'huggingface':
-                return self._init_huggingface()
-            else:
-                logging.error(f"Unknown backend: {backend_name}")
-                return False
-        except Exception as e:
-            logging.debug(f"Failed to initialize {backend_name}: {str(e)}")
-            return False
-
-    def _init_ollama(self) -> bool:
+    def _init_ollama(self):
         """Initialize Ollama backend."""
         # Check if Ollama is installed
         if not shutil.which('ollama'):
-            logging.debug("Ollama not installed")
-            return False
+            raise RuntimeError(
+                "Ollama not installed. Please install from: https://ollama.ai/download"
+            )
 
         # Check if Ollama service is running
         try:
@@ -150,191 +67,49 @@ class LocalClient:
                 timeout=5
             )
             if result.returncode != 0:
-                logging.debug("Ollama service not running")
-                return False
+                raise RuntimeError("Ollama service not running. Please start Ollama.")
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("Ollama service not responding. Please check Ollama status.")
         except Exception as e:
-            logging.debug(f"Ollama check failed: {str(e)}")
-            return False
+            raise RuntimeError(f"Ollama check failed: {str(e)}")
 
         # Try to import ollama library
         try:
             import ollama
             self.client = ollama.Client()
-            self.backend = LocalBackend.OLLAMA
-            self.backend_info = {
-                'name': 'Ollama',
-                'url': 'https://ollama.ai',
-                'storage_path': self.storage_paths['ollama']
-            }
-            return True
         except ImportError:
-            logging.debug("Ollama Python library not installed")
-            return False
-
-    def _init_lm_studio(self) -> bool:
-        """Initialize LM Studio backend (OpenAI-compatible API)."""
-        try:
-            import openai
-
-            # Test if LM Studio server is running (default port 1234)
-            test_client = openai.OpenAI(
-                base_url="http://localhost:1234/v1",
-                api_key="lm-studio",  # LM Studio doesn't require real API key
-                timeout=5.0
+            raise RuntimeError(
+                "Ollama Python library not installed. Install with: pip install ollama"
             )
 
-            # Try to list models to verify server is running
-            try:
-                models = test_client.models.list()
-                if not models.data:
-                    logging.debug("LM Studio server running but no models loaded")
-                    return False
-            except Exception as e:
-                logging.debug(f"LM Studio server not responding: {str(e)}")
-                return False
-
-            self.client = test_client
-            self.backend = LocalBackend.LM_STUDIO
-            self.backend_info = {
-                'name': 'LM Studio',
-                'url': 'http://localhost:1234',
-                'storage_path': self.storage_paths['lm_studio']
-            }
-            return True
-
-        except ImportError:
-            logging.debug("OpenAI library not installed (required for LM Studio)")
-            return False
-        except Exception as e:
-            logging.debug(f"LM Studio initialization failed: {str(e)}")
-            return False
-
-    def _init_huggingface(self) -> bool:
-        """Initialize Hugging Face backend (local transformers)."""
-        try:
-            import torch
-            from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
-
-            # Check if CUDA is available
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-
-            self.client = {
-                'AutoModelForCausalLM': AutoModelForCausalLM,
-                'AutoTokenizer': AutoTokenizer,
-                'pipeline': pipeline,
-                'device': device,
-                'loaded_model': None,
-                'loaded_tokenizer': None,
-                'current_model_name': None
-            }
-
-            self.backend = LocalBackend.HUGGINGFACE_LOCAL
-            self.backend_info = {
-                'name': 'Hugging Face (Local)',
-                'device': device,
-                'storage_path': self.storage_paths['huggingface']
-            }
-
-            logging.info(f"Hugging Face backend initialized (device: {device})")
-            return True
-
-        except ImportError as e:
-            logging.debug(f"Hugging Face libraries not installed: {str(e)}")
-
-            # Try Hugging Face Inference API as fallback
-            hf_token = os.getenv(API_KEY_HUGGINGFACE) or os.getenv(API_KEY_HUGGINGFACE_ALT)
-            if hf_token:
-                try:
-                    import requests
-                    self.client = {
-                        'api_token': hf_token,
-                        'api_url': 'https://api-inference.huggingface.co/models/'
-                    }
-                    self.backend = LocalBackend.HUGGINGFACE_API
-                    self.backend_info = {
-                        'name': 'Hugging Face (API)',
-                        'url': 'https://huggingface.co'
-                    }
-                    logging.info("Using Hugging Face Inference API")
-                    return True
-                except ImportError:
-                    logging.debug("requests library not installed")
-                    return False
-
-            return False
-
     def _init_model_catalog(self):
-        """Initialize model catalog based on backend."""
-        if self.backend == LocalBackend.OLLAMA:
-            self.models = {
-                'flagship': 'qwen2.5:72b',
-                'efficient': 'qwen2.5:14b',
-                'reasoning': 'qwen2.5:72b',
-                'creative': 'qwen2.5:72b',
-                'tiny': 'qwen2.5:7b',
-                'medium': 'qwen2.5:32b',
-            }
-            self.model_sizes = {
-                'qwen2.5:7b': 4.7,
-                'qwen2.5:14b': 9.0,
-                'qwen2.5:32b': 20.0,
-                'qwen2.5:72b': 43.0,
-            }
-
-        elif self.backend == LocalBackend.LM_STUDIO:
-            # LM Studio - get available models from server
-            try:
-                models_list = self.client.models.list()
-                available = [m.id for m in models_list.data]
-
-                # Use first available model as default for all tasks
-                default_model = available[0] if available else None
-
-                self.models = {
-                    'flagship': default_model,
-                    'efficient': default_model,
-                    'reasoning': default_model,
-                    'creative': default_model,
-                    'tiny': default_model,
-                    'medium': default_model,
-                }
-                self.model_sizes = {}  # LM Studio manages models externally
-
-                logging.info(f"LM Studio available models: {available}")
-
-            except Exception as e:
-                logging.error(f"Failed to get LM Studio models: {str(e)}")
-                self.models = {}
-                self.model_sizes = {}
-
-        elif self.backend == LocalBackend.HUGGINGFACE_LOCAL:
-            # Hugging Face local - Czech-friendly models
-            self.models = {
-                'flagship': 'Qwen/Qwen2.5-72B-Instruct',  # Best but huge
-                'efficient': 'Qwen/Qwen2.5-14B-Instruct',  # Good balance
-                'reasoning': 'Qwen/Qwen2.5-72B-Instruct',
-                'creative': 'Qwen/Qwen2.5-72B-Instruct',
-                'tiny': 'Qwen/Qwen2.5-7B-Instruct',  # Smallest
-                'medium': 'Qwen/Qwen2.5-32B-Instruct',
-            }
-            self.model_sizes = {
-                'Qwen/Qwen2.5-7B-Instruct': 15.0,   # ~15GB with weights
-                'Qwen/Qwen2.5-14B-Instruct': 30.0,
-                'Qwen/Qwen2.5-32B-Instruct': 65.0,
-                'Qwen/Qwen2.5-72B-Instruct': 145.0,
-            }
-
-        elif self.backend == LocalBackend.HUGGINGFACE_API:
-            # Hugging Face API - use smaller models for faster inference
-            self.models = {
-                'flagship': 'Qwen/Qwen2.5-72B-Instruct',
-                'efficient': 'Qwen/Qwen2.5-7B-Instruct',  # Faster via API
-                'reasoning': 'Qwen/Qwen2.5-72B-Instruct',
-                'creative': 'Qwen/Qwen2.5-14B-Instruct',
-                'tiny': 'Qwen/Qwen2.5-7B-Instruct',
-                'medium': 'Qwen/Qwen2.5-14B-Instruct',
-            }
-            self.model_sizes = {}  # API doesn't download models
+        """Initialize model catalog for Ollama."""
+        self.models = {
+            'flagship': 'qwen2.5:72b',
+            'efficient': 'qwen2.5:14b',
+            'reasoning': 'qwen2.5:72b',
+            'creative': 'qwen2.5:72b',
+            'tiny': 'qwen2.5:7b',
+            'medium': 'qwen2.5:32b',
+            # Multimodal models
+            'multimodal_flagship': 'llava-llama3:13b',
+            'multimodal_efficient': 'llava-phi3',
+            'multimodal_tiny': 'moondream',
+            'multimodal_medium': 'qwen2-vl:7b',
+            'multimodal_advanced': 'llava:34b',
+        }
+        self.model_sizes = {
+            'qwen2.5:7b': 4.7,
+            'qwen2.5:14b': 9.0,
+            'qwen2.5:32b': 20.0,
+            'qwen2.5:72b': 43.0,
+            # Multimodal model sizes
+            'llava-llama3:13b': 8.0,
+            'llava-phi3': 3.8,
+            'moondream': 1.8,
+            'qwen2-vl:7b': 4.5,
+            'llava:34b': 20.0,
+        }
 
     def get_model_for_task(self, task_type: str = 'general') -> str:
         """Get the appropriate model for a specific task type."""
@@ -359,17 +134,137 @@ class LocalClient:
             'brand_detection': self.models.get('efficient'),
             'type_detection': self.models.get('efficient'),
             'model_detection': self.models.get('efficient'),
-            'keyword_generation': self.models.get('efficient')
+            'keyword_generation': self.models.get('efficient'),
+            # Multimodal tasks
+            'image_analysis': self.models.get('multimodal_efficient'),
+            'image_description': self.models.get('multimodal_efficient'),
+            'product_image_analysis': self.models.get('multimodal_flagship'),
+            'ocr': self.models.get('multimodal_efficient'),
+            'visual_qa': self.models.get('multimodal_medium'),
+            'image_captioning': self.models.get('multimodal_tiny'),
         }
 
         return task_model_mapping.get(task_type, self.models.get('efficient'))
 
-    def _chat_completion_ollama(self, messages: List[Dict[str, str]], model: str,
-                                temperature: float, max_tokens: int) -> Optional[str]:
-        """Chat completion using Ollama backend."""
+    def _ensure_model_available(self, model_name: str) -> bool:
+        """
+        Ensure Ollama model is available, downloading if necessary.
+        Includes cleanup of incomplete downloads.
+        """
+        try:
+            # Check if model is already installed
+            result = subprocess.run(
+                ['ollama', 'list'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            if result.returncode == 0:
+                installed_models = [line.split()[0] for line in result.stdout.strip().split('\n')[1:]]
+                if model_name in installed_models:
+                    return True
+
+            # Model not installed, check disk space
+            required_space = self.model_sizes.get(model_name, 50.0)
+            stat = shutil.disk_usage(self.storage_path)
+            available_space = stat.free / (1024 ** 3)
+
+            if available_space < required_space * 1.2:
+                logging.error(
+                    f"Insufficient disk space for {model_name}. "
+                    f"Required: {required_space:.1f}GB, Available: {available_space:.1f}GB"
+                )
+                return False
+
+            # Download model with timeout
+            logging.info(f"Downloading Ollama model: {model_name} ({required_space:.1f}GB)...")
+
+            try:
+                # Start download process
+                process = subprocess.Popen(
+                    ['ollama', 'pull', model_name],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+
+                # Wait for completion with timeout (1 hour max)
+                stdout, stderr = process.communicate(timeout=3600)
+
+                if process.returncode == 0:
+                    logging.info(f"Model {model_name} downloaded successfully")
+                    return True
+                else:
+                    logging.error(f"Model download failed: {stderr}")
+                    # Cleanup incomplete download
+                    self._cleanup_incomplete_model(model_name)
+                    return False
+
+            except subprocess.TimeoutExpired:
+                logging.error(f"Model download timed out after 1 hour: {model_name}")
+                process.kill()
+                process.communicate()
+                # Cleanup incomplete download
+                self._cleanup_incomplete_model(model_name)
+                return False
+
+        except Exception as e:
+            logging.error(f"Error ensuring Ollama model availability: {str(e)}")
+            # Try cleanup on any error
+            self._cleanup_incomplete_model(model_name)
+            return False
+
+    def _cleanup_incomplete_model(self, model_name: str):
+        """Clean up incomplete model download."""
+        try:
+            logging.info(f"Cleaning up incomplete download for {model_name}...")
+            result = subprocess.run(
+                ['ollama', 'rm', model_name],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            if result.returncode == 0:
+                logging.info(f"Successfully cleaned up {model_name}")
+            else:
+                logging.debug(f"Model cleanup returned: {result.stderr}")
+        except Exception as e:
+            logging.debug(f"Could not cleanup model {model_name}: {str(e)}")
+
+    def chat_completion(self, messages: List[Dict[str, str]], model: str = None,
+                       temperature: float = 0.4, max_tokens: Optional[int] = None,
+                       task_type: str = 'general') -> Optional[str]:
+        """
+        Send chat completion request to Ollama.
+
+        Args:
+            messages: List of messages with 'role' and 'content'
+            model: Model to use (if None, will be selected based on task_type)
+            temperature: Temperature for response randomness (default: 0.4)
+            max_tokens: Maximum tokens in response
+            task_type: Type of task to determine appropriate model
+
+        Returns:
+            Optional[str]: Response content or None if error
+        """
+        from unifierlib.constants import DEFAULT_MAX_TOKENS
+
+        if model is None:
+            model = self.get_model_for_task(task_type)
+
+        if max_tokens is None:
+            max_tokens = DEFAULT_MAX_TOKENS
+
+        if not model:
+            logging.error(f"No model available for task type: {task_type}")
+            return None
+
+        logging.debug(f"Ollama API call - Model: {model}, Temp: {temperature}, Max tokens: {max_tokens}")
+
         # Ensure model is available (auto-download if needed)
-        if not self._ensure_model_available_ollama(model):
-            logging.error(f"Model {model} not available via Ollama")
+        if not self._ensure_model_available(model):
+            logging.error(f"Model {model} not available")
             return None
 
         try:
@@ -388,234 +283,6 @@ class LocalClient:
 
         except Exception as e:
             logging.error(f"Ollama chat completion error: {str(e)}", exc_info=True)
-            return None
-
-    def _chat_completion_lm_studio(self, messages: List[Dict[str, str]], model: str,
-                                   temperature: float, max_tokens: int) -> Optional[str]:
-        """Chat completion using LM Studio backend (OpenAI-compatible)."""
-        try:
-            response = self.client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens
-            )
-
-            if response.choices and len(response.choices) > 0:
-                return response.choices[0].message.content.strip()
-            return None
-
-        except Exception as e:
-            logging.error(f"LM Studio chat completion error: {str(e)}", exc_info=True)
-            return None
-
-    def _chat_completion_huggingface_local(self, messages: List[Dict[str, str]], model: str,
-                                           temperature: float, max_tokens: int) -> Optional[str]:
-        """Chat completion using local Hugging Face transformers."""
-        try:
-            # Load model if not already loaded or if different model requested
-            if (self.client['loaded_model'] is None or
-                self.client['current_model_name'] != model):
-
-                logging.info(f"Loading Hugging Face model: {model}")
-
-                tokenizer = self.client['AutoTokenizer'].from_pretrained(
-                    model,
-                    cache_dir=self.storage_paths['huggingface']
-                )
-
-                model_obj = self.client['AutoModelForCausalLM'].from_pretrained(
-                    model,
-                    cache_dir=self.storage_paths['huggingface'],
-                    device_map="auto" if self.client['device'] == "cuda" else None,
-                    torch_dtype="auto"
-                )
-
-                self.client['loaded_model'] = model_obj
-                self.client['loaded_tokenizer'] = tokenizer
-                self.client['current_model_name'] = model
-
-                logging.info(f"Model {model} loaded successfully")
-
-            # Format messages for model
-            tokenizer = self.client['loaded_tokenizer']
-            model_obj = self.client['loaded_model']
-
-            # Convert messages to prompt format
-            prompt = self._format_messages_for_hf(messages, tokenizer)
-
-            # Generate response
-            inputs = tokenizer(prompt, return_tensors="pt")
-            if self.client['device'] == "cuda":
-                inputs = inputs.to("cuda")
-
-            outputs = model_obj.generate(
-                **inputs,
-                max_new_tokens=max_tokens,
-                temperature=temperature,
-                do_sample=temperature > 0,
-                pad_token_id=tokenizer.eos_token_id
-            )
-
-            response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-            # Extract only the new generated text (after the prompt)
-            response = response[len(prompt):].strip()
-
-            return response
-
-        except Exception as e:
-            logging.error(f"Hugging Face local completion error: {str(e)}", exc_info=True)
-            return None
-
-    def _chat_completion_huggingface_api(self, messages: List[Dict[str, str]], model: str,
-                                         temperature: float, max_tokens: int) -> Optional[str]:
-        """Chat completion using Hugging Face Inference API."""
-        try:
-            import requests
-
-            api_url = self.client['api_url'] + model
-            headers = {"Authorization": f"Bearer {self.client['api_token']}"}
-
-            # Format messages into prompt
-            prompt = "\n".join([f"{m['role']}: {m['content']}" for m in messages])
-
-            payload = {
-                "inputs": prompt,
-                "parameters": {
-                    "temperature": temperature,
-                    "max_new_tokens": max_tokens,
-                    "return_full_text": False
-                }
-            }
-
-            response = requests.post(api_url, headers=headers, json=payload, timeout=120)
-            response.raise_for_status()
-
-            result = response.json()
-
-            if isinstance(result, list) and len(result) > 0:
-                return result[0].get('generated_text', '').strip()
-            elif isinstance(result, dict):
-                return result.get('generated_text', '').strip()
-
-            return None
-
-        except Exception as e:
-            logging.error(f"Hugging Face API completion error: {str(e)}", exc_info=True)
-            return None
-
-    def _format_messages_for_hf(self, messages: List[Dict[str, str]], tokenizer) -> str:
-        """Format messages for Hugging Face models using chat template."""
-        try:
-            # Try to use chat template if available
-            if hasattr(tokenizer, 'apply_chat_template'):
-                return tokenizer.apply_chat_template(
-                    messages,
-                    tokenize=False,
-                    add_generation_prompt=True
-                )
-        except Exception as e:
-            logging.debug(f"Chat template not available: {str(e)}")
-
-        # Fallback to simple formatting
-        formatted = ""
-        for msg in messages:
-            role = msg['role']
-            content = msg['content']
-
-            if role == 'system':
-                formatted += f"System: {content}\n\n"
-            elif role == 'user':
-                formatted += f"User: {content}\n\n"
-            elif role == 'assistant':
-                formatted += f"Assistant: {content}\n\n"
-
-        formatted += "Assistant: "
-        return formatted
-
-    def _ensure_model_available_ollama(self, model_name: str) -> bool:
-        """Ensure Ollama model is available, downloading if necessary."""
-        try:
-            # Check if model is already installed
-            result = subprocess.run(
-                ['ollama', 'list'],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-
-            if result.returncode == 0:
-                installed_models = [line.split()[0] for line in result.stdout.strip().split('\n')[1:]]
-                if model_name in installed_models:
-                    return True
-
-            # Model not installed, check disk space
-            required_space = self.model_sizes.get(model_name, 50.0)
-            stat = shutil.disk_usage(self.storage_paths['ollama'])
-            available_space = stat.free / (1024 ** 3)
-
-            if available_space < required_space * 1.2:
-                logging.error(
-                    f"Insufficient disk space for {model_name}. "
-                    f"Required: {required_space:.1f}GB, Available: {available_space:.1f}GB"
-                )
-                return False
-
-            # Download model
-            logging.info(f"Downloading Ollama model: {model_name} ({required_space:.1f}GB)...")
-            result = subprocess.run(
-                ['ollama', 'pull', model_name],
-                capture_output=True,
-                text=True,
-                timeout=3600
-            )
-
-            return result.returncode == 0
-
-        except Exception as e:
-            logging.error(f"Error ensuring Ollama model availability: {str(e)}")
-            return False
-
-    def chat_completion(self, messages: List[Dict[str, str]], model: str = None,
-                       temperature: float = 0.4, max_tokens: Optional[int] = None,
-                       task_type: str = 'general') -> Optional[str]:
-        """
-        Send chat completion request to local model.
-
-        Args:
-            messages: List of messages with 'role' and 'content'
-            model: Model to use (if None, will be selected based on task_type)
-            temperature: Temperature for response randomness (default: 0.4)
-            max_tokens: Maximum tokens in response
-            task_type: Type of task to determine appropriate model
-
-        Returns:
-            Optional[str]: Response content or None if error
-        """
-        if model is None:
-            model = self.get_model_for_task(task_type)
-
-        if max_tokens is None:
-            max_tokens = DEFAULT_MAX_TOKENS
-
-        if not model:
-            logging.error(f"No model available for task type: {task_type}")
-            return None
-
-        logging.debug(f"Local {self.backend.value} API call - Model: {model}, Temp: {temperature}, Max tokens: {max_tokens}")
-
-        # Route to appropriate backend
-        if self.backend == LocalBackend.OLLAMA:
-            return self._chat_completion_ollama(messages, model, temperature, max_tokens)
-        elif self.backend == LocalBackend.LM_STUDIO:
-            return self._chat_completion_lm_studio(messages, model, temperature, max_tokens)
-        elif self.backend == LocalBackend.HUGGINGFACE_LOCAL:
-            return self._chat_completion_huggingface_local(messages, model, temperature, max_tokens)
-        elif self.backend == LocalBackend.HUGGINGFACE_API:
-            return self._chat_completion_huggingface_api(messages, model, temperature, max_tokens)
-        else:
-            logging.error(f"Unknown backend: {self.backend}")
             return None
 
     def json_completion(self, messages: List[Dict[str, str]], model: str = None,
@@ -641,7 +308,7 @@ class LocalClient:
             return json.loads(response_text)
 
         except json.JSONDecodeError as e:
-            logging.error(f"Failed to parse JSON from local model response: {str(e)}")
+            logging.error(f"Failed to parse JSON from Ollama response: {str(e)}")
             logging.error(f"Response was: {response_text}")
             return None
 
@@ -649,6 +316,8 @@ class LocalClient:
                          temperature: float = 0.4, max_tokens: Optional[int] = None,
                          task_type: str = 'general') -> Optional[str]:
         """Send simple completion request with single prompt."""
+        from unifierlib.constants import DEFAULT_MAX_TOKENS
+
         if max_tokens is None:
             max_tokens = DEFAULT_MAX_TOKENS
 
@@ -669,70 +338,44 @@ class LocalClient:
         return self.json_completion(messages, model, temperature, max_tokens, task_type)
 
     def validate_api_key(self) -> bool:
-        """Validate that local model system is working."""
+        """Validate that Ollama is working."""
         try:
             response = self.simple_completion("Hello", model=self.models.get('tiny'), max_tokens=5)
             return response is not None
         except Exception as e:
-            logging.error(f"Local model validation failed: {str(e)}")
+            logging.error(f"Ollama validation failed: {str(e)}")
             return False
-
-    def create_fine_tuning_job(self, training_file_id: str, model: str = None,
-                              suffix: str = None, hyperparameters: Optional[Dict[str, Any]] = None) -> Optional[str]:
-        """Fine-tuning not supported via this API (manual process required)."""
-        logging.warning("Local model fine-tuning requires manual process")
-        return None
-
-    def upload_training_file(self, file_path: str) -> Optional[str]:
-        """Training file upload not supported (manual process required)."""
-        logging.warning("Local model fine-tuning requires manual process")
-        return None
-
-    def get_fine_tuning_job_status(self, job_id: str) -> Optional[Dict[str, Any]]:
-        """Fine-tuning status not supported (manual process required)."""
-        logging.warning("Local model fine-tuning requires manual process")
-        return None
 
     def get_backend_info(self) -> Dict[str, Any]:
         """
-        Get information about current backend and available models.
+        Get information about Ollama backend and available models.
 
         Returns:
             Dict with backend info, models, and storage details
         """
         info = {
-            'backend': self.backend.value if self.backend else None,
-            'backend_info': self.backend_info,
+            'backend': 'ollama',
+            'backend_info': {
+                'name': 'Ollama',
+                'url': 'https://ollama.ai',
+                'storage_path': self.storage_path
+            },
             'available_models': self.models,
             'model_sizes_gb': self.model_sizes,
         }
 
-        if self.backend == LocalBackend.OLLAMA:
-            # Add Ollama-specific info
-            try:
-                result = subprocess.run(
-                    ['ollama', 'list'],
-                    capture_output=True,
-                    text=True,
-                    timeout=10
-                )
-                if result.returncode == 0:
-                    installed = [line.split()[0] for line in result.stdout.strip().split('\n')[1:]]
-                    info['installed_models'] = installed
-            except Exception as e:
-                logging.debug(f"Could not get installed models: {str(e)}")
-
-        elif self.backend == LocalBackend.LM_STUDIO:
-            # Add LM Studio-specific info
-            try:
-                models_list = self.client.models.list()
-                info['loaded_models'] = [m.id for m in models_list.data]
-            except Exception as e:
-                logging.debug(f"Could not get LM Studio models: {str(e)}")
-
-        elif self.backend == LocalBackend.HUGGINGFACE_LOCAL:
-            # Add HF local-specific info
-            info['device'] = self.client['device']
-            info['currently_loaded'] = self.client['current_model_name']
+        # Add Ollama-specific info
+        try:
+            result = subprocess.run(
+                ['ollama', 'list'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode == 0:
+                installed = [line.split()[0] for line in result.stdout.strip().split('\n')[1:]]
+                info['installed_models'] = installed
+        except Exception as e:
+            logging.debug(f"Could not get installed models: {str(e)}")
 
         return info
