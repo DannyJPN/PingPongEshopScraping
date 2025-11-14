@@ -45,7 +45,8 @@ class ProductMerger:
     def __init__(self, language: str, memory_dir: str, confirm_ai_results: bool = False,
                  skip_ai: bool = False, use_fine_tuned_models: bool = False,
                  fine_tuned_models: Optional[Dict[str, str]] = None,
-                 supported_languages_data: Optional[list] = None):
+                 supported_languages_data: Optional[list] = None,
+                 export_products: Optional[List[Any]] = None):
         """
         Initialize the ProductMerger.
 
@@ -57,12 +58,14 @@ class ProductMerger:
             use_fine_tuned_models: Whether to use fine-tuned models (default: False)
             fine_tuned_models: Dictionary mapping task types to model IDs
             supported_languages_data: Pre-loaded supported languages data
+            export_products: List of ExportProduct objects (reference data from Pincesobchod)
         """
         self.language = language
         self.memory_dir = memory_dir
         self.trash_dir = os.path.join(os.path.dirname(memory_dir), "Trash")
         self.confirm_ai_results = confirm_ai_results
         self.skip_ai = skip_ai
+        self.export_products = export_products or []
         # LRU cache: OrderedDict maintains insertion order, we'll move accessed items to end
         self.memory_cache: OrderedDict[str, Dict[str, str]] = OrderedDict()
         self.memory_dirty = set()  # Track which memory files have been modified
@@ -453,7 +456,8 @@ class ProductMerger:
     def _resolve_conflict_with_ai(self, field_name: str, products: List[RepairedProduct]) -> Optional[str]:
         """
         Use AI to resolve merge conflict by analyzing all product variants and selecting the best value.
-        For Pincesobchod products, also analyzes the product page to make better decisions.
+        AI checks reference data from Pincesobchod (export_products) and verifies actual product
+        specifications from manufacturer's website to determine the correct value.
 
         Args:
             field_name: Name of the conflicting field
@@ -484,26 +488,18 @@ class ProductMerger:
             if not values_with_context:
                 return None
 
-            # Check if any product is from Pincesobchod (domain analysis)
-            pincesobchod_analysis = None
-            for item in values_with_context:
-                url = item.get('url', '')
-                if url and 'pincesobchod' in url.lower():
-                    # Fetch and analyze Pincesobchod product page
-                    pincesobchod_analysis = self._analyze_pincesobchod_product(url, field_name)
-                    if pincesobchod_analysis:
-                        logging.info(f"Retrieved Pincesobchod analysis for conflict resolution: {url}")
-                        break
+            # Find reference data from Pincesobchod (export_products)
+            pincesobchod_reference = self._find_product_in_exports(products[0].name)
 
-            # Build AI prompt
+            # Build AI prompt with reference data and instructions to verify with manufacturer
             prompt = self._build_conflict_resolution_prompt(
-                field_name, values_with_context, pincesobchod_analysis
+                field_name, values_with_context, pincesobchod_reference
             )
 
             # Call AI
             logging.info(f"Requesting AI to resolve conflict for field '{field_name}'")
             messages = [
-                {"role": "system", "content": "You are an expert in e-commerce product data standardization. Your task is to analyze conflicting product field values and select the most appropriate one."},
+                {"role": "system", "content": "You are an expert in e-commerce product data standardization with access to internet search. Your task is to analyze conflicting product field values and determine the correct one by verifying actual product specifications from the manufacturer's website or authoritative sources."},
                 {"role": "user", "content": prompt}
             ]
 
@@ -525,22 +521,58 @@ class ProductMerger:
             logging.error(f"Error using AI to resolve conflict: {str(e)}", exc_info=True)
             return None
 
+    def _find_product_in_exports(self, product_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Find product in export_products (Pincesobchod reference data) by name.
+
+        Args:
+            product_name: Name of the product to find
+
+        Returns:
+            Optional[Dict]: Product data from exports, or None if not found
+        """
+        if not self.export_products or not product_name:
+            return None
+
+        # Normalize product name for comparison
+        normalized_name = product_name.strip().lower()
+
+        for export_product in self.export_products:
+            # Check if export product has the same name
+            export_name = getattr(export_product, 'name', '').strip().lower()
+            if export_name == normalized_name:
+                # Extract relevant fields from export product
+                reference_data = {
+                    'name': getattr(export_product, 'name', ''),
+                    'brand': getattr(export_product, 'brand', ''),
+                    'type': getattr(export_product, 'type', ''),
+                    'model': getattr(export_product, 'model', ''),
+                    'category': getattr(export_product, 'category', ''),
+                    'description': getattr(export_product, 'desc', ''),
+                    'url': getattr(export_product, 'url', '')
+                }
+                logging.info(f"Found Pincesobchod reference for product: {product_name}")
+                return reference_data
+
+        logging.debug(f"No Pincesobchod reference found for product: {product_name}")
+        return None
+
     def _build_conflict_resolution_prompt(self, field_name: str,
                                           values_with_context: List[Dict[str, str]],
-                                          pincesobchod_analysis: Optional[str] = None) -> str:
+                                          pincesobchod_reference: Optional[Dict[str, Any]] = None) -> str:
         """
-        Build prompt for AI conflict resolution.
+        Build prompt for AI conflict resolution with instructions to verify manufacturer specifications.
 
         Args:
             field_name: Name of the conflicting field
             values_with_context: List of values with product context
-            pincesobchod_analysis: Optional analysis from Pincesobchod product page
+            pincesobchod_reference: Optional reference data from Pincesobchod (export_products)
 
         Returns:
             str: Formatted prompt for AI
         """
         prompt = f"""I have multiple products being merged with conflicting values for the field '{field_name}'.
-I need you to select the MOST APPROPRIATE value based on the context.
+I need you to determine the CORRECT value by verifying the actual product specifications.
 
 Product being merged: {values_with_context[0]['original_name']}
 
@@ -562,89 +594,38 @@ Conflicting values:
                 prompt += f"\n   URL: {item['url']}"
             prompt += "\n"
 
-        if pincesobchod_analysis:
-            prompt += f"\nAdditional context from Pincesobchod product page:\n{pincesobchod_analysis}\n"
+        # Add Pincesobchod reference data if available
+        if pincesobchod_reference:
+            prompt += f"\nReference data from Pincesobchod (NOTE: This may also contain errors!):\n"
+            if pincesobchod_reference.get('brand'):
+                prompt += f"   Brand: {pincesobchod_reference['brand']}\n"
+            if pincesobchod_reference.get('type'):
+                prompt += f"   Type: {pincesobchod_reference['type']}\n"
+            if pincesobchod_reference.get('model'):
+                prompt += f"   Model: {pincesobchod_reference['model']}\n"
+            if pincesobchod_reference.get('category'):
+                prompt += f"   Category: {pincesobchod_reference['category']}\n"
+            if pincesobchod_reference.get('description'):
+                desc_excerpt = pincesobchod_reference['description'][:300]
+                prompt += f"   Description (excerpt): {desc_excerpt}\n"
 
-        prompt += f"""\nBased on the above information, which value is most appropriate for the '{field_name}' field?
+        prompt += f"""
+CRITICAL INSTRUCTIONS:
+1. The Pincesobchod reference data above may contain errors - do NOT trust it blindly!
+2. You MUST verify the actual product specifications by searching for:
+   - The manufacturer's official website
+   - Official product specifications from the brand
+   - Authoritative sources (not just any e-shop)
+3. Based on the VERIFIED specifications from the manufacturer, determine which value is correct
+4. The correct value must match the actual product specifications, not just what's in our database
 
-IMPORTANT: Return ONLY the exact value (without option number or explanation).
-If none of the values are appropriate, you may suggest a better value, but prefer selecting from the given options.
+Based on verified manufacturer specifications, which value is correct for the '{field_name}' field?
+
+IMPORTANT: Return ONLY the exact correct value (without option number or explanation).
+If none of the values match the verified specifications, provide the correct value from manufacturer specs.
 """
 
         return prompt
-
-    def _analyze_pincesobchod_product(self, url: str, field_name: str) -> Optional[str]:
-        """
-        Fetch and analyze Pincesobchod product page to help with conflict resolution.
-
-        Args:
-            url: Pincesobchod product URL
-            field_name: Field name being resolved (for focused analysis)
-
-        Returns:
-            Optional[str]: Analysis text, or None if unavailable
-        """
-        try:
-            import requests
-            from bs4 import BeautifulSoup
-
-            logging.info(f"Fetching Pincesobchod product page: {url}")
-
-            # Fetch the page
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-            response = requests.get(url, headers=headers, timeout=10)
-            response.raise_for_status()
-
-            # Parse HTML
-            soup = BeautifulSoup(response.content, 'html.parser')
-
-            # Extract relevant information based on field_name
-            analysis_parts = []
-
-            # Product title
-            title_elem = soup.find('h1')
-            if title_elem:
-                analysis_parts.append(f"Product title: {title_elem.get_text(strip=True)}")
-
-            # Product description
-            desc_elem = soup.find('div', class_='product-description') or soup.find('div', class_='description')
-            if desc_elem:
-                desc_text = desc_elem.get_text(strip=True)[:500]  # Limit length
-                analysis_parts.append(f"Description excerpt: {desc_text}")
-
-            # Product parameters/specifications
-            params_table = soup.find('table', class_='parameters') or soup.find('div', class_='parameters')
-            if params_table:
-                params = []
-                for row in params_table.find_all('tr')[:10]:  # Limit to first 10 parameters
-                    cells = row.find_all(['td', 'th'])
-                    if len(cells) >= 2:
-                        param_name = cells[0].get_text(strip=True)
-                        param_value = cells[1].get_text(strip=True)
-                        params.append(f"{param_name}: {param_value}")
-                if params:
-                    analysis_parts.append(f"Product parameters:\n" + "\n".join(params))
-
-            # Category breadcrumbs
-            breadcrumbs = soup.find('nav', class_='breadcrumb') or soup.find('ul', class_='breadcrumb')
-            if breadcrumbs:
-                categories = [elem.get_text(strip=True) for elem in breadcrumbs.find_all('a')]
-                if categories:
-                    analysis_parts.append(f"Category path: {' > '.join(categories)}")
-
-            if analysis_parts:
-                return "\n".join(analysis_parts)
-
-            return None
-
-        except requests.exceptions.RequestException as e:
-            logging.warning(f"Failed to fetch Pincesobchod page {url}: {str(e)}")
-            return None
-        except Exception as e:
-            logging.warning(f"Error analyzing Pincesobchod page {url}: {str(e)}", exc_info=True)
-            return None
 
     def _confirm_ai_suggestion(self, field_name: str, ai_suggestion: str,
                                 products: List[RepairedProduct]) -> str:

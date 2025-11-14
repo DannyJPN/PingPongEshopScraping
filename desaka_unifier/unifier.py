@@ -341,7 +341,8 @@ def main():
             skip_ai=args.skip_ai,
             use_fine_tuned_models=args.use_fine_tuned_models,
             fine_tuned_models=fine_tuned_models,
-            supported_languages_data=supported_languages_data
+            supported_languages_data=supported_languages_data,
+            export_products=results.get('export_products', [])  # Pincesobchod reference data
         )
         merged_products = product_merger.merge_products(repaired_products)
 
