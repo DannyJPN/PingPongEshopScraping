@@ -424,7 +424,7 @@ class ProductParser:
 
 
         # code = complex code generation (needs brand and category)
-        repaired.code = self._generate_code(repaired.brand, repaired.category, downloaded.name)
+        repaired.code = self._generate_code(repaired.brand, repaired.category, repaired.name)
 
         # Variants = complex variant processing (needs code for variant codes)
         repaired.Variants = self._process_variants(downloaded, repaired.code)
