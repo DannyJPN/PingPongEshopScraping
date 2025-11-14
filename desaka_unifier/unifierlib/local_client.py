@@ -273,12 +273,24 @@ class LocalClient:
                 'creative': 'qwen2.5:72b',
                 'tiny': 'qwen2.5:7b',
                 'medium': 'qwen2.5:32b',
+                # Multimodal models
+                'multimodal_flagship': 'llava-llama3:13b',
+                'multimodal_efficient': 'llava-phi3',
+                'multimodal_tiny': 'moondream',
+                'multimodal_medium': 'qwen2-vl:7b',
+                'multimodal_advanced': 'llava:34b',
             }
             self.model_sizes = {
                 'qwen2.5:7b': 4.7,
                 'qwen2.5:14b': 9.0,
                 'qwen2.5:32b': 20.0,
                 'qwen2.5:72b': 43.0,
+                # Multimodal model sizes
+                'llava-llama3:13b': 8.0,
+                'llava-phi3': 3.8,
+                'moondream': 1.8,
+                'qwen2-vl:7b': 4.5,
+                'llava:34b': 20.0,
             }
 
         elif self.backend == LocalBackend.LM_STUDIO:
@@ -316,12 +328,24 @@ class LocalClient:
                 'creative': 'Qwen/Qwen2.5-72B-Instruct',
                 'tiny': 'Qwen/Qwen2.5-7B-Instruct',  # Smallest
                 'medium': 'Qwen/Qwen2.5-32B-Instruct',
+                # Multimodal models
+                'multimodal_flagship': 'Qwen/Qwen2-VL-72B-Instruct',
+                'multimodal_efficient': 'Qwen/Qwen2-VL-7B-Instruct',
+                'multimodal_tiny': 'vikhyatk/moondream2',
+                'multimodal_medium': 'llava-hf/llava-v1.6-mistral-7b-hf',
+                'multimodal_advanced': 'microsoft/Phi-3-vision-128k-instruct',
             }
             self.model_sizes = {
                 'Qwen/Qwen2.5-7B-Instruct': 15.0,   # ~15GB with weights
                 'Qwen/Qwen2.5-14B-Instruct': 30.0,
                 'Qwen/Qwen2.5-32B-Instruct': 65.0,
                 'Qwen/Qwen2.5-72B-Instruct': 145.0,
+                # Multimodal model sizes
+                'Qwen/Qwen2-VL-7B-Instruct': 18.0,
+                'Qwen/Qwen2-VL-72B-Instruct': 150.0,
+                'vikhyatk/moondream2': 4.0,
+                'llava-hf/llava-v1.6-mistral-7b-hf': 15.0,
+                'microsoft/Phi-3-vision-128k-instruct': 8.0,
             }
 
         elif self.backend == LocalBackend.HUGGINGFACE_API:
@@ -333,6 +357,12 @@ class LocalClient:
                 'creative': 'Qwen/Qwen2.5-14B-Instruct',
                 'tiny': 'Qwen/Qwen2.5-7B-Instruct',
                 'medium': 'Qwen/Qwen2.5-14B-Instruct',
+                # Multimodal models
+                'multimodal_flagship': 'Qwen/Qwen2-VL-72B-Instruct',
+                'multimodal_efficient': 'Qwen/Qwen2-VL-7B-Instruct',
+                'multimodal_tiny': 'vikhyatk/moondream2',
+                'multimodal_medium': 'llava-hf/llava-v1.6-mistral-7b-hf',
+                'multimodal_advanced': 'microsoft/Phi-3-vision-128k-instruct',
             }
             self.model_sizes = {}  # API doesn't download models
 
@@ -359,7 +389,14 @@ class LocalClient:
             'brand_detection': self.models.get('efficient'),
             'type_detection': self.models.get('efficient'),
             'model_detection': self.models.get('efficient'),
-            'keyword_generation': self.models.get('efficient')
+            'keyword_generation': self.models.get('efficient'),
+            # Multimodal tasks
+            'image_analysis': self.models.get('multimodal_efficient'),
+            'image_description': self.models.get('multimodal_efficient'),
+            'product_image_analysis': self.models.get('multimodal_flagship'),
+            'ocr': self.models.get('multimodal_efficient'),
+            'visual_qa': self.models.get('multimodal_medium'),
+            'image_captioning': self.models.get('multimodal_tiny'),
         }
 
         return task_model_mapping.get(task_type, self.models.get('efficient'))
