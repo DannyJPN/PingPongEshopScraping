@@ -348,7 +348,7 @@ def main():
         logging.info("Filtering products...")
         from unifierlib.product_filter import ProductFilter
 
-        product_filter = ProductFilter(memory_data)
+        product_filter = ProductFilter(memory_data, debug=args.debug)
         filtered_products, rejected_products = product_filter.process_products_with_filtering(merged_products)
 
         logging.debug(f"Product filtering completed:")

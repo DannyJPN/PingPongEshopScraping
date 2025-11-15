@@ -140,7 +140,7 @@ python unifier.py --Language CS --Debug
 
 **Key Unifier Parameters**:
 - `--Language CS/SK` - Target language (Czech/Slovak)
-- `--Debug` - Enable debug logging
+- `--Debug` - Enable debug logging (includes detailed product filtering information with rejection reasons)
 - `--SkipScripts` - Skip downloader execution, process existing data only
 - `--SkipAI` - Skip AI processing (use cached memory only)
 - `--ConfirmAIResults` - Auto-confirm AI suggestions without user prompts
