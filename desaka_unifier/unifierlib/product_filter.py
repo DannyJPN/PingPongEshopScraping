@@ -19,29 +19,34 @@ class ProductFilter:
     """
     Handles filtering of products based on various criteria.
     """
-    
-    def __init__(self, memory_data: Dict[str, Any] = None):
+
+    def __init__(self, memory_data: Dict[str, Any] = None, debug: bool = False):
         """
         Initialize product filter.
-        
+
         Args:
             memory_data (Dict[str, Any]): Memory data containing filter configurations
+            debug (bool): Enable debug mode for detailed filtering information
         """
         self.memory = memory_data or {}
+        self.debug = debug
         
     def filter_by_category_and_item_filter(self, repaired_products: List[RepairedProduct]) -> Tuple[List[RepairedProduct], List[RepairedProduct]]:
         """
         Filter products by category "Vyřadit" and ItemFilter rules.
-        
+
         Args:
             repaired_products (List[RepairedProduct]): List of repaired products
-            
+
         Returns:
             Tuple[List[RepairedProduct], List[RepairedProduct]]: (filtered_products, rejected_products)
         """
         filtered_products = []
         rejected_products = []
-        
+
+        # Dictionary to store rejection reasons (product -> reason)
+        self.rejection_reasons = {}
+
         # Load ItemFilter data - use directly without redundant transformation
         item_filter_data = self.memory.get('ItemFilter', [])
 
@@ -49,7 +54,15 @@ class ProductFilter:
             for product in repaired_products:
                 # Check if category is "Vyřadit"
                 if product.category and product.category.strip().lower() == "vyřadit":
+                    reason = f"Category: Vyřadit"
+                    self.rejection_reasons[product] = reason
                     rejected_products.append(product)
+
+                    if self.debug:
+                        logging.debug(f"FILTERED OUT: {product.name}")
+                        logging.debug(f"  Reason: {reason}")
+                        logging.debug(f"  Product category: '{product.category}'")
+
                     pbar.update(1)
                     continue
 
@@ -57,6 +70,8 @@ class ProductFilter:
                 if item_filter_data:
                     # Use product type directly from RepairedProduct.type field
                     product_type = product.type.strip().lower() if product.type else ""
+                    product_brand = product.brand.strip().lower() if product.brand else ""
+                    product_url = product.url.strip().lower() if product.url else ""
 
                     # Check if combination is allowed
                     is_allowed = False
@@ -68,25 +83,40 @@ class ProductFilter:
                             filter_url = filter_row['eshop_url'].strip().lower()
 
                             if (filter_type == product_type and
-                                filter_brand == product.brand.strip().lower() and
-                                filter_url in product.url.strip().lower()):
+                                filter_brand == product_brand and
+                                filter_url in product_url):
                                 is_allowed = True
                                 break
 
                     if is_allowed:
                         filtered_products.append(product)
                     else:
+                        # Build detailed rejection reason
+                        reason = f"ItemFilter: Combination not allowed (Type: '{product.type}', Brand: '{product.brand}', URL: '{product.url}')"
+                        self.rejection_reasons[product] = reason
                         rejected_products.append(product)
+
+                        if self.debug:
+                            logging.debug(f"FILTERED OUT: {product.name}")
+                            logging.debug(f"  Reason: {reason}")
+                            logging.debug(f"  Product values:")
+                            logging.debug(f"    - Type: '{product.type}' (normalized: '{product_type}')")
+                            logging.debug(f"    - Brand: '{product.brand}' (normalized: '{product_brand}')")
+                            logging.debug(f"    - URL: '{product.url}' (normalized: '{product_url}')")
+                            logging.debug(f"  Available filters checked: {len(item_filter_data)} entries")
                 else:
                     # No filter data, allow all products that are not "Vyřadit"
                     filtered_products.append(product)
                 pbar.update(1)
-        
+
         return filtered_products, rejected_products
     
     def save_rejected_products_to_wrongs(self, rejected_products: List[RepairedProduct], wrongs_file_path: str = None):
         """
         Save rejected products to Wrongs.txt file in Memory folder.
+
+        In debug mode, saves detailed rejection reasons including specific values
+        that caused the product to be filtered out.
 
         Args:
             rejected_products (List[RepairedProduct]): List of rejected products
@@ -101,8 +131,23 @@ class ProductFilter:
             lines = []
             for product in rejected_products:
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                reason = "Category: Vyřadit" if product.category and product.category.strip().lower() == "vyřadit" else "ItemFilter: Not allowed"
-                line = f"{timestamp} - {product.name} ({product.url}) - {reason}"
+
+                # Get detailed reason from rejection_reasons dict if available
+                if hasattr(self, 'rejection_reasons') and product in self.rejection_reasons:
+                    reason = self.rejection_reasons[product]
+                else:
+                    # Fallback to basic reason detection
+                    reason = "Category: Vyřadit" if product.category and product.category.strip().lower() == "vyřadit" else "ItemFilter: Not allowed"
+
+                # In debug mode, create multi-line detailed entry
+                if self.debug:
+                    line = f"{timestamp} - {product.name}\n"
+                    line += f"  URL: {product.url}\n"
+                    line += f"  Reason: {reason}"
+                else:
+                    # Standard single-line format
+                    line = f"{timestamp} - {product.name} ({product.url}) - {reason}"
+
                 lines.append(line)
 
             # Use file_ops module to append lines
