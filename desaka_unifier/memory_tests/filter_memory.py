@@ -290,7 +290,9 @@ def filter_contains_brand(
     debug: bool = False
 ) -> Tuple[Dict[str, str], TrashData]:
     """
-    Odstraní záznamy, jejichž VALUE obsahuje název značky.
+    Odstraní záznamy, jejichž VALUE obsahuje název značky jako celé slovo.
+
+    Slova jsou oddělena mezerou nebo pomlčkou.
 
     Args:
         memory: Memory slovník
@@ -308,11 +310,14 @@ def filter_contains_brand(
 
     with tqdm(total=len(memory), desc=f"Filtrování {memory_name}", unit="záznam") as pbar:
         for key, value in memory.items():
+            # Rozdělení hodnoty na slova (podle mezery a pomlčky)
+            value_words = set(word.lower() for word in re.split(r'[\s\-]+', value) if word)
+
             contains_brand = False
             found_brand = None
             for brand in brands:
-                # Hledáme pouze značky delší než 3 znaky
-                if len(brand) >= 3 and brand.lower() in value.lower():
+                # Hledáme pouze značky delší než 3 znaky jako celá slova
+                if len(brand) >= 3 and brand.lower() in value_words:
                     contains_brand = True
                     found_brand = brand
                     break
@@ -324,7 +329,7 @@ def filter_contains_brand(
                 removed_count += 1
                 if debug:
                     print(f"  ❌ Odstraněn: KEY='{key}', VALUE='{value}'")
-                    print(f"     Důvod: Obsahuje značku '{found_brand}'")
+                    print(f"     Důvod: Obsahuje značku '{found_brand}' jako celé slovo")
 
             pbar.update(1)
 
@@ -340,9 +345,10 @@ def filter_types_containing_models(
     debug: bool = False
 ) -> Tuple[Dict[str, str], TrashData]:
     """
-    Odstraní typy obsahující celou hodnotu nějakého modelu.
+    Odstraní typy obsahující model jako celé slovo nebo sekvenci slov.
 
     Např. typ "Koš na míčky" bude odstraněn, pokud existuje model "na míčky".
+    Slova jsou oddělena mezerou nebo pomlčkou.
 
     Args:
         type_memory: ProductTypeMemory slovník
@@ -361,12 +367,21 @@ def filter_types_containing_models(
         for key, value in type_memory.items():
             contains_model = False
             found_model = None
+
+            # Rozdělení hodnoty typu na slova
+            value_words = set(word.lower() for word in re.split(r'[\s\-]+', value) if word)
+
             for model in model_values:
                 # Hledáme pouze modely delší než 3 znaky
-                if len(model) >= 3 and model in value:  # Celá hodnota modelu
-                    contains_model = True
-                    found_model = model
-                    break
+                if len(model) >= 3:
+                    # Rozdělení modelu na slova
+                    model_words = set(word.lower() for word in re.split(r'[\s\-]+', model) if word)
+
+                    # Kontrola, zda všechna slova z modelu jsou v typu jako celá slova
+                    if model_words and model_words.issubset(value_words):
+                        contains_model = True
+                        found_model = model
+                        break
 
             if not contains_model:
                 filtered[key] = value
@@ -375,7 +390,7 @@ def filter_types_containing_models(
                 removed_count += 1
                 if debug:
                     print(f"  ❌ Odstraněn: KEY='{key}', VALUE='{value}'")
-                    print(f"     Důvod: Obsahuje model '{found_model}'")
+                    print(f"     Důvod: Obsahuje slova z modelu '{found_model}'")
 
             pbar.update(1)
 
@@ -447,7 +462,9 @@ def filter_models_containing_variant_values(
     debug: bool = False
 ) -> Tuple[Dict[str, str], TrashData]:
     """
-    Odstraní modely obsahující VariantValue delší než 2 znaky.
+    Odstraní modely obsahující VariantValue delší než 2 znaky jako celé slovo.
+
+    Slova jsou oddělena mezerou nebo pomlčkou.
 
     Args:
         model_memory: ProductModelMemory slovník
@@ -468,11 +485,14 @@ def filter_models_containing_variant_values(
 
     with tqdm(total=len(model_memory), desc="Filtrování variant hodnot", unit="záznam") as pbar:
         for key, value in model_memory.items():
+            # Rozdělení hodnoty na slova
+            value_words = set(word.lower() for word in re.split(r'[\s\-]+', value) if word)
+
             contains_variant = False
             found_variant = None
             for variant in long_variant_values:
-                # Dodatečná kontrola délky (již filtrováno v long_variant_values, ale pro jistotu)
-                if len(variant) >= 3 and variant in value:
+                # Kontrola, zda variantní hodnota je v modelu jako celé slovo
+                if len(variant) >= 3 and variant.lower() in value_words:
                     contains_variant = True
                     found_variant = variant
                     break
@@ -484,7 +504,7 @@ def filter_models_containing_variant_values(
                 removed_count += 1
                 if debug:
                     print(f"  ❌ Odstraněn: KEY='{key}', VALUE='{value}'")
-                    print(f"     Důvod: Obsahuje variantní hodnotu '{found_variant}'")
+                    print(f"     Důvod: Obsahuje variantní hodnotu '{found_variant}' jako celé slovo")
 
             pbar.update(1)
 
@@ -515,9 +535,12 @@ def filter_invalid_characters(
     """
     print(f"\n🧹 Čištění {memory_name} od záznamů s nepovolenými znaky...")
 
-    # Regex pro detekci nepovolených znaků
+    # Regex pro detekci nepovolených znaků v celém řetězci
     # Povolené: a-z, A-Z, 0-9, české znaky, běžné znaky jako mezera, čárka, tečka atd.
     czech_pattern = re.compile(r'^[a-zA-Z0-9áčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ\s\-.,;:!?()\/+%&@°#\[\]{}><„"\'\"]+$')
+
+    # Regex pro kontrolu jednotlivých znaků (bez ^ a $)
+    char_pattern = re.compile(r'[a-zA-Z0-9áčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ\s\-.,;:!?()\/+%&@°#\[\]{}><„"\'\"]')
 
     filtered = {}
     trash = []
@@ -532,8 +555,8 @@ def filter_invalid_characters(
                 trash.append({'KEY': key, 'VALUE': value})
                 removed_count += 1
                 if debug:
-                    # Find invalid characters
-                    invalid_chars = set(c for c in value if not czech_pattern.match(c))
+                    # Find invalid characters - znaky, které neodpovídají povoleným
+                    invalid_chars = set(c for c in value if not char_pattern.match(c))
                     print(f"  ❌ Odstraněn: KEY='{key}', VALUE='{value}'")
                     print(f"     Důvod: Obsahuje nepovolené znaky: {invalid_chars}")
 
