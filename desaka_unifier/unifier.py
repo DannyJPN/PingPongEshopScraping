@@ -334,7 +334,16 @@ def main():
 
         # Step 5.5: Merge duplicate products
         logging.info("Merging duplicate products...")
-        product_merger = ProductMerger(language=args.language, memory_dir=args.memory_dir)
+        product_merger = ProductMerger(
+            language=args.language,
+            memory_dir=args.memory_dir,
+            confirm_ai_results=args.confirm_ai_results,
+            skip_ai=args.skip_ai,
+            use_fine_tuned_models=args.use_fine_tuned_models,
+            fine_tuned_models=fine_tuned_models,
+            supported_languages_data=supported_languages_data,
+            export_products=results.get('export_products', [])  # Pincesobchod reference data
+        )
         merged_products = product_merger.merge_products(repaired_products)
 
         logging.info(f"Product merging completed:")
