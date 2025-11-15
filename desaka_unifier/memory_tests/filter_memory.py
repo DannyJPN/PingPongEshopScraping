@@ -184,7 +184,8 @@ def filter_incomplete_categories(category_name_memory: Dict[str, str]) -> Set[st
 def filter_category_memory(
     category_memory: Dict[str, str],
     incomplete_categories: Set[str],
-    valid_categories: Set[str]
+    valid_categories: Set[str],
+    debug: bool = False
 ) -> Tuple[Dict[str, str], TrashData]:
     """
     Odstraní záznamy s neúplnými a neexistujícími kategoriemi.
@@ -193,6 +194,7 @@ def filter_category_memory(
         category_memory: CategoryMemory slovník
         incomplete_categories: Set neúplných kategorií
         valid_categories: Set platných kategorií (z CategoryNameMemory)
+        debug: Zobrazit detailní důvody odstranění
 
     Returns:
         Tuple (vyfiltrovaný slovník, smazaná data)
@@ -208,9 +210,15 @@ def filter_category_memory(
             if value in incomplete_categories:
                 trash.append({'KEY': key, 'VALUE': value})
                 removed_incomplete += 1
+                if debug:
+                    print(f"  ❌ Odstraněn: KEY='{key}', VALUE='{value}'")
+                    print(f"     Důvod: Hierarchicky neúplná kategorie (existuje podkategorie)")
             elif value not in valid_categories:
                 trash.append({'KEY': key, 'VALUE': value})
                 removed_nonexistent += 1
+                if debug:
+                    print(f"  ❌ Odstraněn: KEY='{key}', VALUE='{value}'")
+                    print(f"     Důvod: Kategorie neexistuje v CategoryNameMemory")
             else:
                 filtered[key] = value
             pbar.update(1)
@@ -238,7 +246,8 @@ def get_brand_list(brandcodelist_filepath: Path) -> Set[str]:
 
 def filter_brand_memory(
     brand_memory: Dict[str, str],
-    valid_brands: Set[str]
+    valid_brands: Set[str],
+    debug: bool = False
 ) -> Tuple[Dict[str, str], TrashData]:
     """
     Odstraní záznamy s neznámými značkami.
@@ -246,6 +255,7 @@ def filter_brand_memory(
     Args:
         brand_memory: ProductBrandMemory slovník
         valid_brands: Set platných značek
+        debug: Zobrazit detailní důvody odstranění
 
     Returns:
         Tuple (vyfiltrovaný slovník, smazaná data)
@@ -262,6 +272,9 @@ def filter_brand_memory(
             else:
                 trash.append({'KEY': key, 'VALUE': value})
                 removed_count += 1
+                if debug:
+                    print(f"  ❌ Odstraněn: KEY='{key}', VALUE='{value}'")
+                    print(f"     Důvod: Značka neexistuje v BrandCodeList")
             pbar.update(1)
 
     print(f"   ❌ Odstraněno: {removed_count} záznamů")
@@ -273,7 +286,8 @@ def filter_brand_memory(
 def filter_contains_brand(
     memory: Dict[str, str],
     brands: Set[str],
-    memory_name: str
+    memory_name: str,
+    debug: bool = False
 ) -> Tuple[Dict[str, str], TrashData]:
     """
     Odstraní záznamy, jejichž VALUE obsahuje název značky.
@@ -282,6 +296,7 @@ def filter_contains_brand(
         memory: Memory slovník
         brands: Set značek
         memory_name: Název memory (pro výpis)
+        debug: Zobrazit detailní důvody odstranění
 
     Returns:
         Tuple (vyfiltrovaný slovník, smazaná data)
@@ -307,6 +322,9 @@ def filter_contains_brand(
             else:
                 trash.append({'KEY': key, 'VALUE': value})
                 removed_count += 1
+                if debug:
+                    print(f"  ❌ Odstraněn: KEY='{key}', VALUE='{value}'")
+                    print(f"     Důvod: Obsahuje značku '{found_brand}'")
 
             pbar.update(1)
 
@@ -318,7 +336,8 @@ def filter_contains_brand(
 
 def filter_types_containing_models(
     type_memory: Dict[str, str],
-    model_values: Set[str]
+    model_values: Set[str],
+    debug: bool = False
 ) -> Tuple[Dict[str, str], TrashData]:
     """
     Odstraní typy obsahující celou hodnotu nějakého modelu.
@@ -328,6 +347,7 @@ def filter_types_containing_models(
     Args:
         type_memory: ProductTypeMemory slovník
         model_values: Set hodnot z ProductModelMemory
+        debug: Zobrazit detailní důvody odstranění
 
     Returns:
         Tuple (vyfiltrovaný slovník, smazaná data)
@@ -353,6 +373,9 @@ def filter_types_containing_models(
             else:
                 trash.append({'KEY': key, 'VALUE': value})
                 removed_count += 1
+                if debug:
+                    print(f"  ❌ Odstraněn: KEY='{key}', VALUE='{value}'")
+                    print(f"     Důvod: Obsahuje model '{found_model}'")
 
             pbar.update(1)
 
@@ -364,7 +387,8 @@ def filter_types_containing_models(
 
 def filter_models_containing_type_words(
     model_memory: Dict[str, str],
-    type_values: Set[str]
+    type_values: Set[str],
+    debug: bool = False
 ) -> Tuple[Dict[str, str], TrashData]:
     """
     Odstraní modely obsahující slova z typů.
@@ -374,6 +398,7 @@ def filter_models_containing_type_words(
     Args:
         model_memory: ProductModelMemory slovník
         type_values: Set hodnot z ProductTypeMemory
+        debug: Zobrazit detailní důvody odstranění
 
     Returns:
         Tuple (vyfiltrovaný slovník, smazaná data)
@@ -404,6 +429,9 @@ def filter_models_containing_type_words(
             else:
                 trash.append({'KEY': key, 'VALUE': value})
                 removed_count += 1
+                if debug:
+                    print(f"  ❌ Odstraněn: KEY='{key}', VALUE='{value}'")
+                    print(f"     Důvod: Obsahuje slova z typu: {', '.join(found_words)}")
 
             pbar.update(1)
 
@@ -415,7 +443,8 @@ def filter_models_containing_type_words(
 
 def filter_models_containing_variant_values(
     model_memory: Dict[str, str],
-    variant_values: Set[str]
+    variant_values: Set[str],
+    debug: bool = False
 ) -> Tuple[Dict[str, str], TrashData]:
     """
     Odstraní modely obsahující VariantValue delší než 2 znaky.
@@ -423,6 +452,7 @@ def filter_models_containing_variant_values(
     Args:
         model_memory: ProductModelMemory slovník
         variant_values: Set hodnot z VariantValueMemory
+        debug: Zobrazit detailní důvody odstranění
 
     Returns:
         Tuple (vyfiltrovaný slovník, smazaná data)
@@ -452,6 +482,9 @@ def filter_models_containing_variant_values(
             else:
                 trash.append({'KEY': key, 'VALUE': value})
                 removed_count += 1
+                if debug:
+                    print(f"  ❌ Odstraněn: KEY='{key}', VALUE='{value}'")
+                    print(f"     Důvod: Obsahuje variantní hodnotu '{found_variant}'")
 
             pbar.update(1)
 
@@ -463,7 +496,8 @@ def filter_models_containing_variant_values(
 
 def filter_invalid_characters(
     memory: Dict[str, str],
-    memory_name: str
+    memory_name: str,
+    debug: bool = False
 ) -> Tuple[Dict[str, str], TrashData]:
     """
     Odstraní záznamy s nepovolenými znaky (znaky nepoužívané v češtině).
@@ -474,6 +508,7 @@ def filter_invalid_characters(
     Args:
         memory: Memory slovník
         memory_name: Název memory (pro výpis)
+        debug: Zobrazit detailní důvody odstranění
 
     Returns:
         Tuple (vyfiltrovaný slovník, smazaná data)
@@ -496,6 +531,11 @@ def filter_invalid_characters(
             else:
                 trash.append({'KEY': key, 'VALUE': value})
                 removed_count += 1
+                if debug:
+                    # Find invalid characters
+                    invalid_chars = set(c for c in value if not czech_pattern.match(c))
+                    print(f"  ❌ Odstraněn: KEY='{key}', VALUE='{value}'")
+                    print(f"     Důvod: Obsahuje nepovolené znaky: {invalid_chars}")
 
             pbar.update(1)
 
@@ -509,7 +549,8 @@ def filter_name_memory(
     name_memory: Dict[str, str],
     type_memory: Dict[str, str],
     brand_memory: Dict[str, str],
-    model_memory: Dict[str, str]
+    model_memory: Dict[str, str],
+    debug: bool = False
 ) -> Tuple[Dict[str, str], TrashData]:
     """
     Odstraní záznamy z NameMemory, které nemají klíč ve všech třech souborech.
@@ -519,6 +560,7 @@ def filter_name_memory(
         type_memory: ProductTypeMemory slovník
         brand_memory: ProductBrandMemory slovník
         model_memory: ProductModelMemory slovník
+        debug: Zobrazit detailní důvody odstranění
 
     Returns:
         Tuple (vyfiltrovaný slovník, smazaná data)
@@ -545,6 +587,9 @@ def filter_name_memory(
             else:
                 trash.append({'KEY': key, 'VALUE': value})
                 removed_count += 1
+                if debug:
+                    print(f"  ❌ Odstraněn: KEY='{key}', VALUE='{value}'")
+                    print(f"     Důvod: Chybí klíč v: {', '.join(missing)}")
 
             pbar.update(1)
 
@@ -563,6 +608,13 @@ def main():
 Příklady použití:
   python filter_memory.py --language CS
   python filter_memory.py --language SK --dry-run
+  python filter_memory.py --language CS --debug
+
+Debug mód:
+  --debug zapne detailní výpisy pro každý odstraněný záznam včetně:
+  - KEY a VALUE odstraněného záznamu
+  - Konkrétní důvod odstranění (jaká hodnota způsobila vyřazení)
+  - Užitečné pro pochopení, proč byla konkrétní data odfiltrována
 
 Skript provádí kaskádové filtrování:
 1. Načte CategoryNameMemory a najde neúplné kategorie (pouze zdrojový soubor, nemodifikuje se)
@@ -590,6 +642,8 @@ Trash soubory:
                        help='Jazyk (CS nebo SK, default: CS)')
     parser.add_argument('--dry-run', action='store_true',
                        help='Suchý běh - pouze spočítá změny, neuloží')
+    parser.add_argument('--debug', action='store_true',
+                       help='Debug mód - zobrazí detailní důvody odstranění každého záznamu')
 
     args = parser.parse_args()
 
@@ -602,6 +656,9 @@ Trash soubory:
 
         if dry_run:
             print("\n⚠️  SUCHÝ BĚH - změny nebudou uloženy")
+
+        if args.debug:
+            print("\n🐛 DEBUG MÓD - budou zobrazeny detailní důvody odstranění každého záznamu")
 
         print(f"\n{'='*80}")
         print(f"FILTROVÁNÍ MEMORY SOUBORŮ - {language}")
@@ -631,7 +688,7 @@ Trash soubory:
         category_memory = load_memory_as_dict(category_filepath)
         print(f"✓ Načteno {len(category_memory)} záznamů z CategoryMemory")
 
-        category_memory, trash = filter_category_memory(category_memory, incomplete_categories, valid_categories)
+        category_memory, trash = filter_category_memory(category_memory, incomplete_categories, valid_categories, debug=args.debug)
         all_trash_data['CategoryMemory'] = trash
         save_memory_dict(category_memory, category_filepath, dry_run)
 
@@ -653,7 +710,7 @@ Trash soubory:
         brand_memory = load_memory_as_dict(brand_filepath)
         print(f"✓ Načteno {len(brand_memory)} záznamů z ProductBrandMemory")
 
-        brand_memory, trash = filter_brand_memory(brand_memory, valid_brands)
+        brand_memory, trash = filter_brand_memory(brand_memory, valid_brands, debug=args.debug)
         all_trash_data['ProductBrandMemory'] = trash
         save_memory_dict(brand_memory, brand_filepath, dry_run)
 
@@ -676,10 +733,10 @@ Trash soubory:
         print("KROK 6: Odstranění značek z ProductType a ProductModel")
         print("="*80)
 
-        type_memory, trash = filter_contains_brand(type_memory, valid_brands, "ProductTypeMemory")
+        type_memory, trash = filter_contains_brand(type_memory, valid_brands, "ProductTypeMemory", debug=args.debug)
         all_trash_data.setdefault('ProductTypeMemory', []).extend(trash)
 
-        model_memory, trash = filter_contains_brand(model_memory, valid_brands, "ProductModelMemory")
+        model_memory, trash = filter_contains_brand(model_memory, valid_brands, "ProductModelMemory", debug=args.debug)
         all_trash_data.setdefault('ProductModelMemory', []).extend(trash)
 
         save_memory_dict(type_memory, type_filepath, dry_run)
@@ -691,7 +748,7 @@ Trash soubory:
         print("="*80)
 
         model_values = set(model_memory.values())
-        type_memory, trash = filter_types_containing_models(type_memory, model_values)
+        type_memory, trash = filter_types_containing_models(type_memory, model_values, debug=args.debug)
         all_trash_data['ProductTypeMemory'].extend(trash)
         save_memory_dict(type_memory, type_filepath, dry_run)
 
@@ -701,7 +758,7 @@ Trash soubory:
         print("="*80)
 
         type_values = set(type_memory.values())
-        model_memory, trash = filter_models_containing_type_words(model_memory, type_values)
+        model_memory, trash = filter_models_containing_type_words(model_memory, type_values, debug=args.debug)
         all_trash_data['ProductModelMemory'].extend(trash)
         save_memory_dict(model_memory, model_filepath, dry_run)
 
@@ -715,7 +772,7 @@ Trash soubory:
         print(f"✓ Načteno {len(variant_value_memory)} záznamů z VariantValueMemory")
 
         variant_values = set(variant_value_memory.values())
-        model_memory, trash = filter_models_containing_variant_values(model_memory, variant_values)
+        model_memory, trash = filter_models_containing_variant_values(model_memory, variant_values, debug=args.debug)
         all_trash_data['ProductModelMemory'].extend(trash)
         save_memory_dict(model_memory, model_filepath, dry_run)
 
@@ -724,20 +781,20 @@ Trash soubory:
         print("KROK 10: Odstranění nepovolených znaků")
         print("="*80)
 
-        type_memory, trash = filter_invalid_characters(type_memory, "ProductTypeMemory")
+        type_memory, trash = filter_invalid_characters(type_memory, "ProductTypeMemory", debug=args.debug)
         all_trash_data['ProductTypeMemory'].extend(trash)
 
-        model_memory, trash = filter_invalid_characters(model_memory, "ProductModelMemory")
+        model_memory, trash = filter_invalid_characters(model_memory, "ProductModelMemory", debug=args.debug)
         all_trash_data['ProductModelMemory'].extend(trash)
 
         variant_name_filepath = get_memory_filepath('VariantNameMemory', language)
         variant_name_memory = load_memory_as_dict(variant_name_filepath)
         print(f"✓ Načteno {len(variant_name_memory)} záznamů z VariantNameMemory")
 
-        variant_name_memory, trash = filter_invalid_characters(variant_name_memory, "VariantNameMemory")
+        variant_name_memory, trash = filter_invalid_characters(variant_name_memory, "VariantNameMemory", debug=args.debug)
         all_trash_data['VariantNameMemory'] = trash
 
-        variant_value_memory, trash = filter_invalid_characters(variant_value_memory, "VariantValueMemory")
+        variant_value_memory, trash = filter_invalid_characters(variant_value_memory, "VariantValueMemory", debug=args.debug)
         all_trash_data['VariantValueMemory'] = trash
 
         save_memory_dict(type_memory, type_filepath, dry_run)
@@ -754,7 +811,7 @@ Trash soubory:
         name_memory = load_memory_as_dict(name_filepath)
         print(f"✓ Načteno {len(name_memory)} záznamů z NameMemory")
 
-        name_memory, trash = filter_name_memory(name_memory, type_memory, brand_memory, model_memory)
+        name_memory, trash = filter_name_memory(name_memory, type_memory, brand_memory, model_memory, debug=args.debug)
         all_trash_data['NameMemory'] = trash
         save_memory_dict(name_memory, name_filepath, dry_run)
 
@@ -764,6 +821,7 @@ Trash soubory:
         print("="*80)
         print(f"\nJazyk: {language}")
         print(f"Režim: {'SUCHÝ BĚH (změny neuloženy)' if dry_run else 'ŽIVÝ BĚH (změny uloženy)'}")
+        print(f"Debug: {'ZAPNUT (detailní výpisy důvodů)' if args.debug else 'VYPNUT'}")
         print(f"\nVýsledný počet záznamů:")
         print(f"  • CategoryMemory:       {len(category_memory):>8,} záznamů")
         print(f"  • ProductBrandMemory:   {len(brand_memory):>8,} záznamů")
