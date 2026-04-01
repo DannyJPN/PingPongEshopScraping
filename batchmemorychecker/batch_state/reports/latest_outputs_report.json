@@ -1,0 +1,50 @@
+[
+  {
+    "eshop": "Stoten",
+    "status": "ok",
+    "latest_dir": "H:/Desaka\\stoten\\Full_13.01.2026",
+    "csv_path": "H:/Desaka\\stoten\\Full_13.01.2026\\StotenOutput.csv",
+    "json_path": "",
+    "source_date": "2026-01-13T00:00:00"
+  },
+  {
+    "eshop": "Sportspin",
+    "status": "ok",
+    "latest_dir": "H:/Desaka\\sportspin\\Full_13.01.2026",
+    "csv_path": "H:/Desaka\\sportspin\\Full_13.01.2026\\SportspinOutput.csv",
+    "json_path": "",
+    "source_date": "2026-01-13T00:00:00"
+  },
+  {
+    "eshop": "VseNaStolniTenis",
+    "status": "ok",
+    "latest_dir": "H:/Desaka\\vsenastolnitenis\\Full_13.01.2026",
+    "csv_path": "H:/Desaka\\vsenastolnitenis\\Full_13.01.2026\\VseNaStolniTenisOutput.csv",
+    "json_path": "",
+    "source_date": "2026-01-13T00:00:00"
+  },
+  {
+    "eshop": "Spinway",
+    "status": "ok",
+    "latest_dir": "H:/Desaka\\spinway\\Full_13.01.2026",
+    "csv_path": "H:/Desaka\\spinway\\Full_13.01.2026\\SpinwayOutput.csv",
+    "json_path": "",
+    "source_date": "2026-01-13T00:00:00"
+  },
+  {
+    "eshop": "Gewo",
+    "status": "ok",
+    "latest_dir": "H:/Desaka\\gewo\\Full_13.01.2026",
+    "csv_path": "H:/Desaka\\gewo\\Full_13.01.2026\\GewoOutput.csv",
+    "json_path": "",
+    "source_date": "2026-01-13T00:00:00"
+  },
+  {
+    "eshop": "Nittaku",
+    "status": "ok",
+    "latest_dir": "H:/Desaka\\nittaku\\Full_13.01.2026",
+    "csv_path": "H:/Desaka\\nittaku\\Full_13.01.2026\\NittakuOutput.csv",
+    "json_path": "",
+    "source_date": "2026-01-13T00:00:00"
+  }
+]
