@@ -61,7 +61,8 @@ class ProductFilter:
                     if self.debug:
                         logging.debug(f"FILTERED OUT: {product.name}")
                         logging.debug(f"  Reason: {reason}")
-                        logging.debug(f"  Product category: '{product.category}'")
+                        logging.debug(f"  Product values:")
+                        logging.debug(f"    - Category: '{product.category}'")
 
                     pbar.update(1)
                     continue
