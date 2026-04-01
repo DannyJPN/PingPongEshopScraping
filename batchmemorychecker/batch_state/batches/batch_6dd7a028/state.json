@@ -1,0 +1,1724 @@
+{
+  "batch_id": "batch_6dd7a028",
+  "created_at": "2026-01-21T15:18:03.599883",
+  "records": [
+    {
+      "record_id": "VariantNameMemory_CS\\1",
+      "custom_id": "VariantNameMemory_CS_1_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Barevná kombinace",
+        "value": "Barva",
+        "row_index": 1,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Barva",
+        "reason": [
+          "normalization",
+          "synonym",
+          "Czech"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\2",
+      "custom_id": "VariantNameMemory_CS_2_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Barva",
+        "value": "Barva",
+        "row_index": 2,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Barva",
+        "reason": [
+          "Czech",
+          "normalized",
+          "variant label"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\3",
+      "custom_id": "VariantNameMemory_CS_3_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Breite",
+        "value": "Šířka",
+        "row_index": 3,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Šířka",
+        "reason": [
+          "correct translation",
+          "Czech variant name",
+          "matches German 'Breite'"
+        ],
+        "source": "https://www.dict.cc/?s=Breite"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\4",
+      "custom_id": "VariantNameMemory_CS_4_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Farbe",
+        "value": "Barva",
+        "row_index": 4,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Barva",
+        "reason": [
+          "correct translation",
+          "German->Czech",
+          "variant name 'color'"
+        ],
+        "source": "https://glosbe.com/de/cs/Farbe"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\5",
+      "custom_id": "VariantNameMemory_CS_5_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Farbe // Color",
+        "value": "Barva",
+        "row_index": 5,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Barva",
+        "reason": [
+          "translation",
+          "Farbe=Color",
+          "Czech term"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\6",
+      "custom_id": "VariantNameMemory_CS_6_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Farbe // Colour",
+        "value": "Barva",
+        "row_index": 6,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Barva",
+        "reason": [
+          "translation",
+          "German->Czech",
+          "Farbe=colour"
+        ],
+        "source": "https://de.wiktionary.org/wiki/Farbe"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\7",
+      "custom_id": "VariantNameMemory_CS_7_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Farbe // color",
+        "value": "Barva",
+        "row_index": 7,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Barva",
+        "reason": [
+          "translation",
+          "Czech",
+          "variant_name"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\8",
+      "custom_id": "VariantNameMemory_CS_8_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Farbe//Color",
+        "value": "Barva",
+        "row_index": 8,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Barva",
+        "reason": [
+          "translation",
+          "Czech",
+          "matches key"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\9",
+      "custom_id": "VariantNameMemory_CS_9_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Farbe//Colour",
+        "value": "Barva",
+        "row_index": 9,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Barva",
+        "reason": [
+          "translation",
+          "Czech"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\10",
+      "custom_id": "VariantNameMemory_CS_10_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Farbe/Colour",
+        "value": "Barva",
+        "row_index": 10,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Barva",
+        "reason": [
+          "Czech translation",
+          "matches key"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\11",
+      "custom_id": "VariantNameMemory_CS_11_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Griff",
+        "value": "Držení",
+        "row_index": 11,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Rukojeť",
+        "reason": [
+          "wrong_translation",
+          "Griff=handle",
+          "Czech=Rukojeť"
+        ],
+        "source": "https://www.linguee.com/german-czech/search?source=auto&query=Griff"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\12",
+      "custom_id": "VariantNameMemory_CS_12_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Griff // Handle",
+        "value": "Držení",
+        "row_index": 12,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Rukojeť",
+        "reason": [
+          "translation",
+          "noun-handle",
+          "common-term"
+        ],
+        "source": "https://en.wiktionary.org/wiki/handle"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\13",
+      "custom_id": "VariantNameMemory_CS_13_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Griff//Handle",
+        "value": "Držení",
+        "row_index": 13,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Rukojeť",
+        "reason": [
+          "incorrect_translation",
+          "Držení=holding (gerund)",
+          "proper_translation=Rukojeť",
+          "variant_name_physical_handle"
+        ],
+        "source": "https://en.wiktionary.org/wiki/handle#Czech"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\14",
+      "custom_id": "VariantNameMemory_CS_14_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Griffform",
+        "value": "Držení",
+        "row_index": 14,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Tvar rukojeti",
+        "reason": [
+          "translation",
+          "Griffform=griff form",
+          "Držení=wrong meaning"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\15",
+      "custom_id": "VariantNameMemory_CS_15_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Griffform // Handle",
+        "value": "Držení",
+        "row_index": 15,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Tvar rukojeti",
+        "reason": [
+          "incorrect_translation",
+          "Griffform = tvar rukojeti",
+          "držení ≠ tvar"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\16",
+      "custom_id": "VariantNameMemory_CS_16_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Griffform // handle",
+        "value": "Držení",
+        "row_index": 16,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Tvar rukojeti",
+        "reason": [
+          "wrong_term",
+          "should_be_handle_shape",
+          "Griffform=handle_shape"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\17",
+      "custom_id": "VariantNameMemory_CS_17_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Griffform Handle",
+        "value": "Držení",
+        "row_index": 17,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Tvar rukojeti",
+        "reason": [
+          "translation",
+          "Griff=rukojeť",
+          "Form=tvar",
+          "variant_name_CZ"
+        ],
+        "source": "https://en.wiktionary.org/wiki/Griff https://en.wiktionary.org/wiki/Form"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\18",
+      "custom_id": "VariantNameMemory_CS_18_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Griffform//Handle",
+        "value": "Držení",
+        "row_index": 18,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Tvar rukojeti",
+        "reason": [
+          "translation_mismatch",
+          "Griffform=grip_shape",
+          "preferred_term"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\19",
+      "custom_id": "VariantNameMemory_CS_19_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Grifform//Handle",
+        "value": "Držení",
+        "row_index": 19,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Rukojeť",
+        "reason": [
+          "translation",
+          "wrong-form",
+          "use-rukojeť"
+        ],
+        "source": "https://www.linguee.com/english-czech/translation/handle.html"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\20",
+      "custom_id": "VariantNameMemory_CS_20_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Größe",
+        "value": "Velikost",
+        "row_index": 20,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Velikost",
+        "reason": [
+          "translation",
+          "Czech",
+          "matches"
+        ],
+        "source": "https://en.wiktionary.org/wiki/Gr%C3%B6%C3%9Fe"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\21",
+      "custom_id": "VariantNameMemory_CS_21_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Größe  // size",
+        "value": "Velikost",
+        "row_index": 21,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Velikost",
+        "reason": [
+          "translation",
+          "German→Czech",
+          "variant name"
+        ],
+        "source": "https://en.wiktionary.org/wiki/Gr%C3%B6%C3%9Fe"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\22",
+      "custom_id": "VariantNameMemory_CS_22_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Größe//Size",
+        "value": "Velikost",
+        "row_index": 22,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Velikost",
+        "reason": [
+          "translation",
+          "Czech",
+          "size"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\23",
+      "custom_id": "VariantNameMemory_CS_23_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Hodnota poukazu",
+        "value": "Hodnota",
+        "row_index": 23,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Hodnota poukazu",
+        "reason": [
+          "incomplete",
+          "missing noun",
+          "not normalized"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\24",
+      "custom_id": "VariantNameMemory_CS_24_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Inhalt",
+        "value": "Objem",
+        "row_index": 24,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Objem",
+        "reason": [
+          "German-Czech translation",
+          "variant-volume",
+          "common e-shop label"
+        ],
+        "source": "https://translate.google.com/?sl=de&tl=cs&text=Inhalt&op=translate"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\25",
+      "custom_id": "VariantNameMemory_CS_25_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Kombinationen",
+        "value": "Kombinace",
+        "row_index": 25,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Kombinace",
+        "reason": [
+          "translation",
+          "German->Czech",
+          "normalized variant name"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\26",
+      "custom_id": "VariantNameMemory_CS_26_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Lakování dřeva",
+        "value": "Lakování dřeva",
+        "row_index": 26,
+        "product_context": {
+          "name": "Lakování dřeva",
+          "short_description": "<span>Lakování provádíme lakem JOOLA. Jaká je výhoda nalakovaného dřeva? Potahy půjdou lépe sundat z pálky a nevytrhávají se dýhy.</span>",
+          "description": "<p><span>Lakování provádíme lakem JOOLA. Jaká je výhoda nalakovaného dřeva? Potahy půjdou lépe sundat z pálky a nevytrhávají se dýhy.</span></p>",
+          "main_photo": "H:\\Desaka\\Stoten\\Full_13.01.2026\\Photos\\Lakování dřeva\\MainImage\\6476_tempsiegel250x401.jpg%3F62cac103",
+          "gallery": "H:\\Desaka\\Stoten\\Full_13.01.2026\\Photos\\Lakování dřeva\\GalleryImages\\6476_tempsiegel250x401.jpg%3F62cac103",
+          "variants": "{\"key_value_pairs\": {\"Lakování dřeva\": \"Lakování dřeva\"}, \"current_price\": 50.0, \"basic_price\": 50.0, \"stock_status\": \"\"}",
+          "url": "https://www.stoten.cz/sluzby-stoten-cz/lakovani-dreva/",
+          "source_eshop": "Stoten",
+          "source_path": "H:/Desaka\\stoten\\Full_13.01.2026\\StotenOutput.csv",
+          "source_dir": "H:/Desaka\\stoten\\Full_13.01.2026",
+          "source_date": "2026-01-13T00:00:00",
+          "source_type": "csv"
+        }
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Lakování dřeva",
+        "reason": [
+          "matches source",
+          "Czech normalized",
+          "service variant"
+        ],
+        "source": "https://www.stoten.cz/sluzby-stoten-cz/lakovani-dreva/"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\27",
+      "custom_id": "VariantNameMemory_CS_27_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Material",
+        "value": "Materiál",
+        "row_index": 27,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Materiál",
+        "reason": [
+          "translation",
+          "Czech",
+          "variant name"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\28",
+      "custom_id": "VariantNameMemory_CS_28_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Montáž stolu",
+        "value": "Montáž stolu",
+        "row_index": 28,
+        "product_context": {
+          "name": "Montáž stolu",
+          "short_description": "<span>Nabízíme montáž Vámi objednaného stolu. Stůl Vám tak bude doručený již zkompletovaný a odpadne Vám starost s montáží.</span>",
+          "description": "<p><span>Nabízíme montáž Vámi objednaného stolu. Stůl Vám tak bude doručený již zkompletovaný a odpadne Vám starost s montáží.</span></p>",
+          "main_photo": "H:\\Desaka\\Stoten\\Full_13.01.2026\\Photos\\Montáž stolu\\MainImage\\6443_world-cup-25-s-kompletace.jpg%3F62cac103",
+          "gallery": "H:\\Desaka\\Stoten\\Full_13.01.2026\\Photos\\Montáž stolu\\GalleryImages\\6443_world-cup-25-s-kompletace.jpg%3F62cac103",
+          "variants": "{\"key_value_pairs\": {\"Montáž stolu\": \"Montáž stolu\"}, \"current_price\": 490.0, \"basic_price\": 490.0, \"stock_status\": \"\"}",
+          "url": "https://www.stoten.cz/vnitrni/montaz-stolu/",
+          "source_eshop": "Stoten",
+          "source_path": "H:/Desaka\\stoten\\Full_13.01.2026\\StotenOutput.csv",
+          "source_dir": "H:/Desaka\\stoten\\Full_13.01.2026",
+          "source_date": "2026-01-13T00:00:00",
+          "source_type": "csv"
+        }
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Montáž stolu",
+        "reason": [
+          "variant-normalized",
+          "matches-eshop",
+          "service-assembly"
+        ],
+        "source": "https://www.stoten.cz/vnitrni/montaz-stolu/"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\29",
+      "custom_id": "VariantNameMemory_CS_29_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Míčky",
+        "value": "Množství",
+        "row_index": 29,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Množství",
+        "reason": [
+          "Czech",
+          "variant-label",
+          "quantity"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\30",
+      "custom_id": "VariantNameMemory_CS_30_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Nennwerte",
+        "value": "Hodnota",
+        "row_index": 30,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Jmenovité hodnoty",
+        "reason": [
+          "translation_error",
+          "wrong_number_singular",
+          "German:Nennwerte"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\31",
+      "custom_id": "VariantNameMemory_CS_31_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Nášivky",
+        "value": "Barva",
+        "row_index": 31,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Barva",
+        "reason": [
+          "Czech",
+          "variant-attribute",
+          "color",
+          "patches"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\32",
+      "custom_id": "VariantNameMemory_CS_32_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Objem",
+        "value": "Objem",
+        "row_index": 32,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Objem",
+        "reason": [
+          "matches_key",
+          "Czech_variant_name",
+          "normalized"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\33",
+      "custom_id": "VariantNameMemory_CS_33_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Ochranná páska",
+        "value": "Délka/šířka",
+        "row_index": 33,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Délka/šířka",
+        "reason": [
+          "délka/šířka",
+          "páska-variant"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\34",
+      "custom_id": "VariantNameMemory_CS_34_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Ohrádky",
+        "value": "Délka",
+        "row_index": 34,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Ohrádka",
+        "reason": [
+          "plural-to-singular",
+          "normalization",
+          "mismatched-attribute"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\35",
+      "custom_id": "VariantNameMemory_CS_35_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Poukaz",
+        "value": "Poukaz",
+        "row_index": 35,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Poukaz",
+        "reason": [
+          "matches_key",
+          "normalized_variant_name_cs"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\36",
+      "custom_id": "VariantNameMemory_CS_36_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Prkna",
+        "value": "Držátko",
+        "row_index": 36,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Prkna",
+        "reason": [
+          "mismatch-meaning",
+          "prkna≠držátko",
+          "variant-name"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\37",
+      "custom_id": "VariantNameMemory_CS_37_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Pálka",
+        "value": "Typ pálky",
+        "row_index": 37,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Typ pálky",
+        "reason": [
+          "Czech",
+          "variant-name",
+          "normalized"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\38",
+      "custom_id": "VariantNameMemory_CS_38_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Příslušenství",
+        "value": "Příslušenství",
+        "row_index": 38,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Příslušenství",
+        "reason": [
+          "matches_key",
+          "Czech_term",
+          "normalized"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\39",
+      "custom_id": "VariantNameMemory_CS_39_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Robot",
+        "value": "Robot",
+        "row_index": 39,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Robot",
+        "reason": [
+          "matches_key",
+          "normalized",
+          "Czech"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\40",
+      "custom_id": "VariantNameMemory_CS_40_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Rozměr dřeva (š x v) mm",
+        "value": "Rozměr (š x v)",
+        "row_index": 40,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Rozměr dřeva (š x v) mm",
+        "reason": [
+          "missing_specifier_dřeva",
+          "missing_unit_mm"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\41",
+      "custom_id": "VariantNameMemory_CS_41_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Schwammstärke",
+        "value": "Šířka",
+        "row_index": 41,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Tloušťka",
+        "reason": [
+          "translation",
+          "Schwammstärke=thickness",
+          "Šířka=width_incorrect"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\42",
+      "custom_id": "VariantNameMemory_CS_42_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Stärke",
+        "value": "Šířka",
+        "row_index": 42,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Tloušťka",
+        "reason": [
+          "translation",
+          "Stärke=thickness",
+          "Šířka=width_mismatch"
+        ],
+        "source": "https://translate.google.com/?sl=de&tl=cs&text=St%C3%A4rke"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\43",
+      "custom_id": "VariantNameMemory_CS_43_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Stärke // Thickness",
+        "value": "Šířka",
+        "row_index": 43,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Tloušťka",
+        "reason": [
+          "wrong-translation",
+          "thickness→tloušťka",
+          "šířka=width"
+        ],
+        "source": "https://cs.wiktionary.org/wiki/tlou%C5%A1%C5%A5ka"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\44",
+      "custom_id": "VariantNameMemory_CS_44_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Stärke // thickness",
+        "value": "Šířka",
+        "row_index": 44,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Tloušťka",
+        "reason": [
+          "wrong_translation",
+          "Stärke/thickness → tloušťka",
+          "šířka = width"
+        ],
+        "source": "https://en.wiktionary.org/wiki/thickness"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\45",
+      "custom_id": "VariantNameMemory_CS_45_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Stärke//Thickness",
+        "value": "Šířka",
+        "row_index": 45,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Tloušťka",
+        "reason": [
+          "wrong_translation",
+          "šířka_means_width",
+          "tloušťka_means_thickness"
+        ],
+        "source": "https://en.wiktionary.org/wiki/thickness"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\46",
+      "custom_id": "VariantNameMemory_CS_46_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Stärke/Thickness",
+        "value": "Šířka",
+        "row_index": 46,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Tloušťka",
+        "reason": [
+          "wrong-translation",
+          "Šířka=width",
+          "Czech for thickness=tloušťka"
+        ],
+        "source": "https://en.wiktionary.org/wiki/thickness#Czech"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\47",
+      "custom_id": "VariantNameMemory_CS_47_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Stück",
+        "value": "Množství",
+        "row_index": 47,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Množství",
+        "reason": [
+          "translation",
+          "Czech term",
+          "variant name",
+          "Stück=piece"
+        ],
+        "source": "https://de.wiktionary.org/wiki/St%C3%BCck"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\48",
+      "custom_id": "VariantNameMemory_CS_48_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Síla houby",
+        "value": "Šířka",
+        "row_index": 48,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Síla houby",
+        "reason": [
+          "mismatch",
+          "šířka ≠ síla",
+          "use key as normalized name"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\49",
+      "custom_id": "VariantNameMemory_CS_49_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Textil",
+        "value": "Velikost",
+        "row_index": 49,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Materiál",
+        "reason": [
+          "mismatch",
+          "textil→materiál"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\50",
+      "custom_id": "VariantNameMemory_CS_50_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Title",
+        "value": "Držení",
+        "row_index": 50,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Název varianty",
+        "reason": [
+          "incorrect_term",
+          "should_be_variant_label"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\51",
+      "custom_id": "VariantNameMemory_CS_51_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Tloušťka desky",
+        "value": "Tloušťka desky",
+        "row_index": 51,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Tloušťka desky",
+        "reason": [
+          "same as key",
+          "Czech normalized variant name"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\52",
+      "custom_id": "VariantNameMemory_CS_52_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Tloušťka houby",
+        "value": "Šířka",
+        "row_index": 52,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Tloušťka",
+        "reason": [
+          "mismatch",
+          "width_vs_thickness",
+          "Czech_normalization"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\53",
+      "custom_id": "VariantNameMemory_CS_53_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Tloušťka potahů",
+        "value": "Šířka",
+        "row_index": 53,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Tloušťka",
+        "reason": [
+          "mismatch",
+          "thickness≠width",
+          "Czech normalization"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\54",
+      "custom_id": "VariantNameMemory_CS_54_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Tuning potahu",
+        "value": "Tuning potahu",
+        "row_index": 54,
+        "product_context": {
+          "name": "Tuning potahu",
+          "short_description": "Nabízíme službu - tuning potahu. Tuning provádíme tuningem <span>Sweedex Booster. Tato služba se týká jednoho kusu potahu.</span>",
+          "description": "<p>Nabízíme službu - tuning potahu. Tuning provádíme tuningem <span>Sweedex Booster. Tato služba se týká jednoho kusu potahu.</span></p>",
+          "main_photo": "H:\\Desaka\\Stoten\\Full_13.01.2026\\Photos\\Tuning potahu\\MainImage\\6446_sweedex.jpg%3F62cac103",
+          "gallery": "H:\\Desaka\\Stoten\\Full_13.01.2026\\Photos\\Tuning potahu\\GalleryImages\\6446_sweedex.jpg%3F62cac103",
+          "variants": "{\"key_value_pairs\": {\"Tuning potahu\": \"Tuning potahu\"}, \"current_price\": 50.0, \"basic_price\": 50.0, \"stock_status\": \"\"}",
+          "url": "https://www.stoten.cz/potahy/tuning-potahu/",
+          "source_eshop": "Stoten",
+          "source_path": "H:/Desaka\\stoten\\Full_13.01.2026\\StotenOutput.csv",
+          "source_dir": "H:/Desaka\\stoten\\Full_13.01.2026",
+          "source_date": "2026-01-13T00:00:00",
+          "source_type": "csv"
+        }
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Tuning potahu",
+        "reason": [
+          "matches product page",
+          "service variant",
+          "Czech normalized"
+        ],
+        "source": "https://www.stoten.cz/potahy/tuning-potahu/"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\55",
+      "custom_id": "VariantNameMemory_CS_55_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Tvar držátka",
+        "value": "Držení",
+        "row_index": 55,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Tvar držadla",
+        "reason": [
+          "wrong-meaning",
+          "should-describe-handle-shape",
+          "Czech-normalization"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\56",
+      "custom_id": "VariantNameMemory_CS_56_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Typ Euro Classic ALL++Ventus Regular Alpha",
+        "value": "Typ pálky Euro Classic ALL++ Ventus Regular Alpha",
+        "row_index": 56,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Typ pálky",
+        "reason": [
+          "includes_variant_values",
+          "should_be_only_name",
+          "normalization_CS"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\57",
+      "custom_id": "VariantNameMemory_CS_57_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Velikost",
+        "value": "Velikost",
+        "row_index": 57,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Velikost",
+        "reason": [
+          "Czech term",
+          "normalized variant name",
+          "matches memory key"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\58",
+      "custom_id": "VariantNameMemory_CS_58_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Velikost FT Igre",
+        "value": "Velikost",
+        "row_index": 58,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Velikost",
+        "reason": [
+          "matches_key",
+          "normalized_cs",
+          "variant_name_size"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\59",
+      "custom_id": "VariantNameMemory_CS_59_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Velikost ponožek",
+        "value": "Velikost",
+        "row_index": 59,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Velikost",
+        "reason": [
+          "Czech",
+          "normalized variant name",
+          "matches key"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\60",
+      "custom_id": "VariantNameMemory_CS_60_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Verpackungseinheit",
+        "value": "Počet",
+        "row_index": 60,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Počet kusů",
+        "reason": [
+          "wrong_translation",
+          "too_generic",
+          "Verpackungseinheit=packaging_unit",
+          "preferred_Počet_kusů"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\61",
+      "custom_id": "VariantNameMemory_CS_61_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "Váha (gr)",
+        "value": "Hmotnost",
+        "row_index": 61,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Hmotnost",
+        "reason": [
+          "synonym",
+          "Czech term",
+          "unit not required"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\62",
+      "custom_id": "VariantNameMemory_CS_62_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "barva",
+        "value": "Barva",
+        "row_index": 62,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Barva",
+        "reason": [
+          "Czech term",
+          "normalized variant name",
+          "capitalized"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\63",
+      "custom_id": "VariantNameMemory_CS_63_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "drzatko",
+        "value": "Držení",
+        "row_index": 63,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Držátko",
+        "reason": [
+          "wrong-term",
+          "diacritics",
+          "variant-name",
+          "handle"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\64",
+      "custom_id": "VariantNameMemory_CS_64_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "houba",
+        "value": "Šířka",
+        "row_index": 64,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Houba",
+        "reason": [
+          "mismatch",
+          "houba='sponge'",
+          "Šířka='width'"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\65",
+      "custom_id": "VariantNameMemory_CS_65_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "pa_farba",
+        "value": "Barva",
+        "row_index": 65,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Barva",
+        "reason": [
+          "normalized",
+          "Czech",
+          "means color"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\66",
+      "custom_id": "VariantNameMemory_CS_66_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "pa_hrubka-spongie",
+        "value": "Šířka",
+        "row_index": 66,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Tloušťka",
+        "reason": [
+          "pa_hrubka=thickness",
+          "Šířka=width_mismatch",
+          "use_Czech_term"
+        ],
+        "source": "https://cs.wiktionary.org/wiki/tlou%C5%A1tka"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\67",
+      "custom_id": "VariantNameMemory_CS_67_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "pa_tvrdost-spongie",
+        "value": "Tvrdost",
+        "row_index": 67,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Tvrdost Spongie",
+        "reason": [
+          "slug-includes-spongie",
+          "missing-suffix",
+          "normalization"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\68",
+      "custom_id": "VariantNameMemory_CS_68_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "pa_typ-rucky",
+        "value": "Držení",
+        "row_index": 68,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "no",
+        "correct_value": "Typ rukojetí",
+        "reason": [
+          "term_mismatch",
+          "ruky=rukojetí",
+          "normalized_variant_name"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\69",
+      "custom_id": "VariantNameMemory_CS_69_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "pa_velkost",
+        "value": "Velikost",
+        "row_index": 69,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Velikost",
+        "reason": [
+          "Czech",
+          "variant name",
+          "pa_velkost",
+          "normalized"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\70",
+      "custom_id": "VariantNameMemory_CS_70_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "pa_velkost-ponoziek",
+        "value": "Velikost",
+        "row_index": 70,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Velikost",
+        "reason": [
+          "translation",
+          "Czech",
+          "variant-name",
+          "size"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\71",
+      "custom_id": "VariantNameMemory_CS_71_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "pa_velkosti",
+        "value": "Velikost",
+        "row_index": 71,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Velikost",
+        "reason": [
+          "pa_velkosti = velikost",
+          "Czech variant name",
+          "matches VariantNameMemory_CS guidance"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\72",
+      "custom_id": "VariantNameMemory_CS_72_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "pa_znamenie-zverokruhu",
+        "value": "Znamení zvěrokruhu",
+        "row_index": 72,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Znamení zvěrokruhu",
+        "reason": [
+          "correct Czech phrase",
+          "matches key meaning",
+          "normalized variant name"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    },
+    {
+      "record_id": "VariantNameMemory_CS\\73",
+      "custom_id": "VariantNameMemory_CS_73_batch_6dd7a028",
+      "payload": {
+        "memory_file": "F:\\Dropbox\\Scripts\\Python\\Desaka\\desaka_unifier\\Memory\\VariantNameMemory_CS.csv",
+        "key": "velikost",
+        "value": "Velikost",
+        "row_index": 73,
+        "product_context": {}
+      },
+      "status": "completed",
+      "result": {
+        "is_correct": "yes",
+        "correct_value": "Velikost",
+        "reason": [
+          "Czech",
+          "variant-name",
+          "capitalized"
+        ],
+        "source": "provided_data"
+      },
+      "error": null
+    }
+  ]
+}
