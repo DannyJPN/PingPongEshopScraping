@@ -5,7 +5,9 @@
 tqdm>=4.64.0
 
 # AI API clients
-openai>=1.0.0  # OpenAI GPT models
+# >=1.66.0 required for Responses API (client.responses.create) and the
+# built-in web_search tool used by openai_client.py.
+openai>=1.66.0  # OpenAI GPT models
 google-generativeai>=0.3.0  # Google Gemini
 mistralai>=0.1.0  # Mistral AI
 
