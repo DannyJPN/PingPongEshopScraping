@@ -417,10 +417,10 @@ class ProductParser:
         repaired.url = downloaded.url
 
         # desc = from DescMemory or OpenAI
-        #repaired.desc = self._get_description(downloaded)
+        repaired.desc = self._get_description(downloaded)
 
         # shortdesc = from ShortDescMemory or OpenAI
-        #repaired.shortdesc = self._get_short_description(downloaded)
+        repaired.shortdesc = self._get_short_description(downloaded)
 
         # name = from NameMemory or OpenAI (composed from type + brand + model)
         repaired.name = self._get_product_name(downloaded)
@@ -1420,6 +1420,24 @@ class ProductParser:
             return response.strip()
         except KeyboardInterrupt:
             return None
+
+    def _format_html_for_display(self, html_text: str) -> str:
+        """Convert HTML to readable plain text for terminal display (display only, never modifies data)."""
+        if not html_text:
+            return ""
+        from html import unescape
+        # Block elements -> newline for readability
+        text = re.sub(r'<(br|p|/p|li|/li|tr|/tr|h[1-6]|/h[1-6])[^>]*>', '\n', html_text, flags=re.IGNORECASE)
+        # Strip remaining tags
+        text = re.sub(r'<[^>]+>', ' ', text)
+        # Decode HTML entities (&amp; -> &, &nbsp; -> space, etc.)
+        text = unescape(text)
+        # Collapse whitespace, preserve intentional newlines
+        text = re.sub(r'[ \t]+', ' ', text)
+        text = re.sub(r'\n{3,}', '\n\n', text).strip()
+        if len(text) > 400:
+            text = text[:400] + '...'
+        return text
 
     def _confirm_ai_result(self, property_name: str, current_value: str, ai_suggestion: str, product_name: str, product_url: str = "", heuristic_matches: List[str] = None, memory_prefix: str = None, product_key: str = None) -> str:
         """Confirm AI result with user or return suggestion if auto-confirm is enabled.

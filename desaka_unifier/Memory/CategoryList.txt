@@ -54,5 +54,5 @@ Textil>Potítka
 Textil>Ručníky
 Textil>Sukně
 Textil>Teplákové soupravy
-Textil>Trika
+Textil>Trička
 Poukázky
