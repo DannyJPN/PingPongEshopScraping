@@ -81,14 +81,22 @@ CRITICAL: Always use table tennis slang and industry terminology, not literal tr
 
 Your task requires accurate analysis and proper translation to {target_language} using correct table tennis slang and terminology when needed.""")
 
+    _web_context_cache: Dict[str, str] = {}
+
     def _gather_web_context(self, product: DownloadedProduct, focus: str = "") -> str:
         """
         Perform a real web search for this product and return a context snippet.
+        Results are cached per (product.name, focus) to avoid duplicate API calls.
         Returns empty string on failure — never raises.
         """
-        query = product.name
-        if focus:
-            query += f" {focus}"
+        cache_key = f"{product.name}|{focus}"
+        if cache_key in self._web_context_cache:
+            logging.debug(f"Web context cache hit for '{product.name}'")
+            return self._web_context_cache[cache_key]
+
+        safe_name = product.name.replace('"', "'").replace('\n', ' ').strip()
+        query = f"{safe_name} {focus}".strip() if focus else safe_name
+
         prompt = (
             f"Search the web for information about this table tennis product: \"{query}\"\n"
             f"Product URL: {product.url}\n\n"
@@ -99,11 +107,12 @@ Your task requires accurate analysis and proper translation to {target_language}
         )
         try:
             result = self.client.web_search_completion(prompt, task_type='product_analysis')
-            if result:
-                return f"\n\nWeb search results for \"{product.name}\":\n{result}"
+            context = f"\n\nWeb search results for \"{safe_name}\":\n{result}" if result else ""
         except Exception as e:
-            logging.warning(f"_gather_web_context failed for '{product.name}': {e}")
-        return ""
+            logging.warning(f"_gather_web_context failed for '{product.name}': {type(e).__name__}: {e}")
+            context = ""
+        self._web_context_cache[cache_key] = context
+        return context
 
     def find_category(self, product: DownloadedProduct, category_list: List[str], language: str = 'CS', heuristic_info: str = "") -> Optional[str]:
         """

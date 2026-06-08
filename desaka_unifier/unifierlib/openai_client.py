@@ -273,7 +273,7 @@ class OpenAIClient:
                     if getattr(item, 'type', None) == 'message':
                         for part in getattr(item, 'content', []):
                             if getattr(part, 'type', None) == 'output_text':
-                                output_text = part.text
+                                output_text = getattr(part, 'text', None)
                                 break
             if output_text:
                 logging.debug(f"Web search response - {len(output_text)} chars")
