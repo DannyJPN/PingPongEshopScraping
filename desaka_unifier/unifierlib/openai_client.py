@@ -34,14 +34,23 @@ class OpenAIClient:
             logging.error("OpenAI library not installed. Install with: pip install openai")
             raise
 
-        # Define latest available models
+        # Reasoning models (gpt-5 family) are required so that:
+        #   1) the Responses API web_search tool can actually browse the web
+        #   2) reasoning.effort ("thinking mode") is honored
+        # Cheaper tier: gpt-5-mini everywhere except fine-tuning.
         self.models = {
-            'flagship': 'gpt-4o',  # Latest flagship model for complex tasks
-            'efficient': 'gpt-4o-mini',  # Cost-efficient model for simpler tasks
-            'reasoning': 'gpt-4o',  # Best for reasoning and analysis
-            'creative': 'gpt-4o',  # Best for creative tasks
-            'fine_tuning': 'gpt-4o-mini'  # Model for fine-tuning
+            'flagship': 'gpt-5-mini',
+            'efficient': 'gpt-5-mini',
+            'reasoning': 'gpt-5-mini',
+            'creative': 'gpt-5-mini',
+            'fine_tuning': 'gpt-4o-mini'
         }
+
+        # Responses API options applied to every chat_completion call.
+        # reasoning_effort: "minimal" | "low" | "medium" | "high"
+        # web_search_context_size: "low" | "medium" | "high"
+        self.reasoning_effort = 'low'
+        self.web_search_context_size = 'low'
 
         # Fine-tuned model settings
         self.use_fine_tuned_models = use_fine_tuned_models
@@ -89,62 +98,89 @@ class OpenAIClient:
                        temperature: float = 0.4, max_tokens: Optional[int] = None,
                        task_type: str = 'general') -> Optional[str]:
         """
-        Send chat completion request to OpenAI.
+        Send a chat-style request via the Responses API with the web_search
+        tool attached and reasoning ("thinking") enabled.
+
+        The Chat Completions endpoint cannot browse the web - every prompt in
+        openai_unifier.py asks the model to "search the internet" and
+        "check pincesobchod.cz", so we MUST use responses.create() with the
+        web_search tool for those instructions to be honored.
 
         Args:
             messages (List[Dict[str, str]]): List of messages with 'role' and 'content'
             model (str): Model to use (if None, will be selected based on task_type)
-            temperature (float): Temperature for response randomness (default: 0.1)
-            max_tokens (Optional[int]): Maximum tokens in response
+            temperature (float): Ignored on reasoning models (gpt-5 family).
+            max_tokens (Optional[int]): Mapped to max_output_tokens. Scaled up
+                so the budget isn't consumed entirely by reasoning tokens.
             task_type (str): Type of task to determine appropriate model
 
         Returns:
             Optional[str]: Response content or None if error
         """
-        # Select model if not provided
         if model is None:
             model = self.get_model_for_task(task_type)
 
-        # Ensure max_tokens is always a number, never None
         if max_tokens is None:
             max_tokens = DEFAULT_MAX_TOKENS
 
+        # Reasoning tokens count against max_output_tokens; small caller
+        # budgets (e.g. 50) would otherwise leave nothing for the answer.
+        max_output_tokens = max(max_tokens * 8, 2000)
+
+        is_reasoning_model = model.startswith(('gpt-5', 'o1', 'o3', 'o4'))
+
+        request_kwargs = {
+            "model": model,
+            "input": messages,
+            "max_output_tokens": max_output_tokens,
+            "tools": [{
+                "type": "web_search",
+                "search_context_size": self.web_search_context_size,
+            }],
+        }
+
+        if is_reasoning_model:
+            request_kwargs["reasoning"] = {"effort": self.reasoning_effort}
+        else:
+            request_kwargs["temperature"] = temperature
+
         try:
-            logging.debug(f"OpenAI API call - Model: {model}, Temperature: {temperature}, Max tokens: {max_tokens}")
+            logging.debug(
+                f"OpenAI Responses API call - Model: {model}, "
+                f"Reasoning: {request_kwargs.get('reasoning')}, "
+                f"web_search: on, max_output_tokens: {max_output_tokens}"
+            )
             logging.debug(f"OpenAI API call - Messages: {len(messages)} messages")
             time.sleep(10)
-            response = self.client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens
-            )
+            response = self.client.responses.create(**request_kwargs)
 
-            # Track token usage if available
             if hasattr(response, 'usage') and response.usage:
                 try:
                     tracker = get_tracker()
+                    prompt_tokens = getattr(response.usage, 'input_tokens', 0)
+                    completion_tokens = getattr(response.usage, 'output_tokens', 0)
+                    total_tokens = getattr(response.usage, 'total_tokens',
+                                           prompt_tokens + completion_tokens)
                     tracker.track_usage(
                         model=model,
-                        prompt_tokens=response.usage.prompt_tokens,
-                        completion_tokens=response.usage.completion_tokens,
-                        total_tokens=response.usage.total_tokens,
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                        total_tokens=total_tokens,
                         task_type=task_type
                     )
                 except Exception as tracking_error:
-                    # Don't fail the API call if tracking fails
                     logging.warning(f"Failed to track token usage: {str(tracking_error)}")
 
-            if response.choices and len(response.choices) > 0:
-                response_content = response.choices[0].message.content.strip()
-                logging.debug(f"OpenAI API response received - Length: {len(response_content)} characters")
-                return response_content
-            else:
-                logging.error("No response choices returned from OpenAI")
+            response_content = getattr(response, 'output_text', None)
+            if not response_content:
+                logging.error("No output_text returned from OpenAI Responses API")
                 return None
+            response_content = response_content.strip()
+            logging.debug(f"OpenAI API response received - Length: {len(response_content)} characters")
+            return response_content
 
         except Exception as e:
-            logging.error(f"Error in OpenAI chat completion: {str(e)}", exc_info=True)
+            logging.error(f"Error in OpenAI Responses API call: {str(e)}", exc_info=True)
             return None
     
     def json_completion(self, messages: List[Dict[str, str]], model: str = None,
