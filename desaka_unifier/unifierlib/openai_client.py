@@ -264,6 +264,7 @@ class OpenAIClient:
             response = self.client.responses.create(
                 model=self.models['web_search'],
                 tools=[{"type": "web_search_preview"}],
+                tool_choice={"type": "web_search_preview"},
                 input=prompt
             )
             # output_text is a convenience property in SDK >= 1.x

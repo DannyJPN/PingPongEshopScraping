@@ -82,17 +82,23 @@ CRITICAL: Always use table tennis slang and industry terminology, not literal tr
 Your task requires accurate analysis and proper translation to {target_language} using correct table tennis slang and terminology when needed.""")
 
     _web_context_cache: Dict[str, str] = {}
+    _WEB_CONTEXT_CACHE_MAX = 500
 
     def _gather_web_context(self, product: DownloadedProduct, focus: str = "") -> str:
         """
         Perform a real web search for this product and return a context snippet.
         Results are cached per (product.name, focus) to avoid duplicate API calls.
+        Cache is capped at _WEB_CONTEXT_CACHE_MAX entries (FIFO eviction).
         Returns empty string on failure — never raises.
         """
         cache_key = f"{product.name}|{focus}"
         if cache_key in self._web_context_cache:
             logging.debug(f"Web context cache hit for '{product.name}'")
             return self._web_context_cache[cache_key]
+
+        if len(self._web_context_cache) >= self._WEB_CONTEXT_CACHE_MAX:
+            oldest_key = next(iter(self._web_context_cache))
+            del self._web_context_cache[oldest_key]
 
         safe_name = product.name.replace('"', "'").replace('\n', ' ').strip()
         query = f"{safe_name} {focus}".strip() if focus else safe_name
