@@ -147,7 +147,7 @@ class ProductMerger:
             return products[0]
 
         # Log products being merged for debugging
-        logging.info(f"Merging {len(products)} products with name: {products[0].name}")
+        logging.debug(f"Merging {len(products)} products with name: {products[0].name}")
         for i, product in enumerate(products):
             logging.debug(f"  Product {i+1}: original_name='{product.original_name}', "
                          f"brand='{product.brand}', price='{product.price}'")
