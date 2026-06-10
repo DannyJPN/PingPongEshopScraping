@@ -36,11 +36,13 @@ class OpenAIClient:
 
         # Define latest available models
         self.models = {
-            'flagship': 'gpt-4o',  # Latest flagship model for complex tasks
-            'efficient': 'gpt-4o-mini',  # Cost-efficient model for simpler tasks
-            'reasoning': 'gpt-4o',  # Best for reasoning and analysis
-            'creative': 'gpt-4o',  # Best for creative tasks
-            'fine_tuning': 'gpt-4o-mini'  # Model for fine-tuning
+            'flagship': 'gpt-4o',
+            'efficient': 'gpt-4o-mini',
+            'reasoning': 'gpt-4o',
+            'creative': 'gpt-4o',
+            'fine_tuning': 'gpt-4o-mini',
+            'web_search': 'gpt-4o-mini',           # Responses API with web_search_preview tool
+            'web_search_fallback': 'gpt-4o-mini-search-preview',  # fallback search model
         }
 
         # Fine-tuned model settings
@@ -250,6 +252,57 @@ class OpenAIClient:
         except Exception as e:
             logging.error(f"API key validation failed: {str(e)}")
             return False
+
+    def web_search_completion(self, prompt: str, task_type: str = 'general') -> Optional[str]:
+        """
+        Send a prompt with real web search using OpenAI Responses API (web_search_preview tool).
+        Falls back to gpt-4o-mini-search-preview model if Responses API is unavailable.
+        """
+        try:
+            logging.debug(f"OpenAI web search - Task: {task_type}, prompt length: {len(prompt)}")
+            time.sleep(3)
+            response = self.client.responses.create(
+                model=self.models['web_search'],
+                tools=[{"type": "web_search_preview"}],
+                tool_choice={"type": "web_search_preview"},
+                input=prompt
+            )
+            # output_text is a convenience property in SDK >= 1.x
+            output_text = getattr(response, 'output_text', None)
+            if not output_text:
+                for item in getattr(response, 'output', []):
+                    if getattr(item, 'type', None) == 'message':
+                        for part in getattr(item, 'content', []):
+                            if getattr(part, 'type', None) == 'output_text':
+                                output_text = getattr(part, 'text', None)
+                                break
+            if output_text:
+                logging.debug(f"Web search response - {len(output_text)} chars")
+                return output_text.strip()
+            logging.warning("Web search returned empty output")
+            return None
+        except AttributeError:
+            logging.warning("Responses API unavailable, falling back to search-preview model")
+            return self._fallback_search_completion(prompt)
+        except Exception as e:
+            logging.error(f"Web search completion failed: {str(e)}", exc_info=True)
+            return self._fallback_search_completion(prompt)
+
+    def _fallback_search_completion(self, prompt: str) -> Optional[str]:
+        """Fallback web search using gpt-4o-mini-search-preview via Chat Completions."""
+        try:
+            time.sleep(3)
+            response = self.client.chat.completions.create(
+                model=self.models['web_search_fallback'],
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=DEFAULT_MAX_TOKENS
+            )
+            if response.choices:
+                return response.choices[0].message.content.strip()
+            return None
+        except Exception as e:
+            logging.error(f"Fallback search completion failed: {str(e)}")
+            return None
 
     def create_fine_tuning_job(self, training_file_id: str, model: str = None,
                               suffix: str = None, hyperparameters: Optional[Dict[str, Any]] = None) -> Optional[str]:

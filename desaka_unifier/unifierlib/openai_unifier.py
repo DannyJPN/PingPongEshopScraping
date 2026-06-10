@@ -81,6 +81,45 @@ CRITICAL: Always use table tennis slang and industry terminology, not literal tr
 
 Your task requires accurate analysis and proper translation to {target_language} using correct table tennis slang and terminology when needed.""")
 
+    _web_context_cache: Dict[str, str] = {}
+    _WEB_CONTEXT_CACHE_MAX = 500
+
+    def _gather_web_context(self, product: DownloadedProduct, focus: str = "") -> str:
+        """
+        Perform a real web search for this product and return a context snippet.
+        Results are cached per (product.name, focus) to avoid duplicate API calls.
+        Cache is capped at _WEB_CONTEXT_CACHE_MAX entries (FIFO eviction).
+        Returns empty string on failure — never raises.
+        """
+        cache_key = f"{product.name}|{focus}"
+        if cache_key in self._web_context_cache:
+            logging.debug(f"Web context cache hit for '{product.name}'")
+            return self._web_context_cache[cache_key]
+
+        if len(self._web_context_cache) >= self._WEB_CONTEXT_CACHE_MAX:
+            oldest_key = next(iter(self._web_context_cache))
+            del self._web_context_cache[oldest_key]
+
+        safe_name = product.name.replace('"', "'").replace('\n', ' ').strip()
+        query = f"{safe_name} {focus}".strip() if focus else safe_name
+
+        prompt = (
+            f"Search the web for information about this table tennis product: \"{query}\"\n"
+            f"Product URL: {product.url}\n\n"
+            f"Also check pincesobchod.cz for the same or similar product.\n\n"
+            f"Provide a concise factual summary (3-5 sentences) covering: "
+            f"product type, brand, key features, and typical e-commerce category. "
+            f"Facts only, no recommendations."
+        )
+        try:
+            result = self.client.web_search_completion(prompt, task_type='product_analysis')
+            context = f"\n\nWeb search results for \"{safe_name}\":\n{result}" if result else ""
+        except Exception as e:
+            logging.warning(f"_gather_web_context failed for '{product.name}': {type(e).__name__}: {e}")
+            context = ""
+        self._web_context_cache[cache_key] = context
+        return context
+
     def find_category(self, product: DownloadedProduct, category_list: List[str], language: str = 'CS', heuristic_info: str = "") -> Optional[str]:
         """
         Find category for product using OpenAI.
@@ -110,17 +149,18 @@ Your task requires accurate analysis and proper translation to {target_language}
 
         # Add heuristic info to the prompt if available
         heuristic_section = f"\n\n{heuristic_info}" if heuristic_info else ""
+        web_context = self._gather_web_context(product, "table tennis category")
 
         user_prompt = f"""I humbly request your assistance in categorizing a product. Please help me select the most appropriate category from the provided list.
 
 Product information:
-{product_json}{heuristic_section}
+{product_json}{heuristic_section}{web_context}
 
 Available categories:
 {categories_text}
 
 I kindly ask you to:
-1. Search the internet for similar products to understand their categorization
+1. Use the web search results above (if available) to understand the product's correct category
 2. Check pincesobchod.cz for table tennis product categories
 3. Analyze the product information carefully
 4. Select EXACTLY ONE category from the list above
@@ -177,17 +217,18 @@ Please return your response as valid JSON only."""
 
         # Add heuristic info to the prompt if available
         heuristic_section = f"\n\n{heuristic_info}" if heuristic_info else ""
+        web_context = self._gather_web_context(product, "brand manufacturer")
 
         user_prompt = f"""I humbly request your help in identifying the brand of a product. Please assist me in selecting the correct brand from the provided list.
 
 Product information:
-{product_json}{heuristic_section}
+{product_json}{heuristic_section}{web_context}
 
 Available brands:
 {brands_text}
 
 I respectfully ask you to:
-1. Search the internet for information about table tennis brands and manufacturers
+1. Use the web search results above (if available) to confirm the correct brand
 2. Check pincesobchod.cz for brand information and product listings
 3. Carefully analyze the product information
 4. Select EXACTLY ONE brand from the list above
@@ -293,14 +334,15 @@ Existing Google keywords from memory:
 Please draw inspiration from these existing keywords to ensure consistency and avoid duplication."""
 
         system_prompt = self._create_system_prompt('keyword_generation', language)
+        web_context = self._gather_web_context(product, "keywords search terms")
 
         user_prompt = f"""I humbly request your assistance in generating keywords for a product. Please help me create relevant search keywords.
 
 Product information:
-{product_json}{memory_section}
+{product_json}{memory_section}{web_context}
 
 I respectfully ask you to:
-1. Search the internet for similar products and current market trends
+1. Use the web search results above (if available) for current market terminology and trends
 2. Check pincesobchod.cz for table tennis product terminology and keywords
 3. Analyze the product information thoroughly
 4. Generate exactly 5 relevant keywords in {target_language}
@@ -350,14 +392,15 @@ Existing Zbozi keywords from memory:
 Please draw inspiration from these existing keywords to ensure consistency and avoid duplication."""
 
         system_prompt = self._create_system_prompt('keyword_generation', language)
+        web_context = self._gather_web_context(product, "Czech e-commerce keywords zbozi")
 
         user_prompt = f"""I humbly request your help in generating keywords for a Czech shopping platform. Please assist me in creating relevant keywords.
 
 Product information:
-{product_json}{memory_section}
+{product_json}{memory_section}{web_context}
 
 I respectfully ask you to:
-1. Search the internet for similar products on Czech e-commerce sites
+1. Use the web search results above (if available) for current Czech market terminology
 2. Check pincesobchod.cz for table tennis product terminology in Czech
 3. Research Zbozi.cz platform to understand their keyword structure
 4. Analyze the product information carefully
@@ -605,14 +648,15 @@ Please return your response as valid JSON only."""
         target_language = get_language_name(language, self.supported_languages_data)
 
         system_prompt = self._create_system_prompt('name_generation', language)
+        web_context = self._gather_web_context(product, "product name type brand model")
 
         user_prompt = f"""I humbly request your assistance in analyzing a table tennis product name. Please help me break down the product information into three distinct, non-overlapping components.
 
 Product information:
-{product_json}
+{product_json}{web_context}
 
 I respectfully ask you to:
-1. Search the internet for table tennis product naming conventions
+1. Use the web search results above (if available) to correctly identify type, brand and model
 2. Check pincesobchod.cz for how they structure table tennis product names
 3. Analyze the product information carefully
 4. Extract three DISTINCT components: type, brand, and model
@@ -787,14 +831,15 @@ Please return your response as valid JSON only."""
 
         # Add heuristic info to the prompt if available
         heuristic_section = f"\n\n{heuristic_info}" if heuristic_info else ""
+        web_context = self._gather_web_context(product, "model specifications")
 
         user_prompt = f"""I humbly request your help in identifying the product model. Please assist me in determining the specific model of this product.
 
 Product information:
-{product_json}{heuristic_section}
+{product_json}{heuristic_section}{web_context}
 
 I respectfully ask you to:
-1. Analyze the product information thoroughly
+1. Use the web search results above (if available) to confirm the exact model name
 2. Extract the specific model name/number (e.g., "ROG Strix", "Air Max 90", "Pro V1")
 3. If the model name is not in {target_language}, translate descriptive parts to {target_language} using proper table tennis terminology (e.g., "rubber" = "potah", "blade" = "dřevo", not literal translations)
 4. Keep brand-specific model names in their original form when appropriate
