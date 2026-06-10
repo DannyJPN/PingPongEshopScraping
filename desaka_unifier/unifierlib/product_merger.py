@@ -1032,8 +1032,9 @@ If none of the values match the verified specifications, provide the correct val
         cache_key = f"{memory_prefix}_{self.language}"
         self.memory_cache[cache_key] = memory_dict
 
-        # Mark as dirty (needs saving)
+        # Mark as dirty and save immediately so corrections survive an interrupt
         self.memory_dirty.add(cache_key)
+        self._save_memory_file(memory_prefix)
 
         logging.info(f"Updated {memory_prefix}_{self.language}.csv in memory: set {len(products)} entries to '{new_value}'")
 
@@ -1081,8 +1082,9 @@ If none of the values match the verified specifications, provide the correct val
         cache_key = f"{NAME_MEMORY_PREFIX}_{self.language}"
         self.memory_cache[cache_key] = memory_dict
 
-        # Mark as dirty (needs saving)
+        # Mark as dirty and save immediately so corrections survive an interrupt
         self.memory_dirty.add(cache_key)
+        self._save_memory_file(NAME_MEMORY_PREFIX)
 
         logging.info(f"Updated {NAME_MEMORY_PREFIX}_{self.language}.csv in memory: set {len(products)} entries to '{composed_name}'")
 
