@@ -346,6 +346,10 @@ def main():
         )
         merged_products = product_merger.merge_products(repaired_products)
 
+        # Generate product codes now that brand/category are finalised after merging
+        logging.info("Generating product codes post-merge...")
+        parser.generate_codes_for_products(merged_products)
+
         logging.info(f"Product merging completed:")
         logging.info(f"  - Original products: {len(repaired_products)}")
         logging.info(f"  - Merged products: {len(merged_products)}")
