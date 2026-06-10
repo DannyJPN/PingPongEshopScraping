@@ -922,7 +922,7 @@ If none of the values match the verified specifications, provide the correct val
                        for key, value in self.memory_cache[cache_key].items()]
 
             save_csv_file(csv_data, file_path)
-            logging.info(f"Saved memory file: {file_path} ({len(csv_data)} entries)")
+            logging.debug(f"Saved memory file: {file_path} ({len(csv_data)} entries)")
 
             # Clear dirty flag after successful save
             self.memory_dirty.discard(cache_key)
@@ -1036,7 +1036,7 @@ If none of the values match the verified specifications, provide the correct val
         self.memory_dirty.add(cache_key)
         self._save_memory_file(memory_prefix)
 
-        logging.info(f"Updated {memory_prefix}_{self.language}.csv in memory: set {len(products)} entries to '{new_value}'")
+        logging.debug(f"Updated {memory_prefix}_{self.language}.csv in memory: set {len(products)} entries to '{new_value}'")
 
     def _update_name_memory(self, products: List[RepairedProduct], type_val: str,
                             brand_val: str, model_val: str):
@@ -1086,7 +1086,7 @@ If none of the values match the verified specifications, provide the correct val
         self.memory_dirty.add(cache_key)
         self._save_memory_file(NAME_MEMORY_PREFIX)
 
-        logging.info(f"Updated {NAME_MEMORY_PREFIX}_{self.language}.csv in memory: set {len(products)} entries to '{composed_name}'")
+        logging.debug(f"Updated {NAME_MEMORY_PREFIX}_{self.language}.csv in memory: set {len(products)} entries to '{composed_name}'")
 
     def _get_variant_key(self, variant: Variant) -> str:
         """
