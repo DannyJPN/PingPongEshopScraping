@@ -9,7 +9,7 @@ from typing import List, Dict, Any
 from shared.file_ops import load_txt_file, load_csv_file, save_csv_file
 from .constants import (
     BRAND_CODE_LIST, CATEGORY_CODE_LIST, CATEGORY_ID_LIST, CATEGORY_LIST,
-    CATEGORY_SUB_CODE_LIST, DEFAULT_EXPORT_PRODUCT_VALUES,
+    CATEGORY_SUB_CODE_LIST, DEFAULT_EXPORT_PRODUCT_VALUES, VAT_RATE_LIST,
     ESHOP_LIST, ITEM_FILTER, WRONGS_FILE, SUPPORTED_LANGUAGES_FILE,
     CATEGORY_MAPPING_GLAMI_PREFIX, CATEGORY_MAPPING_GOOGLE_PREFIX,
     CATEGORY_MAPPING_HEUREKA_PREFIX, CATEGORY_MAPPING_ZBOZI_PREFIX,
@@ -143,6 +143,7 @@ def load_all_memory_files(memory_dir: str, language: str) -> Dict[str, Any]:
             'CategoryList': CATEGORY_LIST,
             'CategorySubCodeList': CATEGORY_SUB_CODE_LIST,
             'DefaultExportProductValues': DEFAULT_EXPORT_PRODUCT_VALUES,
+            'VATRateList': VAT_RATE_LIST,
             'EshopList': ESHOP_LIST,
             'ItemFilter': ITEM_FILTER,
             'Wrongs': WRONGS_FILE,
