@@ -344,7 +344,7 @@ def extract_product_photogallery_links(dom_tree):
             meta = dom_tree.find('meta', property='og:image')
             if meta and meta.get('content'):
                 url = _normalize_img_url(meta['content'])
-                if url and url != main_img_url:
+                if url:
                     links.append(url)
                     logging.debug(f'Gallery fallback via og:image: {url}')
         logging.debug(f'Extracted {len(links)} gallery images')
