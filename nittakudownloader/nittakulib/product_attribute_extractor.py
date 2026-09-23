@@ -307,52 +307,50 @@ def extract_product_main_photo_link(dom_tree):
         logging.error(f"Error extracting main photo: {e}")
         return ""
 
+def _normalize_img_url(raw_url):
+    if not raw_url:
+        return ''
+    if raw_url.startswith('//'):
+        raw_url = 'https:' + raw_url
+    elif not raw_url.startswith(('http://', 'https://')):
+        raw_url = urljoin(MAIN_URL, raw_url)
+    for size in ['_800x', '_600x', '_500x', '_400x', '_300x', '_200x', '_130x', '_100x', '_60x']:
+        if size in raw_url:
+            raw_url = raw_url.replace(size, '_1600x')
+            break
+    return raw_url
+
+
 def extract_product_photogallery_links(dom_tree):
-    """
-    Extract product gallery image URLs from the product detail page DOM.
-
-    :param dom_tree: BeautifulSoup object containing the parsed HTML of a product detail page
-    :return: List of URLs of product gallery images
-    """
     links = []
+    seen = set()
     try:
-        # Find all product images in the gallery
-        all_images = dom_tree.find_all('img')
         main_img_url = extract_product_main_photo_link(dom_tree)
-
-        # Process each image
-        for img in all_images:
-            if img.get('src'):
-                img_url = img['src']
-
-                # Skip icons, logos, and other non-product images
-                if any(x in img_url.lower() for x in ['icon', 'logo', 'payment', 'social']):
-                    continue
-
-                # Make sure it's a full URL
-                if img_url.startswith('//'):
-                    img_url = 'https:' + img_url
-                elif not img_url.startswith(('http://', 'https://')):
-                    img_url = urljoin(MAIN_URL, img_url)
-
-                # Replace size indicators with highest quality version
-                for size in ['_800x', '_600x', '_500x', '_400x', '_300x', '_200x', '_130x', '_100x', '_60x']:
-                    if size in img_url:
-                        img_url = img_url.replace(size, '_1600x')
-                        break
-
-                # Note: We keep the original URL format (webp) for downloading
-                # The conversion from webp to jpg will happen in the image_downloader
-
-                # Add to links if not already there and not the main image
-                if img_url != main_img_url and img_url not in links:
-                    links.append(img_url)
-                    logging.debug(f"Found gallery image: {img_url}")
-
-        logging.debug(f"Extracted {len(links)} gallery images")
+        carousel_items = dom_tree.find_all(
+            class_=lambda c: c and 'product-gallery__carousel-item' in (
+                c if isinstance(c, str) else ' '.join(c)
+            )
+        )
+        if carousel_items:
+            for item in carousel_items:
+                for img in item.find_all('img'):
+                    raw = img.get('data-zoom') or img.get('src', '')
+                    url = _normalize_img_url(raw)
+                    if url and url != main_img_url and url not in seen:
+                        seen.add(url)
+                        links.append(url)
+                        logging.debug(f'Found gallery image: {url}')
+        else:
+            meta = dom_tree.find('meta', property='og:image')
+            if meta and meta.get('content'):
+                url = _normalize_img_url(meta['content'])
+                if url and url != main_img_url:
+                    links.append(url)
+                    logging.debug(f'Gallery fallback via og:image: {url}')
+        logging.debug(f'Extracted {len(links)} gallery images')
         return links
     except Exception as e:
-        logging.error(f"Error extracting gallery photos: {e}")
+        logging.error(f'Error extracting gallery photos: {e}')
         return []
 
 def extract_product(filepath):
