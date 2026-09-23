@@ -417,10 +417,10 @@ class ProductParser:
         repaired.url = downloaded.url
 
         # desc = from DescMemory or OpenAI
-        repaired.desc = self._get_description(downloaded)
+        #repaired.desc = self._get_description(downloaded)
 
         # shortdesc = from ShortDescMemory or OpenAI
-        repaired.shortdesc = self._get_short_description(downloaded)
+        #repaired.shortdesc = self._get_short_description(downloaded)
 
         # name = from NameMemory or OpenAI (composed from type + brand + model)
         repaired.name = self._get_product_name(downloaded)
@@ -440,11 +440,12 @@ class ProductParser:
 
 
 
-        # code = complex code generation (needs brand and category)
-        repaired.code = self._generate_code(repaired.brand, repaired.category, repaired.name)
+        # code is generated after merging (in generate_codes_for_products) so that
+        # brand/category corrections during merge don't produce stale/duplicate codes
+        repaired.code = ""
 
-        # Variants = complex variant processing (needs code for variant codes)
-        repaired.Variants = self._process_variants(downloaded, repaired.code)
+        # Variants processed without base_code; variant codes are assigned after merge
+        repaired.Variants = self._process_variants(downloaded)
         # price and price_standard = from variants
         repaired.price, repaired.price_standard = self._get_prices(downloaded)
 
@@ -1317,6 +1318,20 @@ class ProductParser:
         self.product_name_codes[(base_code, product_name)] = final_code
 
         return final_code
+
+    def generate_codes_for_products(self, products) -> None:
+        """Assign product codes and variant codes after merging.
+
+        Must be called after ProductMerger.merge_products() so that brand and
+        category are already corrected and stable.
+        """
+        for product in products:
+            product.code = self._generate_code(product.brand, product.category, product.name)
+            for i, variant in enumerate(product.Variants or []):
+                if product.code:
+                    variant.variantcode = self._generate_variant_code_for_variant(
+                        product.code, variant, i + 1
+                    )
 
     def _get_next_product_index(self, base_code: str, product_name: str) -> int:
         """
