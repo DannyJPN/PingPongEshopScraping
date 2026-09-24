@@ -7,6 +7,7 @@ import logging
 import time
 import requests
 from typing import Optional
+from urllib.parse import urlsplit
 
 from .download_constants import (
     MAX_RETRY_ATTEMPTS,
@@ -16,6 +17,37 @@ from .download_constants import (
     DEFAULT_TIMEOUT
 )
 from .download_stats import DownloadStats
+
+
+BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/140.0.0.0 Safari/537.36"
+    ),
+    "Accept": (
+        "text/html,application/xhtml+xml,application/xml;q=0.9,"
+        "image/avif,image/webp,image/apng,*/*;q=0.8"
+    ),
+    "Accept-Language": "cs-CZ,cs;q=0.9,en;q=0.8",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+}
+
+_HTTP_SESSION = requests.Session()
+_HTTP_SESSION.headers.update(BROWSER_HEADERS)
+
+
+def _ensure_referer(url: str) -> None:
+    """Use the downloader's first target site as the session referer."""
+    if "Referer" in _HTTP_SESSION.headers:
+        return
+
+    parsed_url = urlsplit(url)
+    if parsed_url.scheme and parsed_url.netloc:
+        _HTTP_SESSION.headers["Referer"] = (
+            f"{parsed_url.scheme}://{parsed_url.netloc}/"
+        )
 
 
 def download_with_retry(
@@ -43,7 +75,12 @@ def download_with_retry(
     for attempt in range(1, MAX_RETRY_ATTEMPTS + 1):
         try:
             # Make request
-            response = requests.get(url, headers=headers, timeout=timeout)
+            _ensure_referer(url)
+            response = _HTTP_SESSION.get(
+                url,
+                headers=headers,
+                timeout=timeout,
+            )
 
             # Check for HTTP errors
             if response.status_code == 404:
