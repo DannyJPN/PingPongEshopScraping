@@ -207,9 +207,6 @@
     ],
     "deny": [
       "Read(C:/**)",
-
-      "Write(/**)",
-      "Edit(/**)",
       "Delete(/**)",
 
       "Bash(git merge:*)",
