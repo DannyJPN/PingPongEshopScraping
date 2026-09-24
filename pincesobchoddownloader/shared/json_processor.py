@@ -21,7 +21,12 @@ def process_json_file(json_filepath, result_folder, lang_code, overwrite, stats=
         # First loop: Process and save product information
         with tqdm(total=len(products), desc="Processing Products") as pbar:
             for product in products:
-                product_name = product.get('translations', {}).get(lang_code.lower(), {}).get('name', 'Unknown')
+                translations = product.get('translations', {})
+                product_name = (
+                    translations.get(lang_code.lower(), {}).get('name')
+                    or translations.get('cs', {}).get('name')
+                    or 'Unknown'
+                )
                 product_code = product.get('catalogNumber', 'Unknown')
 
                 # Sanitize the product name for use as a filename
