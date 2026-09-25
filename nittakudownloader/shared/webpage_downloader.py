@@ -1,9 +1,9 @@
-import os
+﻿import os
 import logging
-import requests
 from shared.utils import sanitize_filename
+from shared.http_downloader import download_with_retry
 
-def download_webpage(url, filepath, overwrite=False, debug=False):
+def download_webpage(url, filepath, overwrite=False, debug=False, stats=None):
     try:
         logging.debug(f"Starting download_webpage function for URL: {url}")
 
@@ -23,25 +23,32 @@ def download_webpage(url, filepath, overwrite=False, debug=False):
             logging.debug(f"File already exists and overwrite is not set: {sanitized_filepath}")
             return True
 
-        # Download the webpage
+        # Download the webpage with retry logic
         logging.debug(f"Making HTTP request to URL: {url}")
-        response = requests.get(url)
+        response = download_with_retry(url, stats=stats)
 
-        if response.status_code == 404:
-            logging.debug(f"404 Not Found for URL: {url}")
+        if response is None:
+            logging.debug(f"Failed to download URL: {url}")
             return False
-        
-        # Comment out raise_for_status to avoid exceptions for non-404 errors
-        # response.raise_for_status()  # Raise an HTTPError for other bad responses
 
-        logging.debug(f"Downloading webpage from URL: {url} to filepath: {sanitized_filepath}")
+        logging.debug(f"Successfully downloaded webpage from URL: {url} to filepath: {sanitized_filepath}")
 
-        # Write the content to a file in binary mode to preserve encoding
-        with open(sanitized_filepath, 'wb') as file:
-            file.write(response.content)
+        # Write the content to a file
+        with open(sanitized_filepath, 'w', encoding='utf-8') as file:
+            file.write(response.text)
 
         return True
 
     except Exception as e:
-        logging.error(f"Error downloading {url} to {filepath}: {e}", exc_info=True)
+        logging.error(f"Error downloading {url} to {sanitized_filepath}: {e}", exc_info=True)
         return False
+
+
+
+
+
+
+
+
+
+

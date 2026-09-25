@@ -11,6 +11,78 @@ Desaka is a comprehensive Python-based e-commerce product data unification syste
 
 **Note**: The `unifier/` directory is legacy code and should be deleted - it's no longer used.
 
+---
+
+## 🤖 AI Development Team (Claude Code Skills)
+
+This project includes a **complete AI development team** implemented as Claude Code Skills. The team consists of senior specialists, each leading 3-5 junior team members, organized by function.
+
+### Team Organization
+
+The AI team is located in `.claude/skills/` and organized into 12 functional areas:
+
+1. **Leadership** (`01-leadership/`) - Architecture, project management
+2. **Development** (`02-development/`) - Python development, web scraping, AI integration
+3. **Testing** (`03-testing/`) - 8 specialized testing roles (penetration, unit, integration, performance, E2E, load, security, regression)
+4. **Infrastructure** (`04-infrastructure/`) - DevOps, CI/CD, monitoring, SRE
+5. **Data** (`05-data/`) - Data analysis, data science, database management
+6. **Security** (`06-security/`) - Cybersecurity, compliance, auditing
+7. **Design** (`07-design/`) - UI/UX, graphics, technical writing
+8. **Documentation** (`08-documentation/`) - Localization, i18n
+9. **Version Control** (`09-vcs/`) - Git workflows, code review, **Dropbox coordination**
+10. **Domain Specialists** (`10-domain/`) - E-commerce platforms, API design, performance
+11. **Reliability** (`11-reliability/`) - Monitoring, observability
+12. **Memory Validation** (`12-memory-validation/`) - **Semantic validation** of Memory CSV files
+
+### How to Use AI Team Skills
+
+Invoke specialists using the `/` command with their skill name:
+
+```bash
+# Examples:
+/senior-python-developer "Implement variant handling for products"
+/senior-penetration-tester "Test downloader security vulnerabilities"
+/senior-unit-test-specialist "Write tests for parser.py with 95% coverage"
+/senior-github-specialist "Commit and push memory file changes"  # CRITICAL for Dropbox!
+/senior-data-analyst "Analyze product coverage across e-shops"
+```
+
+### Key Specialists for Common Tasks
+
+| Task | Specialist to Use |
+|------|------------------|
+| Implement new feature | `/senior-python-developer` |
+| Add new e-shop downloader | `/senior-web-scraping-specialist` |
+| OpenAI integration | `/senior-ai-llm-integration-specialist` |
+| Security testing | `/senior-penetration-tester` |
+| Unit testing | `/senior-unit-test-specialist` |
+| Performance optimization | `/senior-performance-test-specialist` |
+| Git operations | `/senior-github-specialist` (⚠️ Handles Dropbox!) |
+| Data analysis | `/senior-data-analyst` |
+| Platform exports | `/senior-ecommerce-platform-specialist` |
+| Architecture design | `/senior-software-architect` |
+| Sprint planning | `/senior-technical-project-manager` |
+| **Memory validation** | `/senior-name-memory-validator`, `/senior-product-brand-memory-validator`, `/senior-cross-reference-validator` |
+
+### Team Hierarchy
+
+```
+User (Customer)
+  ↓ (humble, request feedback)
+Senior Specialists (30+ roles)
+  ↓ (mentor, praise/criticize)
+Junior Specialists (100+ team members)
+```
+
+**Behavioral Protocol:**
+- **Seniors → User**: Humble, respectful, request criticism when making mistakes
+- **Seniors → Juniors**: Mentoring, constructive feedback, delegation
+- **Juniors → Seniors**: Eager to learn, execute delegated tasks
+
+For complete team documentation, see [.claude/skills/README.md](.claude/skills/README.md)
+
+---
+
 ## Architecture
 
 ### Main Unifier (desaka_unifier/)
@@ -140,7 +212,7 @@ python unifier.py --Language CS --Debug
 
 **Key Unifier Parameters**:
 - `--Language CS/SK` - Target language (Czech/Slovak)
-- `--Debug` - Enable debug logging
+- `--Debug` - Enable debug logging (includes detailed product filtering information with rejection reasons)
 - `--SkipScripts` - Skip downloader execution, process existing data only
 - `--SkipAI` - Skip AI processing (use cached memory only)
 - `--ConfirmAIResults` - Auto-confirm AI suggestions without user prompts

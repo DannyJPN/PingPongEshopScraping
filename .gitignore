@@ -30,3 +30,6 @@ desaka_unifier/populate_*.py
 # Project-specific temporary files
 MEMORY_COMPLETION_PROMPT.md
 MISSINGDETECTOR.ps1
+
+# Architecture/spec documentation (local, not tracked)
+specs_architecture/

@@ -74,6 +74,107 @@ def load_txt_file(file_path: str) -> List[str]:
         raise
 
 
+def append_to_txt_file(file_path: str, lines: List[str]) -> None:
+    """
+    Append lines to a text file in UTF-8 format.
+
+    Args:
+        file_path (str): Path to the text file
+        lines (List[str]): Lines to append to the file
+    """
+    try:
+        logging.debug(f"Appending {len(lines)} lines to text file: {file_path}")
+
+        # Ensure the parent directory exists
+        parent_dir = os.path.dirname(file_path)
+        if parent_dir and not os.path.exists(parent_dir):
+            ensure_directory_exists(parent_dir)
+
+        # Append with UTF-8 encoding
+        with open(file_path, 'a', encoding='utf-8') as f:
+            for line in lines:
+                f.write(f"{line}\n")
+
+        logging.debug(f"Successfully appended {len(lines)} lines to: {file_path}")
+
+    except PermissionError as e:
+        logging.error(f"Permission denied while appending to file {file_path}. Error: {str(e)}", exc_info=True)
+        raise
+    except OSError as e:
+        if e.errno == 28:  # ENOSPC - No space left on device
+            logging.error(f"Disk full while appending to file {file_path}. Error: {str(e)}", exc_info=True)
+        else:
+            logging.error(f"OS error while appending to file {file_path}. Error: {str(e)}", exc_info=True)
+        raise
+    except Exception as e:
+        logging.error(f"Error appending to text file {file_path}. Error: {str(e)}", exc_info=True)
+        raise
+
+
+def append_to_csv_file(file_path: str, data: Any) -> None:
+    """
+    Append data to a CSV file in UTF-8 format.
+    Creates file with header if it doesn't exist.
+
+    Args:
+        file_path (str): Path to the CSV file
+        data: Dictionary or list of dictionaries to append
+    """
+    import csv
+
+    try:
+        # Normalize data to list of dicts
+        if isinstance(data, dict):
+            rows = [data]
+        elif isinstance(data, list):
+            rows = data
+        else:
+            raise ValueError(f"Data must be dict or list of dicts, got {type(data)}")
+
+        if not rows:
+            return
+
+        # Ensure the parent directory exists
+        parent_dir = os.path.dirname(file_path)
+        if parent_dir and not os.path.exists(parent_dir):
+            ensure_directory_exists(parent_dir)
+
+        # Get fieldnames from first row
+        fieldnames = list(rows[0].keys())
+
+        # Check if file exists to determine if we need to write header
+        file_exists = os.path.exists(file_path)
+
+        logging.debug(f"Appending {len(rows)} row(s) to CSV file: {file_path}")
+
+        # Append with UTF-8 encoding
+        with open(file_path, 'a', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, quotechar='"', quoting=csv.QUOTE_ALL)
+
+            # Write header only if file is new
+            if not file_exists:
+                writer.writeheader()
+                logging.debug(f"Created new CSV file with header: {file_path}")
+
+            # Write data rows
+            writer.writerows(rows)
+
+        logging.debug(f"Successfully appended {len(rows)} row(s) to: {file_path}")
+
+    except PermissionError as e:
+        logging.error(f"Permission denied while appending to CSV file {file_path}. Error: {str(e)}", exc_info=True)
+        raise
+    except OSError as e:
+        if e.errno == 28:  # ENOSPC - No space left on device
+            logging.error(f"Disk full while appending to CSV file {file_path}. Error: {str(e)}", exc_info=True)
+        else:
+            logging.error(f"OS error while appending to CSV file {file_path}. Error: {str(e)}", exc_info=True)
+        raise
+    except Exception as e:
+        logging.error(f"Error appending to CSV file {file_path}. Error: {str(e)}", exc_info=True)
+        raise
+
+
 
 
 
@@ -156,14 +257,25 @@ def load_csv_file(filepath):
 
 
 def save_csv_file(csv_data, filepath):
-    """Save data to a CSV file in UTF-8 format with backup creation."""
+    """
+    Save data to a CSV file in UTF-8 format with backup creation.
+
+    Creates backup of existing file before overwriting.
+    """
+    import csv
+    import shutil
+
     try:
         # Create backup of existing file
         if os.path.exists(filepath):
             backup_filepath = f"{filepath}.{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv_old"
-            import shutil
             shutil.copy(filepath, backup_filepath)
             logging.debug(f"Backup of the original file created: {backup_filepath}")
+
+        # Ensure parent directory exists
+        parent_dir = os.path.dirname(filepath)
+        if parent_dir and not os.path.exists(parent_dir):
+            ensure_directory_exists(parent_dir)
 
         df = pd.DataFrame(csv_data)
 
@@ -171,23 +283,23 @@ def save_csv_file(csv_data, filepath):
         logging.debug(f"Data being saved: {df.head()}")
         logging.debug(f"Saving CSV with UTF-8 encoding to: {filepath}")
 
-        # Save with UTF-8 encoding
-        import csv
+        # Direct write to target file
         df.to_csv(filepath, index=False, quotechar='"', quoting=csv.QUOTE_ALL, encoding='utf-8')
+
         logging.debug(f"CSV file saved successfully in UTF-8 format: {filepath}")
 
     except PermissionError as e:
         logging.error(f"Permission denied while saving file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        raise
     except OSError as e:
-        logging.error(f"OS error while saving file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        if e.errno == 28:  # ENOSPC - No space left on device
+            logging.error(f"Disk full while saving file {filepath}. Error: {str(e)}", exc_info=True)
+        else:
+            logging.error(f"OS error while saving file {filepath}. Error: {str(e)}", exc_info=True)
+        raise
     except Exception as e:
         logging.error(f"Error saving CSV file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        raise
 
 
 def save_json_file(data: Dict[str, Any], filepath: str) -> None:
@@ -209,16 +321,16 @@ def save_json_file(data: Dict[str, Any], filepath: str) -> None:
 
     except PermissionError as e:
         logging.error(f"Permission denied while saving file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        raise
     except OSError as e:
-        logging.error(f"OS error while saving file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        if e.errno == 28:  # ENOSPC - No space left on device
+            logging.error(f"Disk full while saving file {filepath}. Error: {str(e)}", exc_info=True)
+        else:
+            logging.error(f"OS error while saving file {filepath}. Error: {str(e)}", exc_info=True)
+        raise
     except Exception as e:
         logging.error(f"Error saving JSON file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        raise
 
 
 def save_jsonl_file(data: List[Dict[str, Any]], filepath: str) -> None:
@@ -241,13 +353,13 @@ def save_jsonl_file(data: List[Dict[str, Any]], filepath: str) -> None:
 
     except PermissionError as e:
         logging.error(f"Permission denied while saving file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        raise
     except OSError as e:
-        logging.error(f"OS error while saving file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        if e.errno == 28:  # ENOSPC - No space left on device
+            logging.error(f"Disk full while saving file {filepath}. Error: {str(e)}", exc_info=True)
+        else:
+            logging.error(f"OS error while saving file {filepath}. Error: {str(e)}", exc_info=True)
+        raise
     except Exception as e:
         logging.error(f"Error saving JSONL file {filepath}. Error: {str(e)}", exc_info=True)
-        import sys
-        sys.exit(1)
+        raise

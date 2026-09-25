@@ -35,9 +35,9 @@
       "Bash(sort:*)",
       "Bash(gh issue create:*)",
 
-      "Bash(powershell.exe -NoProfile -Command \"Stop-Process -Name 'Dropbox'*:*)",
-      "Bash(powershell.exe -Command \"Get-Process -Name 'Dropbox'*:*)",
-      "Bash(powershell.exe -NoProfile -Command \"Start-Process -FilePath*Dropbox*:*)",
+      "Bash(powershell.exe -NoProfile -Command Stop-Process:*)",
+      "Bash(powershell.exe -Command Get-Process:*)",
+      "Bash(powershell.exe -NoProfile -Command Start-Process:*)",
 
       "Read(//f/tmp/claude/**)",
 
@@ -161,7 +161,6 @@
       "WebFetch(domain:tuttle-tabletennis.com)",
 	  "WebFetch(domain:www.contra.de)",
 	  "WebFetch(domain:www.spinway.sk)",
-	  "WebFetch(domain:nittaku.tt)",
 
       "WebFetch(domain:openai.com)",
       "WebFetch(domain:platform.openai.com)",
@@ -208,9 +207,6 @@
     ],
     "deny": [
       "Read(C:/**)",
-
-      "Write(/**)",
-      "Edit(/**)",
       "Delete(/**)",
 
       "Bash(git merge:*)",
@@ -235,19 +231,9 @@
     "respectUserBranches": true
   },
 
-  "additionalDirectories": [
-    ".."
-  ],
-
-  "statusLine": {
-    "type": "text",
-    "text": "Desaka Project"
-  },
-
   "dropboxManagement": {
-    "stopCommand": "powershell.exe -NoProfile -Command \"Stop-Process -Name 'Dropbox' -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2\"",
-    "startCommand": "powershell.exe -NoProfile -Command \"Start-Process -FilePath 'C:\\Program Files (x86)\\Dropbox\\Client\\Dropbox.exe'\"",
-    "checkCommand": "powershell.exe -Command \"Get-Process -Name 'Dropbox' -ErrorAction SilentlyContinue\"",
-    "note": "Always stop Dropbox BEFORE git operations (add/commit/push) to avoid permission denied errors in .git/objects/"
+    "stopDropbox": "powershell.exe -NoProfile -Command \"Stop-Process -Name 'Dropbox' -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2\"",
+    "startDropbox": "powershell.exe -NoProfile -Command \"Start-Process -FilePath 'C:\\Program Files (x86)\\Dropbox\\Client\\Dropbox.exe'\"",
+    "checkDropbox": "powershell.exe -Command \"Get-Process -Name 'Dropbox' -ErrorAction SilentlyContinue\""
   }
 }

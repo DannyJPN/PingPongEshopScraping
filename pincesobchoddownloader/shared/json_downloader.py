@@ -1,8 +1,8 @@
 import os
 import logging
-import requests
+from shared.http_downloader import download_with_retry
 
-def download_json_file(url, filepath, lang_code, overwrite=False):
+def download_json_file(url, filepath, lang_code, overwrite=False, stats=None):
     try:
         logging.debug(f"Starting download_json_file function for URL: {url} with overwrite={overwrite}")
 
@@ -37,13 +37,13 @@ def download_json_file(url, filepath, lang_code, overwrite=False):
 
         logging.debug(f"Making a request to {url} with headers: {headers}")
 
-        # Make the HTTP GET request
-        response = requests.get(url, headers=headers)
+        # Make the HTTP GET request with retry logic
+        response = download_with_retry(url, stats=stats, headers=headers)
 
         # Check if the request was successful
-        if response.status_code != 200:
-            logging.error(f"Error downloading JSON file: {response.text}")
-            raise Exception(f"Failed to download JSON file: {response.text}")
+        if response is None:
+            logging.error(f"Failed to download JSON file from URL: {url}")
+            raise Exception(f"Failed to download JSON file from URL: {url}")
 
         # Write the response content to the file
         with open(filepath, 'w', encoding='utf-8') as file:

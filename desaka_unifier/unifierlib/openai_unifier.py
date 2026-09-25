@@ -81,6 +81,45 @@ CRITICAL: Always use table tennis slang and industry terminology, not literal tr
 
 Your task requires accurate analysis and proper translation to {target_language} using correct table tennis slang and terminology when needed.""")
 
+    _web_context_cache: Dict[str, str] = {}
+    _WEB_CONTEXT_CACHE_MAX = 500
+
+    def _gather_web_context(self, product: DownloadedProduct, focus: str = "") -> str:
+        """
+        Perform a real web search for this product and return a context snippet.
+        Results are cached per (product.name, focus) to avoid duplicate API calls.
+        Cache is capped at _WEB_CONTEXT_CACHE_MAX entries (FIFO eviction).
+        Returns empty string on failure — never raises.
+        """
+        cache_key = f"{product.name}|{focus}"
+        if cache_key in self._web_context_cache:
+            logging.debug(f"Web context cache hit for '{product.name}'")
+            return self._web_context_cache[cache_key]
+
+        if len(self._web_context_cache) >= self._WEB_CONTEXT_CACHE_MAX:
+            oldest_key = next(iter(self._web_context_cache))
+            del self._web_context_cache[oldest_key]
+
+        safe_name = product.name.replace('"', "'").replace('\n', ' ').strip()
+        query = f"{safe_name} {focus}".strip() if focus else safe_name
+
+        prompt = (
+            f"Search the web for information about this table tennis product: \"{query}\"\n"
+            f"Product URL: {product.url}\n\n"
+            f"Also check pincesobchod.cz for the same or similar product.\n\n"
+            f"Provide a concise factual summary (3-5 sentences) covering: "
+            f"product type, brand, key features, and typical e-commerce category. "
+            f"Facts only, no recommendations."
+        )
+        try:
+            result = self.client.web_search_completion(prompt, task_type='product_analysis')
+            context = f"\n\nWeb search results for \"{safe_name}\":\n{result}" if result else ""
+        except Exception as e:
+            logging.warning(f"_gather_web_context failed for '{product.name}': {type(e).__name__}: {e}")
+            context = ""
+        self._web_context_cache[cache_key] = context
+        return context
+
     def find_category(self, product: DownloadedProduct, category_list: List[str], language: str = 'CS', heuristic_info: str = "") -> Optional[str]:
         """
         Find category for product using OpenAI.
@@ -110,17 +149,18 @@ Your task requires accurate analysis and proper translation to {target_language}
 
         # Add heuristic info to the prompt if available
         heuristic_section = f"\n\n{heuristic_info}" if heuristic_info else ""
+        web_context = self._gather_web_context(product, "table tennis category")
 
         user_prompt = f"""I humbly request your assistance in categorizing a product. Please help me select the most appropriate category from the provided list.
 
 Product information:
-{product_json}{heuristic_section}
+{product_json}{heuristic_section}{web_context}
 
 Available categories:
 {categories_text}
 
 I kindly ask you to:
-1. Search the internet for similar products to understand their categorization
+1. Use the web search results above (if available) to understand the product's correct category
 2. Check pincesobchod.cz for table tennis product categories
 3. Analyze the product information carefully
 4. Select EXACTLY ONE category from the list above
@@ -177,17 +217,18 @@ Please return your response as valid JSON only."""
 
         # Add heuristic info to the prompt if available
         heuristic_section = f"\n\n{heuristic_info}" if heuristic_info else ""
+        web_context = self._gather_web_context(product, "brand manufacturer")
 
         user_prompt = f"""I humbly request your help in identifying the brand of a product. Please assist me in selecting the correct brand from the provided list.
 
 Product information:
-{product_json}{heuristic_section}
+{product_json}{heuristic_section}{web_context}
 
 Available brands:
 {brands_text}
 
 I respectfully ask you to:
-1. Search the internet for information about table tennis brands and manufacturers
+1. Use the web search results above (if available) to confirm the correct brand
 2. Check pincesobchod.cz for brand information and product listings
 3. Carefully analyze the product information
 4. Select EXACTLY ONE brand from the list above
@@ -293,14 +334,15 @@ Existing Google keywords from memory:
 Please draw inspiration from these existing keywords to ensure consistency and avoid duplication."""
 
         system_prompt = self._create_system_prompt('keyword_generation', language)
+        web_context = self._gather_web_context(product, "keywords search terms")
 
         user_prompt = f"""I humbly request your assistance in generating keywords for a product. Please help me create relevant search keywords.
 
 Product information:
-{product_json}{memory_section}
+{product_json}{memory_section}{web_context}
 
 I respectfully ask you to:
-1. Search the internet for similar products and current market trends
+1. Use the web search results above (if available) for current market terminology and trends
 2. Check pincesobchod.cz for table tennis product terminology and keywords
 3. Analyze the product information thoroughly
 4. Generate exactly 5 relevant keywords in {target_language}
@@ -350,14 +392,15 @@ Existing Zbozi keywords from memory:
 Please draw inspiration from these existing keywords to ensure consistency and avoid duplication."""
 
         system_prompt = self._create_system_prompt('keyword_generation', language)
+        web_context = self._gather_web_context(product, "Czech e-commerce keywords zbozi")
 
         user_prompt = f"""I humbly request your help in generating keywords for a Czech shopping platform. Please assist me in creating relevant keywords.
 
 Product information:
-{product_json}{memory_section}
+{product_json}{memory_section}{web_context}
 
 I respectfully ask you to:
-1. Search the internet for similar products on Czech e-commerce sites
+1. Use the web search results above (if available) for current Czech market terminology
 2. Check pincesobchod.cz for table tennis product terminology in Czech
 3. Research Zbozi.cz platform to understand their keyword structure
 4. Analyze the product information carefully
@@ -605,14 +648,15 @@ Please return your response as valid JSON only."""
         target_language = get_language_name(language, self.supported_languages_data)
 
         system_prompt = self._create_system_prompt('name_generation', language)
+        web_context = self._gather_web_context(product, "product name type brand model")
 
         user_prompt = f"""I humbly request your assistance in analyzing a table tennis product name. Please help me break down the product information into three distinct, non-overlapping components.
 
 Product information:
-{product_json}
+{product_json}{web_context}
 
 I respectfully ask you to:
-1. Search the internet for table tennis product naming conventions
+1. Use the web search results above (if available) to correctly identify type, brand and model
 2. Check pincesobchod.cz for how they structure table tennis product names
 3. Analyze the product information carefully
 4. Extract three DISTINCT components: type, brand, and model
@@ -643,37 +687,56 @@ Please return your response as valid JSON only."""
 
         return None
 
-    def translate_and_validate_short_description(self, short_description: str, language: str, description: str = "") -> Optional[str]:
+    def translate_and_validate_short_description(self, short_description: str, language: str, description: str = "",
+                                                 product_type: str = None, product_brand: str = None,
+                                                 product_model: str = None) -> Optional[str]:
         """Translate and validate short description using OpenAI, or generate from description if short_description is empty."""
         from unifierlib.memory_manager import get_language_name
         target_language = get_language_name(language, self.supported_languages_data)
 
         system_prompt = self._create_system_prompt('translation', language)
 
+        # Build product context section if available
+        product_context = ""
+        if product_type or product_brand or product_model:
+            context_parts = []
+            if product_type:
+                context_parts.append(f"- Type: {product_type}")
+            if product_brand:
+                context_parts.append(f"- Brand: {product_brand}")
+            if product_model:
+                context_parts.append(f"- Model: {product_model}")
+            product_context = "\n\nProduct context:\n" + "\n".join(context_parts)
+
         # If short description is empty but description is available, generate from description
         if not short_description or not short_description.strip():
             if description and description.strip():
-                user_prompt = f"""I humbly request your help in generating a short product description for table tennis equipment from the full description. Please assist me in creating a proper short description.
+                user_prompt = f"""I humbly request your help in generating a short product description for table tennis equipment from the full description.{product_context}
 
 Full product description: {description}
 
 I respectfully ask you to:
-1. Create a concise short description based on the full description
-2. If the text is not in {target_language}, translate it to {target_language} using proper table tennis SLANG and terminology - prioritize table tennis industry terms over literal translations:
+1. Create a concise short description (maximum 150 characters including spaces)
+2. Use COMPLETE sentences only - never end with ellipsis (...)
+3. Structure: Start with product type and key benefit
+   Example for rubber: "Potah pro výjimečný spin a kontrolu v útočné hře."
+   Example for blade: "Ofenzivní dřevo s vynikající rychlostí a stabilitou."
+   Example for shoes: "Profesionální boty pro maximální přilnavost a komfort."
+4. If the text is not in {target_language}, translate using proper table tennis SLANG and terminology - prioritize table tennis industry terms over literal translations:
    • "rubber" = "potah" (NEVER "guma")
    • "blade" = "dřevo" (NEVER "čepel")
    • "paddle/racket" = "pálka"
-3. Maximum 150 characters
-4. Focus on the most important product features and benefits
-5. Return plain text without HTML
-6. Return the result as JSON with the property "shortdesc"
+5. Focus on ONE key selling point (spin, speed, control, stability, etc.)
+6. Use active, specific language - avoid generic phrases
+7. Return plain text without HTML
+8. Return the result as JSON with the property "shortdesc"
 
 Please return your response as valid JSON only."""
             else:
                 return None
         else:
             # Original logic for translating existing short description
-            user_prompt = f"""I humbly request your help in translating and validating a short product description for table tennis equipment. Please assist me in creating a proper short description.
+            user_prompt = f"""I humbly request your help in translating and validating a short product description for table tennis equipment.{product_context}
 
 Original short description: {short_description}
 
@@ -682,10 +745,12 @@ I respectfully ask you to:
    • "rubber" = "potah" (NEVER "guma")
    • "blade" = "dřevo" (NEVER "čepel")
    • "paddle/racket" = "pálka"
-2. Maximum 150 characters
-3. Keep the original meaning intact
-4. Return plain text without HTML
-5. Return the result as JSON with the property "shortdesc"
+2. Maximum 150 characters including spaces
+3. Use COMPLETE sentences only - never end with ellipsis (...)
+4. Keep the original meaning intact
+5. Focus on ONE key selling point
+6. Return plain text without HTML
+7. Return the result as JSON with the property "shortdesc"
 
 Please return your response as valid JSON only."""
 
@@ -730,6 +795,7 @@ I respectfully ask you to:
 4. Keep it concise and general (not specific model)
 5. Use {target_language} language for the type
 6. Return the result as JSON with the property "type"
+7. Always begin the response with capital letter 
 
 Please return your response as valid JSON only."""
 
@@ -765,14 +831,15 @@ Please return your response as valid JSON only."""
 
         # Add heuristic info to the prompt if available
         heuristic_section = f"\n\n{heuristic_info}" if heuristic_info else ""
+        web_context = self._gather_web_context(product, "model specifications")
 
         user_prompt = f"""I humbly request your help in identifying the product model. Please assist me in determining the specific model of this product.
 
 Product information:
-{product_json}{heuristic_section}
+{product_json}{heuristic_section}{web_context}
 
 I respectfully ask you to:
-1. Analyze the product information thoroughly
+1. Use the web search results above (if available) to confirm the exact model name
 2. Extract the specific model name/number (e.g., "ROG Strix", "Air Max 90", "Pro V1")
 3. If the model name is not in {target_language}, translate descriptive parts to {target_language} using proper table tennis terminology (e.g., "rubber" = "potah", "blade" = "dřevo", not literal translations)
 4. Keep brand-specific model names in their original form when appropriate

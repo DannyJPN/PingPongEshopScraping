@@ -16,7 +16,7 @@ class RepairedProduct:
     with proper categorization, pricing, and metadata.
     """
 
-    def __init__(self):
+    def __init__(self,**kwargs):
         """Initialize RepairedProduct with default values."""
         self.original_name: str = ""
         self.category: str = ""
@@ -38,6 +38,13 @@ class RepairedProduct:
         self.Variants: List[Any] = []
         self.zbozi_category: str = ""
         self.zbozi_keywords: str = ""
+        allowed = set(self.__dict__.keys())
+        unknown = [k for k in kwargs.keys() if k not in allowed]
+        if unknown:
+            raise TypeError(f"Unknown Parameters: {', '.join(unknown)}")
+
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     def __str__(self) -> str:
         """Return string representation of RepairedProduct."""

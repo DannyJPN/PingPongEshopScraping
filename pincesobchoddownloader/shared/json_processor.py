@@ -5,7 +5,7 @@ from tqdm import tqdm  # Import TQDM
 from shared.image_downloader import download_image
 from shared.utils import get_products_folder, get_photos_folder, sanitize_filename
 
-def process_json_file(json_filepath, result_folder, lang_code, overwrite):
+def process_json_file(json_filepath, result_folder, lang_code, overwrite, stats=None):
     try:
         logging.debug(f"Starting process_json_file function with overwrite={overwrite}")
 
@@ -21,7 +21,12 @@ def process_json_file(json_filepath, result_folder, lang_code, overwrite):
         # First loop: Process and save product information
         with tqdm(total=len(products), desc="Processing Products") as pbar:
             for product in products:
-                product_name = product.get('translations', {}).get(lang_code.lower(), {}).get('name', 'Unknown')
+                translations = product.get('translations', {})
+                product_name = (
+                    translations.get(lang_code.lower(), {}).get('name')
+                    or translations.get('cs', {}).get('name')
+                    or 'Unknown'
+                )
                 product_code = product.get('catalogNumber', 'Unknown')
 
                 # Sanitize the product name for use as a filename
@@ -61,14 +66,22 @@ def process_json_file(json_filepath, result_folder, lang_code, overwrite):
         with tqdm(total=len(main_images), desc="Downloading Main Images") as pbar:
             for image_url, image_filepath in main_images:
                 logging.debug(f"Downloading main image from {image_url} to {image_filepath}")
-                download_image(image_url, image_filepath, overwrite=overwrite)
+                download_image(image_url, image_filepath, overwrite=overwrite, stats=stats)
+
+                # Update progress bar with statistics
+                if stats:
+                    stats.update_progress_bar(pbar, image_url)
                 pbar.update(1)
 
         # Download gallery images
         with tqdm(total=len(gallery_images), desc="Downloading Gallery Images") as pbar:
             for image_url, image_filepath in gallery_images:
                 logging.debug(f"Downloading gallery image from {image_url} to {image_filepath}")
-                download_image(image_url, image_filepath, overwrite=overwrite)
+                download_image(image_url, image_filepath, overwrite=overwrite, stats=stats)
+
+                # Update progress bar with statistics
+                if stats:
+                    stats.update_progress_bar(pbar, image_url)
                 pbar.update(1)
 
     except Exception as e:

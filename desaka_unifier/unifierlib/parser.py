@@ -10,6 +10,7 @@ import logging
 import os
 import re
 from datetime import datetime
+from difflib import SequenceMatcher
 from tqdm import tqdm
 from unifierlib.export_product import ExportProduct, ExportMainProduct, ExportProductVariant
 from unifierlib.downloaded_product import DownloadedProduct
@@ -23,7 +24,13 @@ from unifierlib.constants import (
     MEMORY_KEY_NAME_MEMORY, MEMORY_KEY_PRODUCT_BRAND_MEMORY, MEMORY_KEY_PRODUCT_MODEL_MEMORY,
     MEMORY_KEY_PRODUCT_TYPE_MEMORY, MEMORY_KEY_SHORT_DESC_MEMORY, MEMORY_KEY_VARIANT_NAME_MEMORY,
     MEMORY_KEY_VARIANT_VALUE_MEMORY, MEMORY_KEY_CATEGORY_MAPPING_GLAMI, MEMORY_KEY_CATEGORY_MAPPING_GOOGLE,
-    MEMORY_KEY_CATEGORY_MAPPING_HEUREKA, MEMORY_KEY_CATEGORY_MAPPING_ZBOZI, MEMORY_KEY_DEFAULT_EXPORT_PRODUCT_VALUES
+    MEMORY_KEY_CATEGORY_MAPPING_HEUREKA, MEMORY_KEY_CATEGORY_MAPPING_ZBOZI, MEMORY_KEY_DEFAULT_EXPORT_PRODUCT_VALUES,
+    PRODUCT_BRAND_MEMORY_PREFIX, PRODUCT_TYPE_MEMORY_PREFIX, PRODUCT_MODEL_MEMORY_PREFIX,
+    CATEGORY_MEMORY_PREFIX, DESC_MEMORY_PREFIX, SHORT_DESC_MEMORY_PREFIX,
+    VARIANT_NAME_MEMORY_PREFIX, VARIANT_VALUE_MEMORY_PREFIX, STOCK_STATUS_MEMORY_PREFIX,
+    CATEGORY_MAPPING_GLAMI_PREFIX, CATEGORY_MAPPING_GOOGLE_PREFIX,
+    CATEGORY_MAPPING_HEUREKA_PREFIX, CATEGORY_MAPPING_ZBOZI_PREFIX,
+    KEYWORDS_GOOGLE_PREFIX, KEYWORDS_ZBOZI_PREFIX
 )
 
 
@@ -37,7 +44,7 @@ class ProductParser:
                  export_products: Optional[List[Any]] = None, repaired_products: Optional[List[Any]] = None,
                  confirm_ai_results: bool = False, use_fine_tuned_models: bool = False,
                  fine_tuned_models: Optional[Dict[str, str]] = None, supported_languages_data: Optional[list] = None,
-                 skip_ai: bool = False):
+                 skip_ai: bool = False, memory_dir: Optional[str] = None):
         """
         Initialize parser with optional memory data, language, export products and AI confirmation setting.
 
@@ -51,6 +58,7 @@ class ProductParser:
             fine_tuned_models (Optional[Dict[str, str]]): Dictionary mapping task types to model IDs
             supported_languages_data (Optional[list]): Pre-loaded supported languages data
             skip_ai (bool): Whether to skip using AI for property evaluation (default: False)
+            memory_dir (Optional[str]): Path to Memory directory (for trash file writing)
         """
         self.memory = memory_data or {}
         self.language = language or 'CS'
@@ -58,10 +66,15 @@ class ProductParser:
         self.repaired_products = repaired_products or []
         self.confirm_ai_results = confirm_ai_results
         self.supported_languages_data = supported_languages_data
+        self.memory_dir = memory_dir
 
         # Track assigned codes to avoid duplicates
         self.assigned_codes = set()
         self.assigned_variant_codes = set()
+
+        # Map (base_code, product_name) -> full_code to track which code belongs to which product
+        # This prevents assigning different codes to products with the same name
+        self.product_name_codes = {}  # {(base_code, product_name): full_code}
 
         # Initialize assigned codes from existing products
         self._initialize_assigned_codes()
@@ -83,6 +96,13 @@ class ProductParser:
         for product in self.export_products:
             if hasattr(product, 'kod') and product.kod:
                 self.assigned_codes.add(product.kod)
+
+                # Extract base_code (first 7 chars: 3 brand + 2 category + 2 subcategory)
+                # and map it to product name
+                if hasattr(product, 'nazev') and product.nazev and len(product.kod) >= 11:
+                    base_code = product.kod[:7]
+                    self.product_name_codes[(base_code, product.nazev)] = product.kod
+
             if hasattr(product, 'variantcode') and product.variantcode:
                 self.assigned_variant_codes.add(product.variantcode)
 
@@ -90,6 +110,12 @@ class ProductParser:
         for product in self.repaired_products:
             if hasattr(product, 'code') and product.code:
                 self.assigned_codes.add(product.code)
+
+                # Extract base_code and map it to product name
+                if hasattr(product, 'name') and product.name and len(product.code) >= 11:
+                    base_code = product.code[:7]
+                    self.product_name_codes[(base_code, product.name)] = product.code
+
             if hasattr(product, 'variantcode') and product.variantcode:
                 self.assigned_variant_codes.add(product.variantcode)
             # Also check variant codes in Variants
@@ -396,27 +422,32 @@ class ProductParser:
         # shortdesc = from ShortDescMemory or OpenAI
         #repaired.shortdesc = self._get_short_description(downloaded)
 
-        # name = from NameMemory or OpenAI
-        #repaired.name = self._get_product_name(downloaded)
-        # category = from CategoryMemory or OpenAI (needed for code generation)
-       # repaired.category = self._get_category(downloaded)
+        # name = from NameMemory or OpenAI (composed from type + brand + model)
+        repaired.name = self._get_product_name(downloaded)
 
-        # brand = from ProductBrandMemory or OpenAI (needed for code generation)
+        # Extract individual components: type, brand, and model
+        # These are needed for filtering and export logic
+        repaired.type = self._get_product_type(downloaded)
         repaired.brand = self._get_brand(downloaded)
+        repaired.model = self._get_product_model(downloaded)
+
+        # category = from CategoryMemory or OpenAI (needed for code generation)
+        repaired.category = self._get_category(downloaded)
 
 
         # category_ids = derived from category using CategoryIDList
-       # repaired.category_ids = self._get_category_ids(repaired.category, downloaded)
+        repaired.category_ids = self._get_category_ids(repaired.category, downloaded)
 
 
 
-        # code = complex code generation (needs brand and category)
-       # repaired.code = self._generate_code(repaired.brand, repaired.category, downloaded.name)
+        # code is generated after merging (in generate_codes_for_products) so that
+        # brand/category corrections during merge don't produce stale/duplicate codes
+        repaired.code = ""
 
-        # Variants = complex variant processing (needs code for variant codes)
-        repaired.Variants = self._process_variants(downloaded, repaired.code)
+        # Variants processed without base_code; variant codes are assigned after merge
+        repaired.Variants = self._process_variants(downloaded)
         # price and price_standard = from variants
-      #  repaired.price, repaired.price_standard = self._get_prices(downloaded)
+        repaired.price, repaired.price_standard = self._get_prices(downloaded)
 
         # glami_category = from CategoryMappingGlami or user input
        # repaired.glami_category = self._get_category_mapping(repaired.category, 'Glami', downloaded)
@@ -471,6 +502,210 @@ class ProductParser:
 
         return matches
 
+    def _heuristic_similarity_search(self, downloaded: DownloadedProduct, values: List[str], threshold: float = 0.9) -> tuple:
+        """
+        Perform similarity-based heuristic search on downloaded product.
+        Uses fuzzy matching (SequenceMatcher) to find similar values.
+        This method is called when exact matching finds no results.
+
+        Args:
+            downloaded (DownloadedProduct): Product to extract from
+            values (List[str]): List of values to search for
+            threshold (float): Minimum similarity threshold (0.0-1.0, default: 0.9)
+
+        Returns:
+            tuple: (Single match if exactly one found or None, List of all matches)
+        """
+        if not values:
+            return None, []
+
+        # Collect all texts to search in (same as _heuristic_extraction)
+        texts = []
+
+        # Add original_name if available
+        if downloaded.name:
+            texts.append(downloaded.name)
+
+        # Add URL if available
+        if downloaded.url:
+            texts.append(downloaded.url)
+
+        # Add desc if available
+        if hasattr(downloaded, 'desc') and downloaded.desc:
+            texts.append(downloaded.desc)
+        elif hasattr(downloaded, 'description') and downloaded.description:
+            texts.append(downloaded.description)
+
+        # Add shortdesc if available
+        if hasattr(downloaded, 'shortdesc') and downloaded.shortdesc:
+            texts.append(downloaded.shortdesc)
+        elif hasattr(downloaded, 'short_description') and downloaded.short_description:
+            texts.append(downloaded.short_description)
+
+        # Normalize texts for comparison
+        def normalize_text(text: str) -> str:
+            """Normalize text for similarity comparison."""
+            return ' '.join(text.lower().split())
+
+        normalized_texts = [normalize_text(text) for text in texts if text]
+
+        # Find similar matches using fuzzy matching
+        similarity_scores = {}  # value -> max_similarity
+
+        for value in values:
+            if not value or not value.strip():
+                continue
+
+            normalized_value = normalize_text(value)
+            max_similarity = 0.0
+
+            # Check similarity against all product texts
+            for text in normalized_texts:
+                # Calculate similarity ratio
+                similarity = SequenceMatcher(None, normalized_value, text).ratio()
+                max_similarity = max(max_similarity, similarity)
+
+                # Also check if the value appears as a substring (partial match)
+                if normalized_value in text or text in normalized_value:
+                    # Boost similarity for substring matches
+                    substring_similarity = len(normalized_value) / max(len(text), len(normalized_value))
+                    max_similarity = max(max_similarity, substring_similarity)
+
+            # Store the maximum similarity for this value
+            if max_similarity >= threshold:
+                similarity_scores[value] = max_similarity
+
+        # Sort matches by similarity (highest first)
+        sorted_matches = sorted(similarity_scores.items(), key=lambda x: x[1], reverse=True)
+        all_matches_list = [match[0] for match in sorted_matches]
+
+        # Return single match if exactly one found, otherwise None and list of all matches
+        if len(all_matches_list) == 1:
+            return all_matches_list[0], all_matches_list
+        else:
+            return None, all_matches_list
+
+    def _find_normalized_exact_match(self, search_key: str, memory_dict: Dict[str, str]) -> Optional[str]:
+        """
+        Find exact match in memory after normalizing keys (whitespace normalization).
+        This handles cases where keys differ only in whitespace.
+
+        Args:
+            search_key (str): The key to search for
+            memory_dict (Dict[str, str]): Memory dictionary (KEY -> VALUE)
+
+        Returns:
+            Optional[str]: The value if exact match found after normalization, None otherwise
+        """
+        if not search_key or not memory_dict:
+            return None
+
+        # Normalize search key
+        normalized_search = ' '.join(search_key.lower().split())
+
+        # Search for normalized exact match
+        for key, value in memory_dict.items():
+            normalized_key = ' '.join(key.lower().split())
+            if normalized_search == normalized_key:
+                return value
+
+        return None
+
+    def _find_similar_memory_keys(self, product_name: str, memory_dict: Dict[str, str], threshold: float = 0.9) -> List[tuple]:
+        """
+        Find similar keys in memory dictionary using fuzzy matching.
+        This is called when exact key match is not found in memory.
+
+        Args:
+            product_name (str): The product name to search for (KEY)
+            memory_dict (Dict[str, str]): Memory dictionary (KEY -> VALUE)
+            threshold (float): Minimum similarity threshold (0.0-1.0, default: 0.9)
+
+        Returns:
+            List[tuple]: List of (key, value, similarity) tuples sorted by similarity (highest first)
+        """
+        if not product_name or not memory_dict:
+            return []
+
+        def normalize_text(text: str) -> str:
+            """Normalize text for similarity comparison."""
+            return ' '.join(text.lower().split())
+
+        normalized_product_name = normalize_text(product_name)
+        similar_keys = []
+
+        # Search for similar keys in memory
+        for key, value in memory_dict.items():
+            normalized_key = normalize_text(key)
+
+            # Calculate similarity ratio
+            similarity = SequenceMatcher(None, normalized_product_name, normalized_key).ratio()
+
+            # Store if similarity meets threshold
+            if similarity >= threshold:
+                similar_keys.append((key, value, similarity))
+
+        # Sort by similarity (highest first)
+        similar_keys.sort(key=lambda x: x[2], reverse=True)
+
+        return similar_keys
+
+    def _ask_user_for_similar_key_selection(self, property_name: str, search_key: str, similar_keys: List[tuple], product_url: str = "") -> Optional[str]:
+        """
+        Ask user to select a value from similar memory keys.
+
+        Args:
+            property_name (str): Name of the property (e.g., "Brand", "Product Type", "Variant Name")
+            search_key (str): The key being searched for (product name, variant name, stock status, etc.)
+            similar_keys (List[tuple]): List of (key, value, similarity) tuples
+            product_url (str): Optional URL of the product being processed
+
+        Returns:
+            Optional[str]: Selected value or None if user rejects all options
+        """
+        if not similar_keys:
+            return None
+
+        print("\n" + "=" * 80)
+        print(f"🔍 SIMILAR MEMORY KEYS FOUND FOR {property_name.upper()}")
+        print("=" * 80)
+        print(f"Searching for: {search_key}")
+        if product_url:
+            print(f"Product URL: {product_url}")
+        print(f"\nFound {len(similar_keys)} similar key(s) in memory:")
+        print()
+
+        # Display options with numbering
+        for i, (key, value, similarity) in enumerate(similar_keys, 1):
+            similarity_pct = similarity * 100
+            print(f"  {i}. Key: {key}")
+            print(f"     Value: {value}")
+            print(f"     Similarity: {similarity_pct:.1f}%")
+            print()
+
+        print("=" * 80)
+        print("Options:")
+        print("  [1-N]  - Use value from selected key")
+        print("  [Enter] - Skip all options and continue to heuristic search")
+        print("=" * 80)
+
+        while True:
+            response = input(f"\nSelect option for {property_name}: ").strip()
+
+            if response == '':
+                return None
+
+            try:
+                selection = int(response)
+                if 1 <= selection <= len(similar_keys):
+                    selected_key, selected_value, similarity = similar_keys[selection - 1]
+                    print(f"\n✓ Selected: {selected_value} (from key: {selected_key})")
+                    return selected_value
+                else:
+                    print(f"❌ Invalid selection. Please enter a number between 1 and {len(similar_keys)} or press Enter to skip")
+            except ValueError:
+                print(f"❌ Invalid input. Please enter a number between 1 and {len(similar_keys)} or press Enter to skip")
+
     def _heuristic_extraction(self, downloaded: DownloadedProduct, values: List[str]) -> tuple:
         """
         Perform heuristic extraction on downloaded product.
@@ -520,6 +755,11 @@ class ProductParser:
         # Convert set back to list for consistent ordering
         all_matches_list = list(all_matches)
 
+        # If no exact matches found, try similarity-based search
+        # DISABLED: Heuristic similarity search not working as expected
+        # if len(all_matches_list) == 0:
+        #     return self._heuristic_similarity_search(downloaded, values, threshold=0.9)
+
         # Return single match if exactly one found, otherwise None and list of all matches
         if len(all_matches_list) == 1:
             return all_matches_list[0], all_matches_list
@@ -537,31 +777,69 @@ class ProductParser:
                 standardized_key = self._standardize_category_by_key(category_key)
                 return self._get_translated_category_name(standardized_key)
 
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_category_key = self._find_normalized_exact_match(downloaded.name, category_memory)
+            if normalized_category_key:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][downloaded.name] = normalized_category_key
+                self._save_memory_file(memory_key)
+                # First standardize the category key, then translate
+                standardized_key = self._standardize_category_by_key(normalized_category_key)
+                return self._get_translated_category_name(standardized_key)
+
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     category_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(downloaded.name, category_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         # For categories, we need to convert keys to translated category names for display
+        #         similar_keys_with_translated_names = []
+        #         for key, category_key_value, similarity in similar_keys:
+        #             standardized_key = self._standardize_category_by_key(category_key_value)
+        #             translated_name = self._get_translated_category_name(standardized_key)
+        #             # Store original category_key_value for saving later
+        #             similar_keys_with_translated_names.append((key, translated_name, similarity, category_key_value))
+        #
+        #         # Show user the translated category names
+        #         display_keys = [(key, translated_name, sim) for key, translated_name, sim, _ in similar_keys_with_translated_names]
+        #         selected_category_name = self._ask_user_for_similar_key_selection("Category", downloaded.name, display_keys, downloaded.url)
+        #
+        #         if selected_category_name:
+        #             # Find the original category_key_value for saving
+        #             selected_category_key_value = None
+        #             for key, translated_name, similarity, category_key_value in similar_keys_with_translated_names:
+        #                 if translated_name == selected_category_name:
+        #                     selected_category_key_value = category_key_value
+        #                     break
+        #
+        #             if selected_category_key_value:
+        #                 # Save to memory with current product name as key
+        #                 self.memory[memory_key][downloaded.name] = selected_category_key_value
+        #                 self._save_memory_file(memory_key)
+        #                 # Return the translated category name
+        #                 return selected_category_name
+
         # Get available category names (translated values from CategoryNameMemory)
         category_name_memory_key = MEMORY_KEY_CATEGORY_NAME_MEMORY.format(language=self.language)
         category_name_memory = self.memory.get(category_name_memory_key, {})
         available_categories = list(category_name_memory.values()) if category_name_memory else []
 
-        # Try heuristic extraction
+        # Heuristic extraction disabled for categories (low hit rate due to strict category format)
         single_match = None
         all_matches = []
-        if available_categories:
-            single_match, all_matches = self._heuristic_extraction(downloaded, available_categories)
 
-            # Use OpenAI with CategoryNameMemory (translated category names) even if memory is empty
+        # Use OpenAI with CategoryNameMemory (translated category names) even if memory is empty
         if not single_match and self.openai:
-            # Include information about heuristic matches in the AI prompt if any were found
+            # Heuristic analysis is disabled for categories, so no heuristic info to provide
             heuristic_info = ""
-            if all_matches:
-                heuristic_info = f"Heuristic analysis found these potential categories in the text: {', '.join(all_matches)}. Please evaluate these candidates in your decision."
-            else:
-                heuristic_info = "Heuristic analysis did not find any matching categories in the text."
 
             category = self.openai.find_category(downloaded, available_categories, self.language, heuristic_info)
             if category:
                 # Confirm with user if needed
                 confirmed_category = self._confirm_ai_result(
-                    "Category", "", category, downloaded.name, downloaded.url, all_matches
+                    "Category", "", category, downloaded.name, downloaded.url, all_matches,
+                    CATEGORY_MEMORY_PREFIX, downloaded.name
                 )
                 if confirmed_category:
                     # Find the key for this category value
@@ -578,13 +856,10 @@ class ProductParser:
                         return self._get_translated_category_name(standardized_key)
 
         # Ask user directly if AI not available or failed
-        print("\n🔍 HEURISTIC ANALYSIS RESULTS FOR CATEGORY:")
-        if all_matches:
-            print(f"  Found potential matches: {', '.join(all_matches)}")
-        else:
-            print("  No matches found in product text")
+        print("\n🔍 CATEGORY DETECTION:")
+        print("  (Heuristic analysis disabled for categories)")
 
-        user_category = self._ask_user_for_value(f"Enter category for product '{downloaded.name}'")
+        user_category = self._ask_user_for_product_value("category", downloaded, heuristic_match=single_match, memory_prefix=CATEGORY_MEMORY_PREFIX)
         if user_category:
             # Find the key for this category value
             category_key = self._find_category_key_by_value(user_category)
@@ -599,15 +874,14 @@ class ProductParser:
                 # Return the translated category name for this language
                 return self._get_translated_category_name(standardized_key)
             else:
-                # If category key not found, try old standardization for backward compatibility
-                standardized_category = self._standardize_category(user_category)
-                if standardized_category:
-                    # Save to memory
-                    if memory_key not in self.memory:
-                        self.memory[memory_key] = {}
-                    self.memory[memory_key][downloaded.name] = standardized_category
-                    self._save_memory_file(memory_key)
-                    return standardized_category
+                # If category key not found, use user input as-is for backward compatibility
+                # This handles old categories that might not have keys in the new system
+                logging.debug(f"Category key not found for '{user_category}', saving user input as-is")
+                if memory_key not in self.memory:
+                    self.memory[memory_key] = {}
+                self.memory[memory_key][downloaded.name] = user_category
+                self._save_memory_file(memory_key)
+                return user_category
 
         return ""
 
@@ -622,12 +896,39 @@ class ProductParser:
         memory_key = MEMORY_KEY_PRODUCT_BRAND_MEMORY.format(language=self.language)
         if memory_key in self.memory:
             brand_memory = self.memory[memory_key]
+            # Try exact match first
             if downloaded.name in brand_memory:
                 brand = brand_memory[downloaded.name]
                 # Handle Desaka brand based on for_name_composition parameter
                 if for_name_composition and brand and self._is_desaka_brand(brand):
                     return ""
                 return brand if not for_name_composition else self._format_brand_name(brand)
+
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_brand = self._find_normalized_exact_match(downloaded.name, brand_memory)
+            if normalized_brand:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][downloaded.name] = normalized_brand
+                self._save_memory_file(memory_key)
+                if for_name_composition and normalized_brand and self._is_desaka_brand(normalized_brand):
+                    return ""
+                return normalized_brand if not for_name_composition else self._format_brand_name(normalized_brand)
+
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     brand_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(downloaded.name, brand_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         selected_brand = self._ask_user_for_similar_key_selection("Brand", downloaded.name, similar_keys, downloaded.url)
+        #         if selected_brand:
+        #             # Save to memory with current product name as key
+        #             self.memory[memory_key][downloaded.name] = selected_brand
+        #             self._save_memory_file(memory_key)
+        #             # Handle return based on for_name_composition
+        #             if for_name_composition and self._is_desaka_brand(selected_brand):
+        #                 return ""
+        #             return selected_brand if not for_name_composition else self._format_brand_name(selected_brand)
 
         # Try heuristic extraction
         brand_list = list(self.memory.get(MEMORY_KEY_BRAND_CODE_LIST, {}).keys())
@@ -650,7 +951,8 @@ class ProductParser:
             if brand:
                 # Confirm with user if needed
                 confirmed_brand = self._confirm_ai_result(
-                    "Brand", "", brand, downloaded.name, downloaded.url, all_matches
+                    "Brand", "", brand, downloaded.name, downloaded.url, all_matches,
+                    PRODUCT_BRAND_MEMORY_PREFIX, downloaded.name
                 )
                 if confirmed_brand:
                     # Save to memory
@@ -670,7 +972,7 @@ class ProductParser:
         else:
             print("  No matches found in product text")
 
-        user_brand = self._ask_user_for_product_value("Brand", downloaded)
+        user_brand = self._ask_user_for_product_value("Brand", downloaded, heuristic_match=single_match, memory_prefix=PRODUCT_BRAND_MEMORY_PREFIX)
         if user_brand:
             # Save to memory
             if memory_key not in self.memory:
@@ -697,6 +999,27 @@ class ProductParser:
             if downloaded.name in type_memory:
                 return type_memory[downloaded.name]
 
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_type = self._find_normalized_exact_match(downloaded.name, type_memory)
+            if normalized_type:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][downloaded.name] = normalized_type
+                self._save_memory_file(memory_key)
+                return normalized_type
+
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     type_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(downloaded.name, type_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         selected_type = self._ask_user_for_similar_key_selection("Product Type", downloaded.name, similar_keys, downloaded.url)
+        #         if selected_type:
+        #             # Save to memory with current product name as key
+        #             self.memory[memory_key][downloaded.name] = selected_type
+        #             self._save_memory_file(memory_key)
+        #             return selected_type
+
         # Try heuristic extraction
         # Get all existing product types from memory
         all_types = set()
@@ -722,7 +1045,8 @@ class ProductParser:
             if product_type:
                 # Confirm with user if needed
                 confirmed_type = self._confirm_ai_result(
-                    "Product Type", "", product_type, downloaded.name, downloaded.url, all_matches
+                    "Product Type", "", product_type, downloaded.name, downloaded.url, all_matches,
+                    PRODUCT_TYPE_MEMORY_PREFIX, downloaded.name
                 )
                 if confirmed_type:
                     # Save to memory
@@ -739,7 +1063,7 @@ class ProductParser:
         else:
             print("  No matches found in product text")
 
-        user_type = self._ask_user_for_product_value("Product Type", downloaded)
+        user_type = self._ask_user_for_product_value("Product Type", downloaded, heuristic_match=single_match, memory_prefix=PRODUCT_TYPE_MEMORY_PREFIX)
         if user_type:
             # Save to memory
             if memory_key not in self.memory:
@@ -757,6 +1081,27 @@ class ProductParser:
             model_memory = self.memory[memory_key]
             if downloaded.name in model_memory:
                 return model_memory[downloaded.name]
+
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_model = self._find_normalized_exact_match(downloaded.name, model_memory)
+            if normalized_model:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][downloaded.name] = normalized_model
+                self._save_memory_file(memory_key)
+                return self._format_model_name(normalized_model)
+
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     model_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(downloaded.name, model_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         selected_model = self._ask_user_for_similar_key_selection("Product Model", downloaded.name, similar_keys, downloaded.url)
+        #         if selected_model:
+        #             # Save to memory with current product name as key
+        #             self.memory[memory_key][downloaded.name] = selected_model
+        #             self._save_memory_file(memory_key)
+        #             return self._format_model_name(selected_model)
 
         # Try heuristic extraction
         # Get all existing product models from memory
@@ -783,7 +1128,8 @@ class ProductParser:
             if product_model:
                 # Confirm with user if needed
                 confirmed_model = self._confirm_ai_result(
-                    "Product Model", "", product_model, downloaded.name, downloaded.url, all_matches
+                    "Product Model", "", product_model, downloaded.name, downloaded.url, all_matches,
+                    PRODUCT_MODEL_MEMORY_PREFIX, downloaded.name
                 )
                 if confirmed_model:
                     # Save to memory
@@ -800,7 +1146,7 @@ class ProductParser:
         else:
             print("  No matches found in product text")
 
-        user_model = self._ask_user_for_product_value("Product Model", downloaded)
+        user_model = self._ask_user_for_product_value("Product Model", downloaded, heuristic_match=single_match, memory_prefix=PRODUCT_MODEL_MEMORY_PREFIX)
         if user_model:
             # Save to memory
             if memory_key not in self.memory:
@@ -876,9 +1222,10 @@ class ProductParser:
         if category_key in category_list:
             return category_key
 
-        # If not found, try to find a match using the old standardization logic
-        # This is for backward compatibility
-        return self._standardize_category(category_key)
+        # If not found in CategoryList, return as-is for backward compatibility
+        # (old categories might not be in the new CategoryList yet)
+        logging.debug(f"Category key '{category_key}' not found in CategoryList, returning as-is")
+        return category_key
 
     def _get_category_ids(self, category: str, downloaded: DownloadedProduct) -> str:
         """Get category IDs from category path using the new key-based system."""
@@ -966,14 +1313,50 @@ class ProductParser:
 
         final_code = base_code + f"{product_index:04d}"
 
-        # Remember this code
+        # Remember this code and map it to the product name
         self.assigned_codes.add(final_code)
+        self.product_name_codes[(base_code, product_name)] = final_code
 
         return final_code
 
+    def generate_codes_for_products(self, products) -> None:
+        """Assign product codes and variant codes after merging.
+
+        Must be called after ProductMerger.merge_products() so that brand and
+        category are already corrected and stable.
+        """
+        for product in products:
+            product.code = self._generate_code(product.brand, product.category, product.name)
+            for i, variant in enumerate(product.Variants or []):
+                if product.code:
+                    variant.variantcode = self._generate_variant_code_for_variant(
+                        product.code, variant, i + 1
+                    )
+
     def _get_next_product_index(self, base_code: str, product_name: str) -> int:
-        """Get next available product index efficiently."""
-        # First check if this exact product already exists
+        """
+        Get product index for the given base_code and product_name.
+
+        Logic:
+        1. If we already assigned a code to this exact product (base_code + name), return its index
+        2. If this product exists in export_products with this base_code, return its index
+        3. Otherwise, find the first unused index
+
+        This ensures that:
+        - Multiple variants of the same product get the same index
+        - We don't create duplicate codes for the same product
+        - We avoid conflicts with existing products
+        """
+        # 1. Check if we already assigned a code for this exact product (base_code, name)
+        if (base_code, product_name) in self.product_name_codes:
+            existing_code = self.product_name_codes[(base_code, product_name)]
+            if len(existing_code) >= len(base_code) + 4:
+                try:
+                    return int(existing_code[-4:])
+                except (ValueError, TypeError):
+                    pass
+
+        # 2. Check if this product already exists in export_products
         for product in self.export_products:
             if (hasattr(product, 'nazev') and product.nazev == product_name and
                 hasattr(product, 'kod') and product.kod and
@@ -983,24 +1366,14 @@ class ProductParser:
                 except (ValueError, TypeError):
                     pass
 
-        # Collect all used indices efficiently using a set
+        # 3. Find first unused index - collect all used indices for this base_code
         used_indices = set()
 
-        # Check assigned codes
+        # Check all assigned codes with this base_code
         for code in self.assigned_codes:
             if code and code.startswith(base_code) and len(code) >= len(base_code) + 4:
                 try:
                     index = int(code[-4:])
-                    used_indices.add(index)
-                except (ValueError, TypeError):
-                    pass
-
-        # Check existing export products
-        for product in self.export_products:
-            if (hasattr(product, 'kod') and product.kod and
-                product.kod.startswith(base_code) and len(product.kod) >= len(base_code) + 4):
-                try:
-                    index = int(product.kod[-4:])
                     used_indices.add(index)
                 except (ValueError, TypeError):
                     pass
@@ -1063,8 +1436,38 @@ class ProductParser:
         except KeyboardInterrupt:
             return None
 
-    def _confirm_ai_result(self, property_name: str, current_value: str, ai_suggestion: str, product_name: str, product_url: str = "", heuristic_matches: List[str] = None) -> str:
-        """Confirm AI result with user or return suggestion if auto-confirm is enabled."""
+    def _format_html_for_display(self, html_text: str) -> str:
+        """Convert HTML to readable plain text for terminal display (display only, never modifies data)."""
+        if not html_text:
+            return ""
+        from html import unescape
+        # Block elements -> newline for readability
+        text = re.sub(r'<(br|p|/p|li|/li|tr|/tr|h[1-6]|/h[1-6])[^>]*>', '\n', html_text, flags=re.IGNORECASE)
+        # Strip remaining tags
+        text = re.sub(r'<[^>]+>', ' ', text)
+        # Decode HTML entities (&amp; -> &, &nbsp; -> space, etc.)
+        text = unescape(text)
+        # Collapse whitespace, preserve intentional newlines
+        text = re.sub(r'[ \t]+', ' ', text)
+        text = re.sub(r'\n{3,}', '\n\n', text).strip()
+        if len(text) > 400:
+            text = text[:400] + '...'
+        return text
+
+    def _confirm_ai_result(self, property_name: str, current_value: str, ai_suggestion: str, product_name: str, product_url: str = "", heuristic_matches: List[str] = None, memory_prefix: str = None, product_key: str = None) -> str:
+        """Confirm AI result with user or return suggestion if auto-confirm is enabled.
+        If user changes the value, the original AI suggestion is written to trash.
+
+        Args:
+            property_name: Display name of the property (e.g., "Brand", "Product Type")
+            current_value: Current value of the property
+            ai_suggestion: AI's suggested value
+            product_name: Product name for display
+            product_url: Product URL for display
+            heuristic_matches: Heuristic matches found
+            memory_prefix: Memory file prefix (e.g., "ProductBrandMemory") for trash tracking
+            product_key: Product key (usually downloaded.name) for trash tracking
+        """
         if self.confirm_ai_results:
             return ai_suggestion.strip() if ai_suggestion else ""
 
@@ -1115,12 +1518,37 @@ class ProductParser:
 
             print("=" * 80)
             response = input(f"✅ Press Enter to confirm AI suggestion or type new value: ").strip()
+
+            # If user provided input (not just Enter to accept), check if it differs from AI suggestion
+            if response and memory_prefix and product_key:
+                # Normalize for comparison
+                ai_normalized = (ai_suggestion or "").strip()
+                response_normalized = response.strip()
+
+                # If user's value differs from AI suggestion, write AI suggestion to trash
+                # This includes cases where AI returned None/"" (incorrect) or wrong value
+                if ai_normalized != response_normalized:
+                    # Write AI suggestion to trash (even if empty - that's an incorrect example)
+                    self._add_to_trash(memory_prefix, product_key, ai_normalized)
+
             return response if response else ai_suggestion.strip() if ai_suggestion else ""
         except KeyboardInterrupt:
             return ai_suggestion.strip() if ai_suggestion else ""
 
-    def _ask_user_for_product_value(self, property_name: str, downloaded: DownloadedProduct, current_value: str = "") -> str:
-        """Ask user for product property value with detailed product information display."""
+    def _ask_user_for_product_value(self, property_name: str, downloaded: DownloadedProduct, current_value: str = "", heuristic_match: str = None, memory_prefix: str = None) -> str:
+        """
+        Ask user for product property value with detailed product information display.
+
+        Args:
+            property_name: Name of the property being requested
+            downloaded: DownloadedProduct object for context
+            current_value: Current value if any
+            heuristic_match: Single heuristic match found (if any)
+            memory_prefix: Memory file prefix for trash writing (if heuristic_match changed)
+
+        Returns:
+            User's input or heuristic_match if accepted
+        """
         try:
             # Create a more readable display format similar to AI confirmation
             print("\n" + "=" * 80)
@@ -1130,6 +1558,11 @@ class ProductParser:
             if downloaded.url:
                 print(f"🔗 URL: {downloaded.url}")
             print("-" * 80)
+
+            # Display heuristic match if found
+            if heuristic_match:
+                print(f"🔍 HEURISTIC FOUND: {heuristic_match}")
+                print("-" * 80)
 
             # Display current product properties for context
             print(f"📄 Current Product Properties:")
@@ -1156,10 +1589,19 @@ class ProductParser:
                 print(f"   Current {property_name}: (empty)")
 
             print("=" * 80)
-            response = input(f"✏️  Please enter {property_name}: ").strip()
-            return response if response else ""
+
+            # Adjust prompt based on whether heuristic match exists
+            if heuristic_match:
+                response = input(f"✏️  Press Enter to use '{heuristic_match}' or type new value: ").strip()
+                # If user changed heuristic match, write old value to trash
+                if response and response.lower() != heuristic_match.lower() and memory_prefix and downloaded.name:
+                    self._add_to_trash(memory_prefix, downloaded.name, heuristic_match)
+                return response if response else heuristic_match
+            else:
+                response = input(f"✏️  Please enter {property_name}: ").strip()
+                return response if response else ""
         except KeyboardInterrupt:
-            return ""
+            return heuristic_match if heuristic_match else ""
 
     def _ask_user_for_variant_value(self, property_name: str, original_value: str, downloaded: DownloadedProduct, context_info: str = "") -> str:
         """Ask user for variant property value with context information display."""
@@ -1201,13 +1643,35 @@ class ProductParser:
             if downloaded.name in desc_memory:
                 return desc_memory[downloaded.name]
 
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_desc = self._find_normalized_exact_match(downloaded.name, desc_memory)
+            if normalized_desc:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][downloaded.name] = normalized_desc
+                self._save_memory_file(memory_key)
+                return normalized_desc
+
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     desc_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(downloaded.name, desc_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         selected_desc = self._ask_user_for_similar_key_selection("Description", downloaded.name, similar_keys, downloaded.url)
+        #         if selected_desc:
+        #             # Save to memory with current product name as key
+        #             self.memory[memory_key][downloaded.name] = selected_desc
+        #             self._save_memory_file(memory_key)
+        #             return selected_desc
+
         # Use OpenAI for translation and validation (not generation)
         if self.openai and downloaded.description:
             description = self.openai.translate_and_validate_description(downloaded.description, self.language)
             if description:
                 # Confirm with user if needed
                 confirmed_description = self._confirm_ai_result(
-                    "Description", downloaded.description, description, downloaded.name, downloaded.url
+                    "Description", downloaded.description, description, downloaded.name, downloaded.url,
+                    None, DESC_MEMORY_PREFIX, downloaded.name
                 )
                 if confirmed_description:
                     # Save to memory
@@ -1238,6 +1702,15 @@ class ProductParser:
             if category in mapping:
                 return mapping[category]
 
+        # Map platform to memory prefix for trash tracking
+        platform_to_prefix = {
+            'Glami': CATEGORY_MAPPING_GLAMI_PREFIX,
+            'Google': CATEGORY_MAPPING_GOOGLE_PREFIX,
+            'Heureka': CATEGORY_MAPPING_HEUREKA_PREFIX,
+            'Zbozi': CATEGORY_MAPPING_ZBOZI_PREFIX
+        }
+        memory_prefix = platform_to_prefix.get(platform)
+
         # Use OpenAI with memory content
         if self.openai:
             # Get current memory content to include in prompt
@@ -1246,7 +1719,8 @@ class ProductParser:
             if suggested_mapping:
                 # Confirm with user if needed
                 confirmed_mapping = self._confirm_ai_result(
-                    f"{platform} Category Mapping", "", suggested_mapping, downloaded.name, downloaded.url
+                    f"{platform} Category Mapping", "", suggested_mapping, downloaded.name, downloaded.url,
+                    None, memory_prefix, category
                 )
                 if confirmed_mapping:
                     # Save to memory only after confirmation
@@ -1275,6 +1749,27 @@ class ProductParser:
             if downloaded.name in keywords_memory:
                 return keywords_memory[downloaded.name]
 
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_keywords = self._find_normalized_exact_match(downloaded.name, keywords_memory)
+            if normalized_keywords:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][downloaded.name] = normalized_keywords
+                self._save_memory_file(memory_key)
+                return normalized_keywords
+
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     keywords_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(downloaded.name, keywords_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         selected_keywords = self._ask_user_for_similar_key_selection("Google Keywords", downloaded.name, similar_keys, downloaded.url)
+        #         if selected_keywords:
+        #             # Save to memory with current product name as key
+        #             self.memory[memory_key][downloaded.name] = selected_keywords
+        #             self._save_memory_file(memory_key)
+        #             return selected_keywords
+
         # Use OpenAI with memory content
         if self.openai:
             # Get current memory content to include in prompt
@@ -1283,7 +1778,8 @@ class ProductParser:
             if keywords:
                 # Confirm with user if needed
                 confirmed_keywords = self._confirm_ai_result(
-                    "Google Keywords", "", keywords, downloaded.name, downloaded.url
+                    "Google Keywords", "", keywords, downloaded.name, downloaded.url,
+                    None, KEYWORDS_GOOGLE_PREFIX, downloaded.name
                 )
                 if confirmed_keywords:
                     # Save to memory only after confirmation
@@ -1312,6 +1808,46 @@ class ProductParser:
             name_memory = self.memory[memory_key]
             if downloaded.name in name_memory:
                 return name_memory[downloaded.name]
+
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_name = self._find_normalized_exact_match(downloaded.name, name_memory)
+            if normalized_name:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][downloaded.name] = normalized_name
+                self._save_memory_file(memory_key)
+                return normalized_name
+
+        # Check if Type+Brand+Model exist in their respective memory files
+        type_memory_key = MEMORY_KEY_PRODUCT_TYPE_MEMORY.format(language=self.language)
+        brand_memory_key = MEMORY_KEY_PRODUCT_BRAND_MEMORY.format(language=self.language)
+        model_memory_key = MEMORY_KEY_PRODUCT_MODEL_MEMORY.format(language=self.language)
+
+        has_type = (type_memory_key in self.memory and
+                   downloaded.name in self.memory[type_memory_key])
+        has_brand = (brand_memory_key in self.memory and
+                    downloaded.name in self.memory[brand_memory_key])
+        has_model = (model_memory_key in self.memory and
+                    downloaded.name in self.memory[model_memory_key])
+
+        # If all three exist, compose name from them directly (skip heuristic similarity search)
+        if has_type and has_brand and has_model:
+            product_type = self.memory[type_memory_key][downloaded.name]
+            product_brand = self._format_brand_name(self.memory[brand_memory_key][downloaded.name])
+            product_model = self._format_model_name(self.memory[model_memory_key][downloaded.name])
+
+            # Format: type brand model (skip brand if empty)
+            if product_brand and product_brand.strip():
+                formatted_name = f"{product_type} {product_brand} {product_model}".strip()
+            else:
+                formatted_name = f"{product_type} {product_model}".strip()
+
+            # Save to memory
+            if memory_key not in self.memory:
+                self.memory[memory_key] = {}
+            self.memory[memory_key][downloaded.name] = formatted_name
+            self._save_memory_file(memory_key)
+
+            return formatted_name
 
         # Get individual components
         product_type = self._get_product_type(downloaded)
@@ -1439,16 +1975,61 @@ class ProductParser:
             if downloaded.name in shortdesc_memory:
                 return shortdesc_memory[downloaded.name]
 
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_shortdesc = self._find_normalized_exact_match(downloaded.name, shortdesc_memory)
+            if normalized_shortdesc:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][downloaded.name] = normalized_shortdesc
+                self._save_memory_file(memory_key)
+                return normalized_shortdesc
+
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     shortdesc_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(downloaded.name, shortdesc_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         selected_shortdesc = self._ask_user_for_similar_key_selection("Short Description", downloaded.name, similar_keys, downloaded.url)
+        #         if selected_shortdesc:
+        #             # Save to memory with current product name as key
+        #             self.memory[memory_key][downloaded.name] = selected_shortdesc
+        #             self._save_memory_file(memory_key)
+        #             return selected_shortdesc
+
         # Use OpenAI for translation and validation (or generation from description)
         if self.openai:
-            shortdesc = self.openai.translate_and_validate_short_description(downloaded.short_description, self.language, downloaded.description)
+            # Try to get product context from memory (if already determined)
+            product_type = None
+            product_brand = None
+            product_model = None
+
+            type_memory_key = MEMORY_KEY_PRODUCT_TYPE_MEMORY.format(language=self.language)
+            brand_memory_key = MEMORY_KEY_PRODUCT_BRAND_MEMORY.format(language=self.language)
+            model_memory_key = MEMORY_KEY_PRODUCT_MODEL_MEMORY.format(language=self.language)
+
+            if type_memory_key in self.memory and downloaded.name in self.memory[type_memory_key]:
+                product_type = self.memory[type_memory_key][downloaded.name]
+            if brand_memory_key in self.memory and downloaded.name in self.memory[brand_memory_key]:
+                product_brand = self.memory[brand_memory_key][downloaded.name]
+            if model_memory_key in self.memory and downloaded.name in self.memory[model_memory_key]:
+                product_model = self.memory[model_memory_key][downloaded.name]
+
+            shortdesc = self.openai.translate_and_validate_short_description(
+                downloaded.short_description,
+                self.language,
+                downloaded.description,
+                product_type,
+                product_brand,
+                product_model
+            )
             if shortdesc:
                 # Determine current value for confirmation display
                 current_value = downloaded.short_description if downloaded.short_description else "(generated from description)"
 
                 # Confirm with user if needed
                 confirmed_shortdesc = self._confirm_ai_result(
-                    "Short Description", current_value, shortdesc, downloaded.name, downloaded.url
+                    "Short Description", current_value, shortdesc, downloaded.name, downloaded.url,
+                    None, SHORT_DESC_MEMORY_PREFIX, downloaded.name
                 )
                 if confirmed_shortdesc:
                     # Save to memory
@@ -1598,7 +2179,7 @@ class ProductParser:
                 # Copy price information from original variant
                 processed_variant.current_price = getattr(variant, 'current_price', 0.0) or 0.0
                 processed_variant.basic_price = getattr(variant, 'basic_price', 0.0) or 0.0
-                processed_variant.stock_status = self._standardize_stock_status(getattr(variant, 'stock_status', ''))
+                processed_variant.stock_status = self._standardize_stock_status(getattr(variant, 'stock_status', ''), downloaded)
 
                 # Generate variant code for this specific variant
                 if base_code:
@@ -1616,6 +2197,27 @@ class ProductParser:
             if name in name_memory:
                 return name_memory[name]
 
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_variant_name = self._find_normalized_exact_match(name, name_memory)
+            if normalized_variant_name:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][name] = normalized_variant_name
+                self._save_memory_file(memory_key)
+                return normalized_variant_name
+
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     name_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(name, name_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         selected_variant_name = self._ask_user_for_similar_key_selection("Variant Name", name, similar_keys, downloaded.url)
+        #         if selected_variant_name:
+        #             # Save to memory with current variant name as key
+        #             self.memory[memory_key][name] = selected_variant_name
+        #             self._save_memory_file(memory_key)
+        #             return selected_variant_name
+
         # Use OpenAI with memory content
         if self.openai:
             # Get current memory content to include in prompt
@@ -1624,7 +2226,8 @@ class ProductParser:
             if standardized:
                 # Confirm with user if needed
                 confirmed_name = self._confirm_ai_result(
-                    "Variant Name", name, standardized, downloaded.name, downloaded.url
+                    "Variant Name", name, standardized, downloaded.name, downloaded.url,
+                    None, VARIANT_NAME_MEMORY_PREFIX, name
                 )
                 if confirmed_name:
                     # Save to memory only after confirmation
@@ -1654,6 +2257,27 @@ class ProductParser:
             if value in value_memory:
                 return value_memory[value]
 
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_variant_value = self._find_normalized_exact_match(value, value_memory)
+            if normalized_variant_value:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][value] = normalized_variant_value
+                self._save_memory_file(memory_key)
+                return normalized_variant_value
+
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     value_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(value, value_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         selected_variant_value = self._ask_user_for_similar_key_selection("Variant Value", value, similar_keys, downloaded.url)
+        #         if selected_variant_value:
+        #             # Save to memory with current variant value as key
+        #             self.memory[memory_key][value] = selected_variant_value
+        #             self._save_memory_file(memory_key)
+        #             return selected_variant_value
+
         # Use OpenAI with memory content
         if self.openai:
             # Get current memory content to include in prompt
@@ -1662,7 +2286,8 @@ class ProductParser:
             if standardized:
                 # Confirm with user if needed
                 confirmed_value = self._confirm_ai_result(
-                    "Variant Value", value, standardized, downloaded.name, downloaded.url
+                    "Variant Value", value, standardized, downloaded.name, downloaded.url,
+                    None, VARIANT_VALUE_MEMORY_PREFIX, value
                 )
                 if confirmed_value:
                     # Save to memory only after confirmation
@@ -1692,6 +2317,27 @@ class ProductParser:
             if downloaded.name in keywords_memory:
                 return keywords_memory[downloaded.name]
 
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_keywords = self._find_normalized_exact_match(downloaded.name, keywords_memory)
+            if normalized_keywords:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][downloaded.name] = normalized_keywords
+                self._save_memory_file(memory_key)
+                return normalized_keywords
+
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     keywords_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(downloaded.name, keywords_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         selected_keywords = self._ask_user_for_similar_key_selection("Zbozi Keywords", downloaded.name, similar_keys, downloaded.url)
+        #         if selected_keywords:
+        #             # Save to memory with current product name as key
+        #             self.memory[memory_key][downloaded.name] = selected_keywords
+        #             self._save_memory_file(memory_key)
+        #             return selected_keywords
+
         # Use OpenAI with memory content
         if self.openai:
             # Get current memory content to include in prompt
@@ -1700,7 +2346,8 @@ class ProductParser:
             if keywords:
                 # Confirm with user if needed
                 confirmed_keywords = self._confirm_ai_result(
-                    "Zbozi Keywords", "", keywords, downloaded.name, downloaded.url
+                    "Zbozi Keywords", "", keywords, downloaded.name, downloaded.url,
+                    None, KEYWORDS_ZBOZI_PREFIX, downloaded.name
                 )
                 if confirmed_keywords:
                     # Save to memory only after confirmation
@@ -1746,64 +2393,6 @@ class ProductParser:
                 export_products.append(variant_product)
 
         return export_products
-
-    def _create_main_export_product(self, repaired: RepairedProduct) -> ExportMainProduct:
-        """Create main export product from repaired product."""
-        main_product = ExportMainProduct()
-
-        # Basic product information - map all available fields
-        main_product.nazev = repaired.name
-        main_product.kod = repaired.code
-        main_product.popis = repaired.desc
-        main_product.popis_strucny = repaired.shortdesc
-        main_product.vyrobce = "" if repaired.brand and self._is_desaka_brand(repaired.brand) else repaired.brand
-        main_product.kategorie_id = repaired.category_ids
-
-        # Pricing information
-        main_product.cena = float(repaired.price) if repaired.price else 0.0
-        main_product.cena_bezna = float(repaired.price_standard) if repaired.price_standard else main_product.cena
-
-        # Feed-specific categories and keywords
-        main_product.glami_kategorie = repaired.glami_category
-        main_product.google_kategorie = repaired.google_category
-        main_product.heurekacz_kategorie = repaired.heureka_category
-        main_product.zbozicz_kategorie = repaired.zbozi_category
-        main_product.google_stitek_0 = repaired.google_keywords
-        main_product.zbozicz_stitek_0 = repaired.zbozi_keywords
-
-        # Apply default values from memory for fields not set from repaired product
-        self._apply_default_export_values(main_product)
-
-        return main_product
-
-    def _create_variant_export_product(self, repaired: RepairedProduct, variant: Any, variant_index: int) -> ExportProductVariant:
-        """Create variant export product from repaired product and variant."""
-        variant_product = ExportProductVariant()
-
-        # Basic identification - only set what's different from main product
-        variant_product.varianta_id = f"{repaired.code}-V{variant_index:02d}"
-        variant_product.kod = f"{repaired.code}-V{variant_index:02d}"
-        variant_product.ean = getattr(variant, 'ean', '') if hasattr(variant, 'ean') else ''
-        variant_product.cena = float(getattr(variant, 'price', repaired.price)) if getattr(variant, 'price', repaired.price) else 0.0
-        variant_product.cena_bezna = float(getattr(variant, 'price_standard', repaired.price_standard)) if getattr(variant, 'price_standard', repaired.price_standard) else variant_product.cena
-
-        # Variant-specific properties
-        if hasattr(variant, 'key_value_pairs') and variant.key_value_pairs:
-            pairs = list(variant.key_value_pairs.items())
-            if len(pairs) > 0:
-                variant_product.varianta1_nazev = pairs[0][0]
-                variant_product.varianta1_hodnota = pairs[0][1]
-            if len(pairs) > 1:
-                variant_product.varianta2_nazev = pairs[1][0]
-                variant_product.varianta2_hodnota = pairs[1][1]
-            if len(pairs) > 2:
-                variant_product.varianta3_nazev = pairs[2][0]
-                variant_product.varianta3_hodnota = pairs[2][1]
-
-        # Apply default values from memory for variant-specific fields
-        self._apply_default_export_values(variant_product, is_variant=True)
-
-        return variant_product
 
     def _apply_default_export_values(self, export_product: ExportProduct, is_variant: bool = False):
         """Apply default values from DefaultExportProductValues memory."""
@@ -2043,7 +2632,7 @@ class ProductParser:
 
         return main_product
 
-    def _create_variant_export_product(self, repaired: RepairedProduct, variant: Any, variant_index: int) -> ExportProductVariant:
+    def _create_variant_export_product_complete(self, repaired: RepairedProduct, variant: Any, variant_index: int) -> ExportProductVariant:
         """Create variant export product with complete 96-column specification."""
         variant_product = ExportProductVariant()
 
@@ -2271,7 +2860,7 @@ class ProductParser:
 
         return variant_product
 
-    def _standardize_stock_status(self, stock_status: str) -> str:
+    def _standardize_stock_status(self, stock_status: str, downloaded: DownloadedProduct) -> str:
         """Standardize stock status using memory or OpenAI."""
         if not stock_status or not stock_status.strip():
             return ""
@@ -2285,6 +2874,27 @@ class ProductParser:
             if stock_status in stock_status_memory:
                 return stock_status_memory[stock_status]
 
+            # Try normalized exact match (for keys with whitespace differences)
+            normalized_stock_status = self._find_normalized_exact_match(stock_status, stock_status_memory)
+            if normalized_stock_status:
+                # Found exact match after normalization - save with current key and return
+                self.memory[memory_key][stock_status] = normalized_stock_status
+                self._save_memory_file(memory_key)
+                return normalized_stock_status
+
+        # DISABLED: Try to find similar keys in memory
+        # if memory_key in self.memory:
+        #     stock_status_memory = self.memory[memory_key]
+        #     similar_keys = self._find_similar_memory_keys(stock_status, stock_status_memory, threshold=0.9)
+        #
+        #     if similar_keys:
+        #         selected_stock_status = self._ask_user_for_similar_key_selection("Stock Status", stock_status, similar_keys)
+        #         if selected_stock_status:
+        #             # Save to memory with current stock status as key
+        #             self.memory[memory_key][stock_status] = selected_stock_status
+        #             self._save_memory_file(memory_key)
+        #             return selected_stock_status
+
         # Use OpenAI if available
         if self.openai:
             standardized = self.openai.standardize_stock_status(
@@ -2295,7 +2905,8 @@ class ProductParser:
                 # Confirm with user if needed
                 confirmed_value = self._confirm_ai_result(
                     "Stock Status", stock_status, standardized,
-                    f"Stock status: {stock_status}", ""
+                    f"Stock status: {stock_status}", "",
+                    None, STOCK_STATUS_MEMORY_PREFIX, stock_status
                 )
                 if confirmed_value:
                     # Save to memory
@@ -2306,7 +2917,7 @@ class ProductParser:
                     return confirmed_value
 
         # Ask user directly if AI not available or failed
-        user_value = self._ask_user_for_variant_value("Stock Status", stock_status, f"Stock status: {stock_status}")
+        user_value = self._ask_user_for_variant_value("Stock Status", stock_status, downloaded, f"Stock status: {stock_status}")
         if user_value:
             user_value = user_value.strip()
             # Save to memory
@@ -2317,4 +2928,50 @@ class ProductParser:
             return user_value
 
         return stock_status
+
+    def _add_to_trash(self, memory_prefix: str, product_key: str, value: str):
+        """
+        Immediately append entry to trash file (fire-and-forget).
+
+        Args:
+            memory_prefix: Memory file prefix (e.g., "ProductBrandMemory")
+            product_key: Product key (usually downloaded.name)
+            value: The incorrect value to trash (can be empty string)
+        """
+        if not memory_prefix or not product_key or not self.memory_dir:
+            return
+
+        from shared.file_ops import load_csv_file, append_to_csv_file
+
+        # Determine trash directory and file path
+        trash_dir = os.path.join(os.path.dirname(self.memory_dir), "Trash")
+        os.makedirs(trash_dir, exist_ok=True)
+
+        trash_filepath = os.path.join(trash_dir, f"{memory_prefix}_{self.language}_trash.csv")
+
+        try:
+            # Load existing trash file to check for duplicates
+            existing_rows = set()
+            if os.path.exists(trash_filepath):
+                existing_entries = load_csv_file(trash_filepath)
+                for entry in existing_entries:
+                    row_id = (entry.get('KEY', ''), entry.get('VALUE', ''))
+                    existing_rows.add(row_id)
+
+            # Check if this exact row already exists
+            new_row_id = (product_key, value)
+            if new_row_id in existing_rows:
+                logging.debug(f"Trash entry already exists: {memory_prefix} - KEY='{product_key}', VALUE='{value}'")
+                return
+
+            # Append new entry (no backup, true append mode)
+            new_entry = {'KEY': product_key, 'VALUE': value}
+            append_to_csv_file(trash_filepath, new_entry)
+
+            print(f"\n🗑️  Trash: {memory_prefix} - KEY='{product_key}', VALUE='{value}' → {trash_filepath}")
+            logging.debug(f"Added trash entry to {trash_filepath}")
+
+        except Exception as e:
+            logging.error(f"Error writing trash entry to {trash_filepath}: {str(e)}", exc_info=True)
+
 

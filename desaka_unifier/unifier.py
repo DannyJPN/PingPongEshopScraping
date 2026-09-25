@@ -14,16 +14,17 @@ from unifierlib.memory_manager import load_eshop_list, load_supported_languages
 from unifierlib.result_loader import load_eshop_results
 from unifierlib.repaired_product import RepairedProduct
 from unifierlib.product_merger import ProductMerger
+from unifierlib.token_tracker import get_tracker
 
 from unifierlib.constants import (
     DEFAULT_LANGUAGE,
     DEFAULT_RESULT_DIR,
     DEFAULT_MEMORY_DIR,
     DEFAULT_EXPORT_DIR,
+    DEFAULT_LOG_DIR,
     DEFAULT_CONFIRM_AI_RESULTS,
     DEFAULT_ENABLE_FINE_TUNING,
     DEFAULT_USE_FINE_TUNED_MODELS,
-    LOG_DIR,
     WRONGS_FILE,
     ESHOP_LIST
 )
@@ -66,82 +67,89 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="Desaka Unifier")
 
     parser.add_argument(
-        "--Language",
+        "--language",
         type=validate_language,
         default=DEFAULT_LANGUAGE,
         help=f"ISO 639-1 language code (2 characters). Default: {DEFAULT_LANGUAGE}"
     )
 
     parser.add_argument(
-        "--ResultDir",
+        "--result_dir",
         type=str,
         default=DEFAULT_RESULT_DIR,
         help=f"Directory for results. Default: {DEFAULT_RESULT_DIR}"
     )
 
-    # Update MemoryDir to be relative to script location
+    # Update memory_dir to be relative to script location
     default_memory_dir = os.path.join(script_dir, DEFAULT_MEMORY_DIR.lstrip("./"))
     parser.add_argument(
-        "--MemoryDir",
+        "--memory_dir",
         type=str,
         default=default_memory_dir,
         help=f"Directory for memory files. Default: {DEFAULT_MEMORY_DIR}"
     )
 
     parser.add_argument(
-        "--ExportDir",
+        "--export_dir",
         type=str,
         default=DEFAULT_EXPORT_DIR,
         help=f"Directory for exports. Default: {DEFAULT_EXPORT_DIR}"
     )
 
     parser.add_argument(
-        "--ConfirmAIResults",
+        "--log_dir",
+        type=str,
+        default=DEFAULT_LOG_DIR,
+        help=f"Directory for log files. Default: {DEFAULT_LOG_DIR}"
+    )
+
+    parser.add_argument(
+        "--confirm_ai_results",
         action="store_true",
         help="Automatically confirm AI results without user prompts (default: False)"
     )
 
     parser.add_argument(
-        "--Debug",
+        "--debug",
         action="store_true",
         help="Enable debug logging"
     )
 
     parser.add_argument(
-        "--Overwrite",
+        "--overwrite",
         action="store_true",
         help="Overwrite existing files"
     )
 
     parser.add_argument(
-        "--SkipScripts",
+        "--skip_scripts",
         action="store_true",
         help="Skip running eshop scripts and only perform unification"
     )
 
     parser.add_argument(
-        "--EnableFineTuning",
+        "--enable_fine_tuning",
         action="store_true",
         default=DEFAULT_ENABLE_FINE_TUNING,
         help="Enable fine-tuning of OpenAI models (default: False)"
     )
 
     parser.add_argument(
-        "--UseFineTunedModels",
+        "--use_fine_tuned_models",
         action="store_true",
         default=DEFAULT_USE_FINE_TUNED_MODELS,
         help="Use fine-tuned models instead of generic ones when available (default: False)"
     )
 
     parser.add_argument(
-        "--MaxParallel",
+        "--max_parallel",
         type=int,
         default=3,
         help="Maximum number of eshop scripts to run in parallel (default: 3)"
     )
 
     parser.add_argument(
-        "--SkipAI",
+        "--skip_ai",
         action="store_true",
         help="Skip using AI for property evaluation"
     )
@@ -160,12 +168,16 @@ def main():
     # Parse arguments first to get debug flag
     args = parse_arguments()
 
+    # Ensure log directory exists BEFORE setting up logging
+    if not os.path.exists(args.log_dir):
+        os.makedirs(args.log_dir)
+
     # Generate the log filename
-    log_file = get_log_filename(LOG_DIR)
+    log_file = get_log_filename(args.log_dir)
     logging.debug(f"Generated log filename: {log_file}")
 
     # Setup logging with the log file path
-    setup_logging(args.Debug, log_file)
+    setup_logging(args.debug, log_file)
 
     # Register signal handler for Ctrl+C
     signal.signal(signal.SIGINT, signal_handler)
@@ -180,10 +192,10 @@ def main():
     try:
         # Step 1: Ensure required directories exist
         directories_to_check = [
-            LOG_DIR,
-            args.ResultDir,
-            args.MemoryDir,
-            args.ExportDir
+            args.log_dir,
+            args.result_dir,
+            args.memory_dir,
+            args.export_dir
         ]
         if not ensure_required_directories(directories_to_check):
             logging.error("Failed to create required directories")
@@ -196,12 +208,12 @@ def main():
             logging.error("Failed to load supported languages")
             sys.exit(1)
 
-        if not validate_language_support(args.Language, script_dir, supported_languages):
+        if not validate_language_support(args.language, script_dir, supported_languages):
             logging.error("Language validation failed")
             sys.exit(1)
 
         # Step 3: Validate Memory files (always runs)
-        if not validate_memory_files(args.MemoryDir, args.Language):
+        if not validate_memory_files(args.memory_dir, args.language):
             logging.error("Memory files validation failed")
             sys.exit(1)
 
@@ -209,13 +221,13 @@ def main():
 
         # Load the eshop list (must exist - created manually)
         logging.info("Loading eshop list...")
-        eshop_list_path = os.path.join(args.MemoryDir, ESHOP_LIST)
+        eshop_list_path = os.path.join(args.memory_dir, ESHOP_LIST)
         if not os.path.exists(eshop_list_path):
             logging.error(f"{ESHOP_LIST} not found. This file must be created manually.")
             logging.error(f"Please create {ESHOP_LIST} in the Memory directory with eshop configuration.")
             sys.exit(1)
 
-        eshop_list = load_eshop_list(args.MemoryDir)
+        eshop_list = load_eshop_list(args.memory_dir)
 
         if not eshop_list:
             logging.error(f"Failed to load eshop list or {ESHOP_LIST} is empty")
@@ -224,15 +236,15 @@ def main():
         logging.debug(f"Loaded {len(eshop_list)} eshops for processing")
 
         # Step 4: Run eshop scripts (conditional)
-        if not args.SkipScripts:
+        if not args.skip_scripts:
             logging.info("Running eshop downloader scripts...")
 
             # Run the scripts in parallel
             script_runner_instance = ScriptRunner()
             try:
                 success = script_runner_instance.run_scripts_parallel(
-                    eshop_list, args.Language, args.ResultDir,
-                    debug=args.Debug, overwrite=args.Overwrite, max_workers=args.MaxParallel
+                    eshop_list, args.language, args.result_dir, args.log_dir,
+                    debug=args.debug, overwrite=args.overwrite, max_workers=args.max_parallel
                 )
 
                 if success:
@@ -248,7 +260,7 @@ def main():
 
         # Step 5: Load results from eshop scripts
         logging.info("Loading results from eshop downloader scripts...")
-        results = load_eshop_results(args.ResultDir, eshop_list, args.Language)
+        results = load_eshop_results(args.result_dir, eshop_list, args.language)
 
         if results['summary']['total_products'] == 0:
             logging.error("No products were loaded from any eshop scripts")
@@ -265,12 +277,12 @@ def main():
 
         # Load memory files for parser (optimized loading)
         from unifierlib.memory_manager import load_frequently_used_memory_files
-        frequent_memory_data = load_frequently_used_memory_files(args.MemoryDir, args.Language)
-        memory_data = load_all_memory_files(args.MemoryDir, args.Language)
+        frequent_memory_data = load_frequently_used_memory_files(args.memory_dir, args.language)
+        memory_data = load_all_memory_files(args.memory_dir, args.language)
 
         # Load fine-tuned models if requested
         fine_tuned_models = {}
-        if args.UseFineTunedModels:
+        if args.use_fine_tuned_models:
             from unifierlib.fine_tuning import FineTuningManager
             fine_tuning_manager = FineTuningManager()
             fine_tuned_models = fine_tuning_manager.load_fine_tuned_models(script_dir)
@@ -290,14 +302,15 @@ def main():
         # Initialize parser with memory data and export products
         parser = ProductParser(
             memory_data=memory_data,
-            language=args.Language,
+            language=args.language,
             export_products=results.get('export_products', []),
             repaired_products=results.get('repaired_products', []),
-            confirm_ai_results=args.ConfirmAIResults,
-            use_fine_tuned_models=args.UseFineTunedModels,
+            confirm_ai_results=args.confirm_ai_results,
+            use_fine_tuned_models=args.use_fine_tuned_models,
             fine_tuned_models=fine_tuned_models,
             supported_languages_data=supported_languages_data,
-            skip_ai=args.SkipAI
+            skip_ai=args.skip_ai,
+            memory_dir=args.memory_dir
         )
 
         # Sort downloaded products by name before conversion
@@ -321,8 +334,21 @@ def main():
 
         # Step 5.5: Merge duplicate products
         logging.info("Merging duplicate products...")
-        product_merger = ProductMerger()
+        product_merger = ProductMerger(
+            language=args.language,
+            memory_dir=args.memory_dir,
+            confirm_ai_results=args.confirm_ai_results,
+            skip_ai=args.skip_ai,
+            use_fine_tuned_models=args.use_fine_tuned_models,
+            fine_tuned_models=fine_tuned_models,
+            supported_languages_data=supported_languages_data,
+            export_products=results.get('export_products', [])  # Pincesobchod reference data
+        )
         merged_products = product_merger.merge_products(repaired_products)
+
+        # Generate product codes now that brand/category are finalised after merging
+        logging.info("Generating product codes post-merge...")
+        parser.generate_codes_for_products(merged_products)
 
         logging.info(f"Product merging completed:")
         logging.info(f"  - Original products: {len(repaired_products)}")
@@ -335,7 +361,7 @@ def main():
         logging.info("Filtering products...")
         from unifierlib.product_filter import ProductFilter
 
-        product_filter = ProductFilter(memory_data)
+        product_filter = ProductFilter(memory_data, debug=args.debug)
         filtered_products, rejected_products = product_filter.process_products_with_filtering(merged_products)
 
         logging.debug(f"Product filtering completed:")
@@ -372,7 +398,7 @@ def main():
         logging.info("Combining ExportProducts from JSON and RepairedProducts...")
         from unifierlib.product_combiner import ProductCombiner
 
-        product_combiner = ProductCombiner(args.ExportDir)
+        product_combiner = ProductCombiner(args.export_dir)
         json_export_products = results.get('export_products', [])
 
         combined_products, combination_reports = product_combiner.combine_products(
@@ -390,7 +416,7 @@ def main():
         logging.info("Generating comprehensive export reports...")
         from unifierlib.export_manager import ExportManager
 
-        export_manager = ExportManager(args.ExportDir)
+        export_manager = ExportManager(args.export_dir)
         created_files = export_manager.export_comprehensive_reports(
             combined_products, combination_reports['new_products']
         )
@@ -399,7 +425,7 @@ def main():
 
         # Step 10: Save simple unified products file (backward compatibility)
         logging.info("Saving unified products file for backward compatibility...")
-        export_file_path = os.path.join(args.ExportDir, f"UnifiedProducts_{args.Language}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
+        export_file_path = os.path.join(args.export_dir, f"UnifiedProducts_{args.language}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
 
         try:
             # Save combined products as CSV using file_ops
@@ -430,7 +456,7 @@ def main():
         logging.info("=" * 60)
         logging.info("UNIFICATION SUMMARY")
         logging.info("=" * 60)
-        logging.info(f"Language: {args.Language}")
+        logging.info(f"Language: {args.language}")
         logging.info(f"Eshops processed: {len(eshop_list)}")
         logging.info(f"Total downloaded products: {results['summary']['total_downloaded_products']}")
         logging.info(f"Total export products (JSON): {results['summary']['total_export_products']}")
@@ -449,36 +475,68 @@ def main():
             logging.info(f"Unified products file: {export_file_path}")
         logging.info("=" * 60)
 
-        # Step 12: Fine-tuning (if enabled)
-        if args.EnableFineTuning:
-            logging.info("Starting fine-tuning process...")
+        # Step 12: Fine-tuning (if enabled) - fire-and-forget subprocess
+        if args.enable_fine_tuning:
+            logging.info("Launching fine-tuning process in background...")
             try:
-                from unifierlib.fine_tuning import FineTuningManager
+                import subprocess
 
-                fine_tuning_manager = FineTuningManager(memory_data, args.Language)
-                job_ids = fine_tuning_manager.fine_tune_all_tasks(min_examples=10)
+                # Prepare command for standalone fine-tuning script
+                fine_tuning_script = os.path.join(script_dir, 'unifierlib', 'fine_tuning.py')
+                memory_dir = os.path.join(script_dir, 'Memory')
+                trash_dir = os.path.join(script_dir, 'memory_tests', 'trash')
 
-                logging.info("Fine-tuning jobs started:")
-                for task_type, job_id in job_ids.items():
-                    if job_id:
-                        logging.info(f"  - {task_type}: {job_id}")
-                    else:
-                        logging.warning(f"  - {task_type}: Failed to start")
+                cmd = [
+                    sys.executable,  # Use same Python interpreter
+                    fine_tuning_script,
+                    '--language', args.language,
+                    '--memory_dir', memory_dir,
+                    '--trash_dir', trash_dir,
+                ]
 
-                # Check status and save any completed models
-                status_report = fine_tuning_manager.check_fine_tuning_status(job_ids, script_dir)
-                logging.info("Fine-tuning status:")
-                for task_type, status in status_report.items():
-                    logging.info(f"  - {task_type}: {status}")
+                if args.debug:
+                    cmd.append('--debug')
+
+                # Launch process in fire-and-forget mode
+                # On Windows, use CREATE_NO_WINDOW flag; on Unix, use nohup-like behavior
+                if sys.platform == 'win32':
+                    # Windows: detach process
+                    subprocess.Popen(
+                        cmd,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS
+                    )
+                else:
+                    # Unix-like: redirect output and run in background
+                    log_file = os.path.join(script_dir, 'fine_tuning.log')
+                    with open(log_file, 'w') as f:
+                        subprocess.Popen(
+                            cmd,
+                            stdout=f,
+                            stderr=subprocess.STDOUT,
+                            start_new_session=True  # Detach from parent
+                        )
+
+                logging.info("Fine-tuning process started in background")
+                logging.info(f"Monitor progress: python {fine_tuning_script} --check_status")
 
             except Exception as e:
-                logging.error(f"Error during fine-tuning: {str(e)}", exc_info=True)
+                logging.error(f"Error launching fine-tuning process: {str(e)}", exc_info=True)
         else:
-            logging.info("Fine-tuning skipped (--EnableFineTuning not set)")
+            logging.info("Fine-tuning skipped (--enable_fine_tuning not set)")
+
 
     except Exception as e:
         logging.error(f"Fatal error during initialization: {str(e)}", exc_info=True)
         sys.exit(1)
+
+    # Display AI token usage and cost statistics
+    try:
+        tracker = get_tracker()
+        tracker.print_statistics()
+    except Exception as e:
+        logging.warning(f"Failed to display token statistics: {str(e)}")
 
     end_time = datetime.now()
     logging.info(f"Script ended at {end_time.strftime('%Y-%m-%d %H:%M:%S')}")

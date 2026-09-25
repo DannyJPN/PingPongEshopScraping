@@ -1,9 +1,9 @@
-import os
+﻿import os
 import logging
-import requests
 from shared.utils import sanitize_filename
+from shared.http_downloader import download_with_retry
 
-def download_webpage(url, filepath, overwrite=False, debug=False):
+def download_webpage(url, filepath, overwrite=False, debug=False, stats=None):
     try:
         logging.debug(f"Starting download_webpage function for URL: {url}")
 
@@ -23,17 +23,15 @@ def download_webpage(url, filepath, overwrite=False, debug=False):
             logging.debug(f"File already exists and overwrite is not set: {sanitized_filepath}")
             return True
 
-        # Download the webpage
+        # Download the webpage with retry logic
         logging.debug(f"Making HTTP request to URL: {url}")
-        response = requests.get(url)
+        response = download_with_retry(url, stats=stats)
 
-        if response.status_code == 404:
-            logging.debug(f"404 Not Found for URL: {url}")
+        if response is None:
+            logging.debug(f"Failed to download URL: {url}")
             return False
-        else:
-            response.raise_for_status()  # Raise an HTTPError for other bad responses
 
-        logging.debug(f"Downloading webpage from URL: {url} to filepath: {sanitized_filepath}")
+        logging.debug(f"Successfully downloaded webpage from URL: {url} to filepath: {sanitized_filepath}")
 
         # Write the content to a file
         with open(sanitized_filepath, 'w', encoding='utf-8') as file:
@@ -44,3 +42,13 @@ def download_webpage(url, filepath, overwrite=False, debug=False):
     except Exception as e:
         logging.error(f"Error downloading {url} to {sanitized_filepath}: {e}", exc_info=True)
         return False
+
+
+
+
+
+
+
+
+
+
