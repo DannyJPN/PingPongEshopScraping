@@ -203,6 +203,18 @@ python pincesobchod_downloader.py --result_folder H:/Desaka/Pincesobchod_CS --co
 - `--overwrite` - Overwrite existing downloaded files
 - `--country_code` - Only for Pincesobchod (CZ/SK)
 
+### Pincesobchod CZ vs SK Comparison
+
+`pincesobchoddownloader/cs_sk_compare/` compares the CZ and SK JSON exports (one `check_<property>.py`
+per property, `check_all.py` for everything, `check_photos_vision*.py` for the OpenAI photo check).
+See its README for the price rules, identity rules and the shared report format.
+
+```bash
+cd pincesobchoddownloader/cs_sk_compare
+python check_all.py --pullnewest
+python -m pytest tests
+```
+
 ### Running the Main Unifier
 
 ```bash
