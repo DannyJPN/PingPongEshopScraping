@@ -5,7 +5,8 @@ import os
 import pytest
 
 from cssklib.checks import (
-    CHECKS, PRODUCT_FIELDS, SPECIAL_FIELDS, TRANSLATION_FIELDS, VARIANT_FIELDS, VARIANT_SPECIAL_FIELDS,
+    CHECKS, IGNORED_FIELDS, PRODUCT_FIELDS, SPECIAL_FIELDS, TRANSLATION_FIELDS, VARIANT_FIELDS,
+    VARIANT_IGNORED_FIELDS, VARIANT_SPECIAL_FIELDS,
     Context, run_check, select_vision_products,
 )
 from cssklib.images import ImageStore
@@ -40,9 +41,9 @@ def test_registry_covers_all_json_properties():
         "quantityPack", "limitMultiple", "limitMin", "limitMax", "weight", "length", "comment", "availability",
         "guarantee", "discount", "related", "accessory", "gift", "pairs", "videos", "files", "parameters",
         "warehouse", "wholesale"}
-    assert product_keys <= set(PRODUCT_FIELDS) | SPECIAL_FIELDS
+    assert product_keys <= set(PRODUCT_FIELDS) | SPECIAL_FIELDS | IGNORED_FIELDS
     assert set(make_variant("x", [])) | {"mpn", "purchasePrice", "deliveryDate", "deliveryDateAuto",
-                                         "manageStock", "weight", "length"} <= set(VARIANT_FIELDS) | VARIANT_SPECIAL_FIELDS
+                                         "manageStock", "weight", "length"} <= set(VARIANT_FIELDS) | VARIANT_SPECIAL_FIELDS | VARIANT_IGNORED_FIELDS
     for field in TRANSLATION_FIELDS:
         assert f"translations_{field}" in CHECKS
     assert not CHECKS["vision"].default_enabled
@@ -189,7 +190,6 @@ def test_variant_field_check():
     findings = run("variant_stockQuantity", [cs], [sk]).findings
     assert [(f.variant_code, f.cs_value, f.sk_value) for f in findings] == [("P-01", 5, 3)]
     assert findings[0].variant_options == "Barva=černá"
-    assert len(run("variant_id", [cs], [sk]).findings) == 1
 
 
 def test_variant_price_checks_use_inherited_price():
@@ -335,3 +335,19 @@ def test_sk_twin_helper_is_independent_copy():
     sk = sk_twin(cs)
     sk["images"][0]["url"] = "changed"
     assert cs["images"][0]["url"] != "changed" and copy.deepcopy(cs) == cs
+
+
+def test_product_and_variant_ids_are_never_compared():
+    """Shop internal IDs may differ between CZ and SK."""
+    assert "id" not in CHECKS and "variant_id" not in CHECKS
+    assert not os.path.exists(os.path.join(SCRIPTS_DIR, "check_id.py"))
+    assert not os.path.exists(os.path.join(SCRIPTS_DIR, "check_variant_id.py"))
+    cs = make_product(id=1, variants=[make_variant("P-01", [("Barva", "černá")], id=10)])
+    sk = sk_twin(cs)
+    sk["id"] = 999
+    sk["variants"][0]["id"] = 888
+    ctx = Context(cs_products=[cs], sk_products=[sk], pairing=pair_products([cs], [sk]))
+    for check in CHECKS.values():
+        if check.id in ("images_hash", "vision"):
+            continue
+        assert run_check(check, ctx).findings == [], check.id

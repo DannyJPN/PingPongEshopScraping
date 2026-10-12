@@ -22,7 +22,7 @@ from cssklib.values import (
 
 # Top-level product properties compared for equality (everything except the special ones below)
 PRODUCT_FIELDS = [
-    "id", "guid", "ean", "mpn", "createdAt", "updatedAt", "priority", "archive", "visibility",
+    "guid", "ean", "mpn", "createdAt", "updatedAt", "priority", "archive", "visibility",
     "homepage", "sales", "deliveryFree", "erotic", "adult", "voucherDiscount", "purchasePrice",
     "deliveryDate", "deliveryDateAuto", "manageStock", "stockQuantity", "quantityPack",
     "limitMultiple", "limitMin", "limitMax", "weight", "length", "comment", "availability",
@@ -32,12 +32,15 @@ PRODUCT_FIELDS = [
 TRANSLATION_FIELDS = ["nameext", "slug", "metaTitle", "metaDescription", "annotation", "description"]
 # Properties with special rules / own checks (catalogNumber + name = identity)
 SPECIAL_FIELDS = {"catalogNumber", "translations", "price", "standardPrice", "vat", "images", "variants"}
+# Shop internal IDs of products and variants may legitimately differ between CZ and SK -> never compared
+IGNORED_FIELDS = {"id"}
 
 VARIANT_FIELDS = [
-    "id", "ean", "mpn", "equal", "purchasePrice", "deliveryDate", "deliveryDateAuto", "manageStock",
+    "ean", "mpn", "equal", "purchasePrice", "deliveryDate", "deliveryDateAuto", "manageStock",
     "stockQuantity", "weight", "length", "image", "translations", "availability",
 ]
 VARIANT_SPECIAL_FIELDS = {"catalogNumber", "options", "price", "standardPrice"}
+VARIANT_IGNORED_FIELDS = {"id"}
 
 PRICE_FIELD_LABEL = {"price": "cena bez DPH (price)", "standardPrice": "cena běžná s DPH (standardPrice)"}
 
@@ -116,7 +119,7 @@ def make_field_check(prop, getter=None):
 
 def run_other_fields(ctx, check_id):
     """Properties not covered by any other check (protects against new API fields)."""
-    known = set(PRODUCT_FIELDS) | SPECIAL_FIELDS
+    known = set(PRODUCT_FIELDS) | SPECIAL_FIELDS | IGNORED_FIELDS
     findings, fields = [], set()
     for cs, sk in ctx.pairing.matched:
         for prop in sorted((set(cs) | set(sk)) - known):

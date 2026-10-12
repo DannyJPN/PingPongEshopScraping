@@ -42,7 +42,7 @@ Seznam všech kontrol: `python check_all.py --list-checks`.
 | skupina | kontroly | pravidlo |
 |---|---|---|
 | identity | `identity` | produkty jen v CZ / jen v SK, stejný kód s jiným názvem, duplicitní kódy |
-| product | `id`, `guid`, `ean`, `visibility`, `archive`, `feeds`, `categories`, … (každá vlastnost zvlášť) | stejná hodnota v CZ i SK (u vnořených hodnot report vypíše, které podčásti se liší) |
+| product | `guid`, `ean`, `visibility`, `archive`, `feeds`, `categories`, … (každá vlastnost zvlášť) | stejná hodnota v CZ i SK (u vnořených hodnot report vypíše, které podčásti se liší) |
 | product | `translations_nameext`, `translations_slug`, `translations_metaTitle`, `translations_metaDescription`, `translations_annotation`, `translations_description` | stejný text |
 | product | `other_fields` | vlastnosti, které API přidá a žádná jiná kontrola je nezná |
 | price | `vat` | sazba DPH: CZ 21 %, SK 23 % |
@@ -54,6 +54,8 @@ Seznam všech kontrol: `python check_all.py --list-checks`.
 | images | `images_path` | počet, pořadí, cesty a hlavní fotka (cesta URL bez domény .cz/.sk) |
 | images | `images_hash` | obsah fotek (SHA-256), fotky se stahují do cache `--image-cache-dir` |
 | vision | `vision` | OpenAI: zobrazuje fotka produkt / souvisí s ním? (ve výchozím stavu vypnuto) |
+
+Interní ID produktu a varianty (`id`) se **nekontrolují** – mezi CZ a SK se mohou lišit.
 
 Prázdné hodnoty (`null`, `""`, `[]`, `{}`) se považují za shodné, pořadí položek v seznamech se
 ignoruje, desetinná čísla `320.0` a `320` jsou shodná.
