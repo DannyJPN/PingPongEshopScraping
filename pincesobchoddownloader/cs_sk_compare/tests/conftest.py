@@ -9,13 +9,16 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+from cssklib.shop_checks import slugify  # noqa: E402
+
 
 def make_product(code="BTY01000001", name="Potah BUTTERFLY Tenergy 05", side="cs", **overrides):
     domain = "https://www.pincesobchod.cz" if side == "cs" else "https://www.pincesobchod.sk"
     product = {
         "id": 1, "catalogNumber": code, "guid": "g", "ean": None, "visibility": True, "archive": False,
         "price": 1000.0, "standardPrice": 1210, "vat": {"id": 1, "rate": 21 if side == "cs" else 23},
-        "translations": {"cs": {"name": name, "nameext": None, "slug": "slug", "description": "<p>x</p>"}},
+        "translations": {"cs": {"name": name, "nameext": None, "slug": slugify(name), "metaTitle": name,
+                                "metaDescription": "Popis", "annotation": "Popis", "description": "<p>x</p>"}},
         "manufacturer": {"id": 1, "name": "Butterfly"},
         "categories": [{"id": 44, "main": True, "path": {"44": "Potahy"}}],
         "images": [
@@ -24,7 +27,13 @@ def make_product(code="BTY01000001", name="Potah BUTTERFLY Tenergy 05", side="cs
         ],
         "variants": [],
         "tags": [],
-        "feeds": {"glami": {"hidden": 0, "category": "Potahy"}},
+        "feeds": {
+            "glami": {"hidden": 0, "category": "Potahy", "cpc": 1210},
+            "google": {"hidden": 0, "category": "Potahy"},
+            "heurekacs": {"hidden": 0, "productname": name, "product": name, "cpc": 1210, "category": "Potahy"},
+            "zbozi": {"hidden": 0, "productname": name, "product": name, "cpc": 1210, "cpc_search": 1210,
+                      "category": "Potahy"},
+        },
     }
     product.update(overrides)
     return product

@@ -33,3 +33,7 @@ MISSINGDETECTOR.ps1
 
 # Architecture/spec documentation (local, not tracked)
 specs_architecture/
+
+# Test artifacts
+.coverage
+.pytest_cache/

@@ -27,6 +27,8 @@ def add_common_arguments(parser):
     src.add_argument("--pullnewest", action="store_true",
                      help="Stáhnout nejnovější JSONy mechanismem pincesobchod downloaderu "
                           "(potřebuje JZ_BEARER_TOKEN_CS / JZ_BEARER_TOKEN_SK)")
+    src.add_argument("--sides", choices=["cs", "sk", "both"], default="both",
+                     help="Které e-shopy kontrolovat u kontrol v rámci jednoho e-shopu (výchozí oba)")
     src.add_argument("--active-only", action="store_true",
                      help="Porovnávat jen produkty aktivní (viditelné a nearchivované) aspoň na jedné straně")
 
@@ -98,7 +100,8 @@ def build_context(args, checks, image_store_factory=None, vision_checker_factory
     price_config = PriceConfig(vat_rates={"cs": args.vat_cs, "sk": args.vat_sk},
                                czk_per_eur=args.czk_per_eur, tolerance=args.tolerance)
     ctx = Context(cs_products=cs_products, sk_products=sk_products, pairing=pairing,
-                  price_config=price_config, active_only=args.active_only)
+                  price_config=price_config, active_only=args.active_only,
+                  shop_sides=("cs", "sk") if args.sides == "both" else (args.sides,))
     ids = {c.id for c in checks}
     needs_images = "images_hash" in ids or ("vision" in ids and getattr(args, "vision_embed", False))
     if needs_images:
@@ -135,7 +138,7 @@ def execute(args, checks, report_name, **factories):
     except Exception as exc:
         logging.error(f"Chyba: {exc}", exc_info=args.debug)
         return EXIT_ERROR
-    options = {"active_only": args.active_only, "tolerance": args.tolerance,
+    options = {"active_only": args.active_only, "sides": args.sides, "tolerance": args.tolerance,
                "vat": {"cs": args.vat_cs, "sk": args.vat_sk}, "czk_per_eur": args.czk_per_eur}
     report = build_report(results, sources, ctx.pairing.summary(), options=options)
     paths, text = write_report(report, args.output_dir, args.report_name or report_name,
@@ -209,9 +212,12 @@ def select_checks(args):
     return selected
 
 
-def run_all(argv=None, **factories):
-    """Entry point of check_all.py."""
-    args = build_all_parser().parse_args(argv)
+def run_all(argv=None, default_groups=None, report_name="cs_sk_all", **factories):
+    """Entry point of check_all.py (and check_shop_all.py with default_groups=['shop'])."""
+    parser = build_all_parser()
+    if default_groups:
+        parser.set_defaults(group=list(default_groups))
+    args = parser.parse_args(argv)
     if args.list_checks:
         for check in CHECKS.values():
             flag = "" if check.default_enabled else "  [výchozí vypnuto]"
@@ -221,7 +227,7 @@ def run_all(argv=None, **factories):
     if not checks:
         print("Žádná kontrola není vybrána.")
         return EXIT_ERROR
-    return execute(args, checks, "cs_sk_all", **factories)
+    return execute(args, checks, report_name, **factories)
 
 
 def run_vision(argv=None, require_codes=False, **factories):

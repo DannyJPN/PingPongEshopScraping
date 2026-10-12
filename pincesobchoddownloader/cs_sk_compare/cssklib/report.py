@@ -101,7 +101,7 @@ def render_text(report, max_items=0, summary_only=False):
     """Human readable report. max_items limits listed findings per check (0 = all)."""
     lines = []
     summary = report["summary"]
-    lines.append("PINCESOBCHOD — POROVNÁNÍ CZ vs SK")
+    lines.append("PINCESOBCHOD — KONTROLA CZ / SK")
     lines.append(f"Vygenerováno: {report['generated_at']}   (schema {report['schema']})")
     lines.append("")
     for side, info in report["sources"].items():
@@ -153,7 +153,8 @@ def render_text(report, max_items=0, summary_only=False):
 def _finding_lines(f):
     head = f"[{f['severity'].upper()}] {f['product_code'] or '-'}"
     if f.get("variant_code") or f.get("variant_options"):
-        head += f" / varianta {f.get('variant_code') or '-'} ({f.get('variant_options') or ''})"
+        head += f" / varianta {f.get('variant_code') or '-'}"
+        head += f" ({f['variant_options']})" if f.get("variant_options") else ""
     if f.get("side") and f["side"] != "both":
         head += f" [{f['side'].upper()}]"
     head += f"  {f['product_name'][:70]}" if f.get("product_name") else ""

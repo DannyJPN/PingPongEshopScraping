@@ -206,7 +206,8 @@ python pincesobchod_downloader.py --result_folder H:/Desaka/Pincesobchod_CS --co
 ### Pincesobchod CZ vs SK Comparison
 
 `pincesobchoddownloader/cs_sk_compare/` compares the CZ and SK JSON exports (one `check_<property>.py`
-per property, `check_all.py` for everything, `check_photos_vision*.py` for the OpenAI photo check).
+per property, `check_all.py` for everything, `check_shop_all.py` for consistency checks inside one shop,
+`check_photos_vision*.py` for the OpenAI photo check).
 See its README for the price rules, identity rules and the shared report format.
 
 ```bash

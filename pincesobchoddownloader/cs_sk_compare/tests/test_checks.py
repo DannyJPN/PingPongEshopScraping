@@ -342,7 +342,7 @@ def test_product_and_variant_ids_are_never_compared():
     assert "id" not in CHECKS and "variant_id" not in CHECKS
     assert not os.path.exists(os.path.join(SCRIPTS_DIR, "check_id.py"))
     assert not os.path.exists(os.path.join(SCRIPTS_DIR, "check_variant_id.py"))
-    cs = make_product(id=1, variants=[make_variant("P-01", [("Barva", "černá")], id=10)])
+    cs = make_product(id=1, variants=[make_variant("BTY01000001-01", [("Barva", "černá")], id=10)])
     sk = sk_twin(cs)
     sk["id"] = 999
     sk["variants"][0]["id"] = 888

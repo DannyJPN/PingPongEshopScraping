@@ -43,6 +43,9 @@ def test_render_text():
     assert "[WARNING] B / varianta B-01 (Barva=černá) [SK]" in text
     assert "očekáváno: 1" in text and "CZ: true" in text
     assert "… a dalších 1" in render_text(_report(), max_items=1)
+    report = _report()
+    report["findings"][1]["variant_options"] = ""
+    assert "/ varianta B-01 [SK]" in render_text(report)
     summary = render_text(_report(), summary_only=True)
     assert "SOUHRN" in summary and "[ERROR]" not in summary
 

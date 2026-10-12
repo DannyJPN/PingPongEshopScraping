@@ -1,10 +1,12 @@
-# Pincesobchod – porovnání CZ vs SK
+# Pincesobchod – kontrola CZ vs SK a kontroly v rámci e-shopu
 
-Sada skriptů, které porovnávají JSON exporty Pincesobchodu (`Pincesobchod_CS.json`
-a `Pincesobchod_SK.json`) a hledají rozpory mezi CZ a SK e-shopem.
+Sada skriptů nad JSON exporty Pincesobchodu (`Pincesobchod_CS.json` a `Pincesobchod_SK.json`).
+Hledají rozpory mezi CZ a SK e-shopem a také nekonzistence uvnitř každého e-shopu
+(např. cena vs. cena běžná, název vs. SEO titulek a titulky ve feedech).
 
 * **Jeden skript pro každou vlastnost** – `check_<vlastnost>.py`
 * **Hromadný skript** – `check_all.py` (libovolná kombinace kontrol, souhrnný report)
+* **Kontroly v rámci jednoho e-shopu** – `check_shop_all.py` (skupina `shop`, CZ i SK zvlášť)
 * **OpenAI vizuální kontrola fotek** – `check_photos_vision.py` (vybrané produkty)
   a `check_photos_vision_all.py` (všechny produkty)
 
@@ -45,15 +47,39 @@ Seznam všech kontrol: `python check_all.py --list-checks`.
 | product | `guid`, `ean`, `visibility`, `archive`, `feeds`, `categories`, … (každá vlastnost zvlášť) | stejná hodnota v CZ i SK (u vnořených hodnot report vypíše, které podčásti se liší) |
 | product | `translations_nameext`, `translations_slug`, `translations_metaTitle`, `translations_metaDescription`, `translations_annotation`, `translations_description` | stejný text |
 | product | `other_fields` | vlastnosti, které API přidá a žádná jiná kontrola je nezná |
-| price | `vat` | sazba DPH: CZ 21 %, SK 23 % |
 | price | `price`, `standardPrice` | přepočet CZ → SK dle značky (viz níže) |
-| price | `price_vat` | cena běžná = cena × (1 + DPH) v CZ i SK |
 | variant | `variants` | identita variant: jen v CZ / jen v SK, jiný kód, jiné parametry, duplicitní parametry |
 | variant | `variant_<vlastnost>` | stejná hodnota u každé spárované varianty |
-| variant | `variant_price`, `variant_standardPrice`, `variant_price_vat` | cenová pravidla i pro varianty (cena varianty `null` = cena produktu) |
+| variant | `variant_price`, `variant_standardPrice` | přepočet CZ → SK i pro varianty (cena varianty `null` = cena produktu) |
 | images | `images_path` | počet, pořadí, cesty a hlavní fotka (cesta URL bez domény .cz/.sk) |
 | images | `images_hash` | obsah fotek (SHA-256), fotky se stahují do cache `--image-cache-dir` |
 | vision | `vision` | OpenAI: zobrazuje fotka produkt / souvisí s ním? (ve výchozím stavu vypnuto) |
+| shop | viz níže | kontroly v rámci jednoho e-shopu |
+
+### Kontroly v rámci jednoho e-shopu (skupina `shop`)
+
+Každá kontrola běží zvlášť pro CZ i SK JSON (`--sides cs|sk|both`, výchozí oba) a kontroluje
+všechny produkty daného e-shopu (nejen spárované). Pravidla byla ověřena na skutečných exportech –
+platí pro 90–100 % produktů, zbytek jsou kandidáti na chybu.
+
+| kontrola | pravidlo |
+|---|---|
+| `vat` | sazba DPH: CZ 21 %, SK 23 % |
+| `price_vat`, `variant_price_vat` | cena běžná = cena × (1 + DPH), tolerance 0,1 |
+| `shop_name_metaTitle` | název produktu je zkopírován do SEO titulku (`translations.metaTitle`) |
+| `shop_name_heurekacs_productname`, `shop_name_heurekacs_product` | název produktu = titulek pro Heureku |
+| `shop_name_zbozi_productname`, `shop_name_zbozi_product` | název produktu = titulek pro Zboží |
+| `shop_metaDescription` | SEO popis (`metaDescription`) = anotace (`annotation`) |
+| `shop_slug` | URL (`slug`) = název bez diakritiky, malými písmeny, oddělený pomlčkami |
+| `shop_feed_category` | kategorie je ve všech feedech stejná a rovná se nejhlubší kategorii produktu (`Potahy>Softy>Softy OFF`); prázdná kategorie feedu se ignoruje |
+| `shop_feed_cpc` | CPC je ve všech feedech stejné (warning) |
+| `shop_images` | právě jedna hlavní fotka, je na 1. pozici, pozice 1..n, žádná fotka dvakrát |
+| `shop_variant_codes` | kód varianty = `<kód produktu>-NN`, kódy variant jsou v e-shopu unikátní |
+| `shop_brand_in_name` | název produktu obsahuje značku výrobce (warning) |
+| `shop_visibility_archive` | produkt není zároveň viditelný a archivovaný (warning) |
+
+Kopie názvu se porovnávají přesně (rozdíl ve velikosti písmen je chyba), ignorují se jen mezery
+navíc. Prázdný titulek je warning. Pokud titulek ve feedu obsahuje starý SEO titulek, report to uvede.
 
 Interní ID produktu a varianty (`id`) se **nekontrolují** – mezi CZ a SK se mohou lišit.
 
@@ -94,6 +120,11 @@ python check_all.py
 # jen vybrané kontroly / skupiny, vypnutí jednotlivých kontrol
 python check_all.py --only identity variants price standardPrice
 python check_all.py --group price images
+
+# jen kontroly v rámci e-shopu (CZ i SK), případně jen SK
+python check_shop_all.py
+python check_shop_all.py --sides sk --no-shop_brand_in_name
+python check_shop_name_metaTitle.py --sides cs
 python check_all.py --no-guid --no-updatedAt --no-images_hash
 python check_all.py --skip feeds categories
 
@@ -147,7 +178,7 @@ Struktura JSON:
   "checks": ["identity", "visibility"],
   "sources": {"cs": {"path": "...", "products": 3900}, "sk": {"path": "...", "products": 3968}},
   "pairing": {"matched": 3894, "cs_only": 4, "sk_only": 72, "name_conflicts": 2, "duplicate_codes_cs": 0, "duplicate_codes_sk": 0},
-  "options": {"active_only": false, "tolerance": 0.1, "vat": {"cs": 21.0, "sk": 23.0}, "czk_per_eur": 25.0},
+  "options": {"active_only": false, "sides": "both", "tolerance": 0.1, "vat": {"cs": 21.0, "sk": 23.0}, "czk_per_eur": 25.0},
   "summary": {
     "total_findings": 1,
     "by_severity": {"error": 1},

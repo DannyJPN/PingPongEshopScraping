@@ -6,6 +6,7 @@ import sys
 import pytest
 
 from cssklib import cli
+from cssklib.checks import CHECKS
 from cssklib.images import ImageStore
 from conftest import make_product, make_variant, sk_twin
 
@@ -72,7 +73,10 @@ def test_select_checks_toggles():
     assert ids(["--only", "price", "vat"]) == ["vat", "price"]
     assert ids(["--only", "price", "--no-price"]) == []
     assert "feeds" not in ids(["--skip", "feeds"])
-    assert set(ids(["--group", "price"])) == {"vat", "price", "standardPrice", "price_vat"}
+    assert set(ids(["--group", "price"])) == {"price", "standardPrice"}
+    shop = ids(["--group", "shop"])
+    assert {"vat", "price_vat", "variant_price_vat", "shop_name_metaTitle", "shop_slug"} <= set(shop)
+    assert all(CHECKS[c].group == "shop" for c in shop)
     assert "vision" in ids(["--group", "vision", "--vision"]) and ids(["--group", "vision"]) == []
     with pytest.raises(SystemExit):
         cli.select_checks(parser.parse_args(["--only", "nope"]))
@@ -156,3 +160,18 @@ def test_help_of_every_script_renders():
     for script in scripts:
         proc = subprocess.run([sys.executable, os.path.join(ROOT, script), "--help"], capture_output=True, text=True)
         assert proc.returncode == 0, (script, proc.stderr[-300:])
+
+
+def test_check_shop_all_defaults_to_shop_group(sources, tmp_path):
+    cli.run_all(_args(sources, tmp_path, "--quiet"), default_groups=["shop"], report_name="shop_all")
+    report = _load(tmp_path, "shop_all_")
+    assert report["checks"] and all(CHECKS[c].group == "shop" for c in report["checks"])
+    assert report["options"]["sides"] == "both"
+
+
+def test_sides_option(sources, tmp_path, write_json):
+    product = make_product(visibility=True, archive=True)
+    paths = (write_json([product], "c.json"), write_json([sk_twin(product)], "s.json"))
+    cli.run_single_check("shop_visibility_archive", _args(paths, tmp_path, "--sides", "sk"))
+    report = _load(tmp_path, "cs_sk_shop_visibility_archive_")
+    assert [f["side"] for f in report["findings"]] == ["sk"]

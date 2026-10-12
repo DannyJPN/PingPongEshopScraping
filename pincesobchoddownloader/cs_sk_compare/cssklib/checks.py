@@ -15,6 +15,7 @@ from cssklib.pricing import (
     PriceConfig, expected_sk_price, expected_standard_price, find_rule, within_tolerance,
 )
 from cssklib.report import CheckResult, Finding
+from cssklib.shop_checks import shop_checks
 from cssklib.values import (
     deep_diff, fold_text, get_brand, get_code, get_name, get_translation, image_path, is_active,
     normalize_value,
@@ -52,6 +53,7 @@ class Context:
     pairing: object
     price_config: PriceConfig = field(default_factory=PriceConfig)
     active_only: bool = False
+    shop_sides: tuple = ("cs", "sk")   # sides checked by single-shop checks
     image_store: object = None
     vision: dict = field(default_factory=dict)
     _variant_cache: dict = field(default_factory=dict)
@@ -236,7 +238,7 @@ def make_vat_relation_check(variants=False):
     def run(ctx, check_id):
         config = ctx.price_config
         findings, stats = [], {"checked": 0}
-        for side in ("cs", "sk"):
+        for side in ctx.shop_sides:
             for product in ctx.side_products(side):
                 if not variants:
                     stats["checked"] += 1
@@ -261,7 +263,7 @@ def make_vat_relation_check(variants=False):
 def run_vat(ctx, check_id):
     """vat.rate must be the country VAT rate (CZ 21 %, SK 23 %) — values differ by design."""
     findings, stats = [], {"checked": 0}
-    for side in ("cs", "sk"):
+    for side in ctx.shop_sides:
         expected = ctx.price_config.vat_rates[side]
         for product in ctx.side_products(side):
             stats["checked"] += 1
@@ -483,13 +485,14 @@ def _build_registry():
                             "product"))
     checks.append(Check("other_fields", "Ostatní (neznámé) vlastnosti produktu", run_other_fields, "product"))
     checks += [
-        Check("vat", "Sazba DPH (CZ 21 %, SK 23 %)", run_vat, "price"),
+        Check("vat", "Sazba DPH (CZ 21 %, SK 23 %)", run_vat, "shop"),
         Check("price", "Cena bez DPH: přepočet CZ → SK dle značky", make_price_conversion_check("price"), "price"),
         Check("standardPrice", "Cena běžná: přepočet CZ → SK dle značky",
               make_price_conversion_check("standardPrice"), "price"),
-        Check("price_vat", "Cena běžná = cena × (1 + DPH) v CZ i SK", make_vat_relation_check(), "price"),
+        Check("price_vat", "Cena běžná = cena × (1 + DPH) v CZ i SK", make_vat_relation_check(), "shop"),
         Check("variants", "Varianty: identita (kód + parametry)", run_variants, "variant"),
     ]
+    checks += shop_checks(Check)
     for prop in VARIANT_FIELDS:
         checks.append(Check(f"variant_{prop}", f"Vlastnost varianty '{prop}'", make_variant_field_check(prop),
                             "variant"))
@@ -499,7 +502,7 @@ def _build_registry():
         Check("variant_standardPrice", "Cena běžná varianty: přepočet CZ → SK",
               make_price_conversion_check("standardPrice", variants=True), "variant"),
         Check("variant_price_vat", "Cena běžná varianty = cena × (1 + DPH)",
-              make_vat_relation_check(variants=True), "variant"),
+              make_vat_relation_check(variants=True), "shop"),
         Check("images_path", "Fotky: počet, pořadí a cesty", run_images_path, "images"),
         Check("images_hash", "Fotky: shoda obsahu (SHA-256 hash)", run_images_hash, "images"),
         Check("vision", "Fotky: OpenAI vizuální kontrola, zda zobrazují produkt (drahé)", run_vision,
