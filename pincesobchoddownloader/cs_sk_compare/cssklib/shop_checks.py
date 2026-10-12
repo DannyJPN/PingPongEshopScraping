@@ -11,7 +11,6 @@ Rules (verified on real exports, ~90-100 % of products follow them):
   * exactly one main image, it is the first one, positions are 1..n, no duplicates
   * variant code = <product code>-<suffix>, variant codes are unique in the shop
   * the manufacturer name is part of the product name
-  * a product is not visible and archived at the same time
 """
 import re
 import unicodedata
@@ -198,7 +197,7 @@ def run_images_structure(ctx, check_id):
     return findings, stats
 
 
-# --- Codes, brand, visibility -----------------------------------------------------
+# --- Codes, brand -----------------------------------------------------
 
 def run_variant_codes(ctx, check_id):
     findings, stats = [], {"checked": 0}
@@ -241,18 +240,6 @@ def run_brand_in_name(ctx, check_id):
     return findings, stats
 
 
-def run_visibility_archive(ctx, check_id):
-    findings, stats = [], {"checked": 0}
-    for side, product in _iter_products(ctx):
-        stats["checked"] += 1
-        if product.get("visibility") and product.get("archive"):
-            findings.append(_finding(check_id, product, side, "visibility+archive",
-                                     f"Produkt je v {SIDE_LABEL[side]} viditelný a zároveň archivovaný",
-                                     severity=SEVERITY_WARNING,
-                                     value={"visibility": True, "archive": True}))
-    return findings, stats
-
-
 def shop_checks(check_cls):
     """Check definitions of the single-shop group (registered in checks.CHECKS)."""
     checks = [
@@ -280,7 +267,5 @@ def shop_checks(check_cls):
         check_cls("shop_variant_codes", "Jeden e-shop: kód varianty = kód produktu-NN, unikátní",
                   run_variant_codes, "shop"),
         check_cls("shop_brand_in_name", "Jeden e-shop: název obsahuje značku výrobce", run_brand_in_name, "shop"),
-        check_cls("shop_visibility_archive", "Jeden e-shop: produkt není viditelný a archivovaný zároveň",
-                  run_visibility_archive, "shop"),
     ]
     return checks

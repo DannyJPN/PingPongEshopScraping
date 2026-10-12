@@ -76,7 +76,6 @@ platí pro 90–100 % produktů, zbytek jsou kandidáti na chybu.
 | `shop_images` | právě jedna hlavní fotka, je na 1. pozici, pozice 1..n, žádná fotka dvakrát |
 | `shop_variant_codes` | kód varianty = `<kód produktu>-NN`, kódy variant jsou v e-shopu unikátní |
 | `shop_brand_in_name` | název produktu obsahuje značku výrobce (warning) |
-| `shop_visibility_archive` | produkt není zároveň viditelný a archivovaný (warning) |
 
 Kopie názvu se porovnávají přesně (rozdíl ve velikosti písmen je chyba), ignorují se jen mezery
 navíc. Prázdný titulek je warning. Pokud titulek ve feedu obsahuje starý SEO titulek, report to uvede.

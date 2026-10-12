@@ -18,7 +18,7 @@ def test_shop_group_contents():
     assert {"vat", "price_vat", "variant_price_vat", "shop_name_metaTitle", "shop_name_heurekacs_productname",
             "shop_name_heurekacs_product", "shop_name_zbozi_productname", "shop_name_zbozi_product",
             "shop_metaDescription", "shop_slug", "shop_feed_category", "shop_feed_cpc", "shop_images",
-            "shop_variant_codes", "shop_brand_in_name", "shop_visibility_archive"} == set(SHOP_IDS)
+            "shop_variant_codes", "shop_brand_in_name"} == set(SHOP_IDS)
 
 
 @pytest.mark.parametrize("check_id", SHOP_IDS)
@@ -158,16 +158,16 @@ def test_brand_in_name():
     assert finding.message == "Produkt nemá vyplněného výrobce"
 
 
-def test_visibility_archive():
-    assert len(run("shop_visibility_archive", [make_product(visibility=True, archive=True)]).findings) == 1
-    assert run("shop_visibility_archive", [make_product(visibility=False, archive=True)]).findings == []
+def test_visible_and_archived_is_not_reported():
+    """Visible + archived products are fine (no such check)."""
+    assert "shop_visibility_archive" not in CHECKS
 
 
 def test_shop_sides_restrict_checked_side():
-    cs = make_product(visibility=True, archive=True)
+    cs = make_product(name="Potah Tenergy")
     sk = sk_twin(cs)
     ctx = Context(cs_products=[cs], sk_products=[sk], pairing=pair_products([cs], [sk]), shop_sides=("sk",))
-    findings = run_check(CHECKS["shop_visibility_archive"], ctx).findings
+    findings = run_check(CHECKS["shop_brand_in_name"], ctx).findings
     assert [f.side for f in findings] == ["sk"]
     ctx.shop_sides = ("cs", "sk")
-    assert [f.side for f in run_check(CHECKS["shop_visibility_archive"], ctx).findings] == ["cs", "sk"]
+    assert [f.side for f in run_check(CHECKS["shop_brand_in_name"], ctx).findings] == ["cs", "sk"]

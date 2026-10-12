@@ -170,8 +170,8 @@ def test_check_shop_all_defaults_to_shop_group(sources, tmp_path):
 
 
 def test_sides_option(sources, tmp_path, write_json):
-    product = make_product(visibility=True, archive=True)
+    product = make_product(name="Potah Tenergy")
     paths = (write_json([product], "c.json"), write_json([sk_twin(product)], "s.json"))
-    cli.run_single_check("shop_visibility_archive", _args(paths, tmp_path, "--sides", "sk"))
-    report = _load(tmp_path, "cs_sk_shop_visibility_archive_")
+    cli.run_single_check("shop_brand_in_name", _args(paths, tmp_path, "--sides", "sk"))
+    report = _load(tmp_path, "cs_sk_shop_brand_in_name_")
     assert [f["side"] for f in report["findings"]] == ["sk"]
