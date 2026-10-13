@@ -49,7 +49,11 @@ def test_registry_covers_all_json_properties():
     assert not CHECKS["vision"].default_enabled
 
 
-@pytest.mark.parametrize("check_id", sorted(c for c in CHECKS if c not in ("images_hash", "vision")))
+# dataset level / external checks have their own tests
+SPECIAL_CHECKS = ("images_hash", "vision", "shop_category_mapping_files")
+
+
+@pytest.mark.parametrize("check_id", sorted(c for c in CHECKS if c not in SPECIAL_CHECKS))
 def test_identical_shops_have_no_findings(check_id):
     cs = make_product(variants=[make_variant("BTY01000001-01", [("Barva", "černá")])])
     result = run(check_id, [cs], [sk_twin(cs)])
@@ -348,6 +352,6 @@ def test_product_and_variant_ids_are_never_compared():
     sk["variants"][0]["id"] = 888
     ctx = Context(cs_products=[cs], sk_products=[sk], pairing=pair_products([cs], [sk]))
     for check in CHECKS.values():
-        if check.id in ("images_hash", "vision"):
+        if check.id in SPECIAL_CHECKS:
             continue
         assert run_check(check, ctx).findings == [], check.id

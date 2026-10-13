@@ -19,10 +19,11 @@ def test_shop_group_contents():
     assert {"vat", "price_vat", "variant_price_vat", "shop_name_metaTitle", "shop_name_heurekacs_productname",
             "shop_name_heurekacs_product", "shop_name_zbozi_productname", "shop_name_zbozi_product",
             "shop_metaDescription", "shop_slug", "shop_feed_category", "shop_feed_cpc", "shop_images",
-            "shop_variant_codes", "shop_brand_in_name"} == set(SHOP_IDS)
+            "shop_variant_codes", "shop_brand_in_name", "shop_category_mapping_files",
+            "shop_description_links"} == set(SHOP_IDS)
 
 
-@pytest.mark.parametrize("check_id", SHOP_IDS)
+@pytest.mark.parametrize("check_id", [c for c in SHOP_IDS if c != "shop_category_mapping_files"])
 @pytest.mark.parametrize("side", ["cs", "sk"])
 def test_consistent_product_has_no_findings(check_id, side):
     cs = make_product(variants=[make_variant("BTY01000001-01", [("Barva", "černá")])])
@@ -132,7 +133,9 @@ def test_feed_category_mapped_elsewhere(tmp_path):
     findings = run_mapped([product], mappings).findings
     assert [(f.property, f.cs_value, f.expected) for f in findings] == [
         ("feeds.zbozi.category", "Zbozi: Stoly", "Zbozi: Síťky")]
-    assert findings[0].details == {"feed_category": "Stoly", "product_categories": ["Síťky"]}
+    assert findings[0].details == {"feed_category": "Stoly", "product_categories": ["Síťky"],
+                                   "mapping_file": "CategoryMappingZbozi_CS.csv"}
+    assert findings[0].message.startswith("Rozpor JSON ↔ CategoryMappingZbozi_CS.csv")
 
 
 def test_feed_category_missing_mappings(tmp_path):
@@ -251,3 +254,132 @@ def test_load_mapping_edge_cases(tmp_path):
     assert load_mapping(str(tmp_path), "Zbozi", "CS")[0] == {}
     (tmp_path / "CategoryMappingZbozi_CS.csv").write_text('"KEY","VALUE"\n" Potahy ","X"\n"",""\n', encoding="utf-8")
     assert load_mapping(str(tmp_path), "Zbozi", "CS")[0] == {"Potahy": "X"}
+
+
+# --- category mapping files (file against file) -------------------------------------
+
+def run_files(products, mappings, side="cs"):
+    cs, sk = (products, []) if side == "cs" else ([], products)
+    ctx = Context(cs_products=cs, sk_products=sk, pairing=pair_products(cs, sk), category_mappings=mappings,
+                  shop_sides=(side,))
+    return run_check(CHECKS["shop_category_mapping_files"], ctx)
+
+
+def test_mapping_files_consistent_with_json(tmp_path):
+    mappings = _mapping_dir(tmp_path, {"Potahy": "P"})
+    result = run_files([make_product()], mappings)
+    assert result.findings == [] and result.stats["checked"] == 4
+
+
+def test_mapping_files_against_json(tmp_path):
+    rows = '"KEY","VALUE"\n"Potahy","P"\n"Stoly","S"\n"Prázdná",""\n'
+    for platform in ("Glami", "Google", "Heureka", "Zbozi"):
+        (tmp_path / f"CategoryMapping{platform}_CS.csv").write_text(rows, encoding="utf-8")
+    product = make_product(categories=[{"main": True, "path": {"53": "Textil", "83": "Trička"}}])
+    findings = run_files([product], CategoryMappings(str(tmp_path))).findings
+    zbozi = sorted((f.message, f.severity, f.cs_value) for f in findings
+                   if f.property == "CategoryMappingZbozi_CS.csv")
+    prefix = "Rozpor JSON CS ↔ CategoryMappingZbozi_CS.csv: "
+    assert zbozi == sorted([
+        ("Kategorie nemá v souboru hodnotu", "error", "Prázdná"),
+        (prefix + "kategorie z JSONu v souboru chybí", "error", "Textil>Trička"),
+        (prefix + "kategorie ze souboru se v JSONu nevyskytuje", "warning", "Prázdná"),
+        (prefix + "kategorie ze souboru se v JSONu nevyskytuje", "warning", "Stoly"),
+    ])
+    assert len(findings) == 4 * len(zbozi)
+
+
+def test_mapping_files_against_each_other(tmp_path):
+    mappings = _mapping_dir(tmp_path, {"Potahy": "P"})
+    (tmp_path / "CategoryMappingZbozi_CS.csv").write_text('"KEY","VALUE"\n"Potahy","Z"\n"Stoly","Z"\n',
+                                                          encoding="utf-8")
+    findings = [f for f in run_files([make_product()], mappings).findings if "present_in" in (f.details or {})]
+    assert sorted((f.details["present_in"], f.details["missing_in"], f.cs_value) for f in findings) == [
+        ("CategoryMappingZbozi_CS.csv", "CategoryMappingGlami_CS.csv", "Stoly"),
+        ("CategoryMappingZbozi_CS.csv", "CategoryMappingGoogle_CS.csv", "Stoly"),
+        ("CategoryMappingZbozi_CS.csv", "CategoryMappingHeureka_CS.csv", "Stoly"),
+    ]
+    assert findings[0].message.startswith("Rozpor CategoryMappingZbozi_CS.csv ↔ CategoryMapping")
+
+
+def test_mapping_files_missing_and_sk_fallback(tmp_path):
+    result = run_files([make_product()], CategoryMappings(str(tmp_path)))
+    assert [f.message for f in result.findings] == ["Mapovací soubor chybí nebo je prázdný"] * 4
+    assert {f.severity for f in result.findings} == {"warning"}
+    mappings = _mapping_dir(tmp_path, {"Potahy": "P"}, sk_rows=None)
+    findings = run_files([sk_twin(make_product())], mappings, side="sk").findings
+    assert findings == []
+
+
+# --- hyperlinks in descriptions --------------------------------------------------------
+
+def _with_description(html, field="description", **kwargs):
+    product = make_product(**kwargs)
+    product["translations"]["cs"][field] = html
+    return product
+
+
+OTHER = make_product("BTY01000002", "Potah BUTTERFLY Dignics 09C")   # slug potah-butterfly-dignics-09c
+
+
+@pytest.mark.parametrize("href", [
+    "/potah-butterfly-dignics-09c/",
+    "https://www.pincesobchod.cz/potah-butterfly-dignics-09c/",
+    "https://pincesobchod.cz/potah-butterfly-dignics-09c",
+])
+def test_link_to_other_product_of_same_shop_is_allowed(href):
+    product = _with_description(f'<p>Viz <a href="{href}">Dignics</a></p>')
+    result = run("shop_description_links", [product, OTHER])
+    assert result.findings == [] and result.stats["allowed_links"] == 1
+
+
+@pytest.mark.parametrize("html,reason", [
+    ('<a href="https://www.andro.de/en">x</a>', "Odkaz mimo e-shop"),
+    ('<a href="https://www.pincesobchod.sk/potah-butterfly-dignics-09c/">x</a>', "Odkaz mimo e-shop"),
+    ('<a href="/vyhledavani/?string=etna">x</a>', "Odkaz na stránku e-shopu, která není produktem"),
+    ('<a href="/nase-novinky/recenze/">x</a>', "Odkaz na stránku e-shopu, která není produktem"),
+    ('<a href="/">x</a>', "Odkaz na stránku e-shopu, která není produktem"),
+    ('<a href="/neexistujici-produkt/">x</a>', "Odkaz na neexistující produkt e-shopu"),
+    ('<a href="/potah-butterfly-tenergy-05/">x</a>', "Odkaz na sebe sama (ne na jiný produkt)"),
+    ('<a href="mailto:info@example.com">x</a>', "Odkaz typu 'mailto:' není povolen"),
+    ('<a href="relative-page">x</a>', "Odkaz není na produkt e-shopu"),
+    ('<a name="kotva">x</a>', "Odkaz bez cíle (prázdný href)"),
+    ("<p>Více na www.andro.de</p>", "Adresa URL v textu popisu"),
+    ("<p>https://tibhar.info/en/news</p>", "Adresa URL v textu popisu"),
+])
+def test_forbidden_links(html, reason):
+    findings = run("shop_description_links", [_with_description(html), OTHER]).findings
+    assert [f.message for f in findings] == [reason]
+    assert findings[0].property == "translations.description"
+
+
+@pytest.mark.parametrize("field", ["annotation", "metaDescription"])
+def test_links_checked_in_short_descriptions(field):
+    product = _with_description('<a href="https://www.andro.de">x</a>', field=field)
+    assert [f.property for f in run("shop_description_links", [product]).findings] == [f"translations.{field}"]
+
+
+def test_links_sk_side_uses_sk_domain_and_sk_products():
+    other = sk_twin(OTHER)
+    product = sk_twin(make_product())
+    product["translations"]["cs"]["description"] = (
+        '<a href="https://www.pincesobchod.sk/potah-butterfly-dignics-09c/">ok</a>'
+        '<a href="https://www.pincesobchod.cz/potah-butterfly-dignics-09c/">cz</a>')
+    findings = run("shop_description_links", [product, other], side="sk").findings
+    assert [(f.side, f.sk_value) for f in findings] == [
+        ("sk", "https://www.pincesobchod.cz/potah-butterfly-dignics-09c/")]
+
+
+def test_link_check_targets_whole_shop_even_with_active_only():
+    hidden = make_product("BTY01000002", "Potah BUTTERFLY Dignics 09C", visibility=False)
+    product = _with_description('<a href="/potah-butterfly-dignics-09c/">x</a>')
+    ctx = Context(cs_products=[product, hidden], sk_products=[], pairing=pair_products([product, hidden], []),
+                  active_only=True, shop_sides=("cs",))
+    result = run_check(CHECKS["shop_description_links"], ctx)
+    assert result.findings == [] and result.stats["checked"] == 3
+
+
+def test_extract_links_ignores_urls_inside_links():
+    from cssklib.shop_checks import extract_links
+    links, text_urls = extract_links('<a href="/a/">https://x.cz</a> a www.y.cz <A HREF="/b/">b</A>')
+    assert links == ["/a/", "/b/"] and text_urls == ["www.y.cz"]
