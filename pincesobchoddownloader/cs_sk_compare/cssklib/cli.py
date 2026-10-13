@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 
+from cssklib.category_mapping import DEFAULT_MEMORY_DIR, CategoryMappings
 from cssklib.checks import CHECKS, Context, run_check
 from cssklib.constants import (
     CZK_PER_EUR, DEFAULT_CS_DIR, DEFAULT_IMAGE_CACHE_DIR, DEFAULT_REPORT_DIR, DEFAULT_SK_DIR,
@@ -39,6 +40,9 @@ def add_common_arguments(parser):
                      help="Max. vypsaných nálezů na kontrolu v TXT/konzoli (0 = vše)")
     out.add_argument("--quiet", action="store_true", help="Na konzoli vypsat jen souhrn")
     out.add_argument("--debug", action="store_true", help="Debug logování")
+
+    src.add_argument("--memory-dir", default=DEFAULT_MEMORY_DIR,
+                     help="Složka s mapováním kategorií (CategoryMapping<Platforma>_<LANG>.csv)")
 
     price = parser.add_argument_group("ceny")
     price.add_argument("--tolerance", type=float, default=PRICE_TOLERANCE, help="Tolerance přepočtů")
@@ -101,7 +105,8 @@ def build_context(args, checks, image_store_factory=None, vision_checker_factory
                                czk_per_eur=args.czk_per_eur, tolerance=args.tolerance)
     ctx = Context(cs_products=cs_products, sk_products=sk_products, pairing=pairing,
                   price_config=price_config, active_only=args.active_only,
-                  shop_sides=("cs", "sk") if args.sides == "both" else (args.sides,))
+                  shop_sides=("cs", "sk") if args.sides == "both" else (args.sides,),
+                  category_mappings=CategoryMappings(args.memory_dir))
     ids = {c.id for c in checks}
     needs_images = "images_hash" in ids or ("vision" in ids and getattr(args, "vision_embed", False))
     if needs_images:

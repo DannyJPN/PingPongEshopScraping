@@ -6,7 +6,8 @@ Rules (verified on real exports, ~90-100 % of products follow them):
     Heureka / Zboží product titles (feeds.heurekacs|zbozi.productname|product)
   * meta description = annotation
   * slug = slugified product name
-  * all feeds use the same category, equal to the deepest category path of the product
+  * feed categories map (project mapping desaka_unifier/Memory/CategoryMapping<Platform>_<LANG>.csv)
+    to the same platform category as the product's own categories
   * all feeds use the same CPC
   * exactly one main image, it is the first one, positions are 1..n, no duplicates
   * variant code = <product code>-<suffix>, variant codes are unique in the shop
@@ -16,7 +17,8 @@ import re
 import unicodedata
 from collections import Counter
 
-from cssklib.constants import SEVERITY_ERROR, SEVERITY_WARNING, SIDE_LABEL
+from cssklib.category_mapping import FEED_PLATFORMS, CategoryMappings
+from cssklib.constants import SEVERITY_ERROR, SEVERITY_WARNING, SIDE_LANG
 from cssklib.images import sorted_images
 from cssklib.pairing import variant_code
 from cssklib.report import Finding
@@ -29,7 +31,6 @@ FEED_NAME_TARGETS = [
     ("zbozi", "productname"),
     ("zbozi", "product"),
 ]
-FEED_CATEGORY_KEYS = ("glami", "google", "heurekacs", "zbozi", "shopalikecs")
 FEED_CPC_FIELDS = (("glami", "cpc"), ("heurekacs", "cpc"), ("zbozi", "cpc"), ("zbozi", "cpc_search"),
                    ("shopalikecs", "cpc"))
 
@@ -115,31 +116,47 @@ def _category_paths(product):
 
 
 def run_feed_categories(ctx, check_id):
-    findings, stats = [], {"checked": 0}
+    """
+    The e-shop category stored in each feed (feeds.<feed>.category, e.g. "Potahy>Softy") is mapped
+    to the platform category by the project mapping. It has to map to the same platform category
+    as (at least one of) the product's own categories.
+    """
+    mappings = ctx.category_mappings or CategoryMappings()
+    findings, stats = [], {"checked": 0, "no_mapping_file": 0}
+    used_files = set()
     for side, product in _iter_products(ctx):
-        # empty category = feed does not use it for this product (e.g. shopalikecs for non-textile)
-        feeds = {k: _feed(product, k).get("category") for k in FEED_CATEGORY_KEYS
-                 if normalize_text(_feed(product, k).get("category"))}
-        if not feeds:
-            continue
-        stats["checked"] += 1
-        values = {normalize_text(v) for v in feeds.values()}
-        if len(values) > 1:
-            findings.append(_finding(check_id, product, side, "feeds.*.category",
-                                     "Feedy mají různé kategorie", value=feeds))
         paths = _category_paths(product)
-        if not paths:
-            continue
-        depth = max(p.count(">") for p in paths)
-        deepest = sorted(p for p in paths if p.count(">") == depth)
-        for key, value in feeds.items():
-            if normalize_text(value) not in deepest:
+        unmapped = {}   # product category path -> mapping files without it
+        for feed_key, platform in FEED_PLATFORMS.items():
+            feed_category = normalize_text(_feed(product, feed_key).get("category"))
+            if not feed_category:
+                continue
+            mapping, file_name = mappings.get(platform, SIDE_LANG[side])
+            if not mapping:
+                stats["no_mapping_file"] += 1
+                continue
+            used_files.add(file_name)
+            stats["checked"] += 1
+            prop = f"feeds.{feed_key}.category"
+            if feed_category not in mapping:
+                findings.append(_finding(check_id, product, side, prop,
+                                         f"Kategorie ve feedu nemá mapování v {file_name}", value=feed_category))
+                continue
+            for path in paths:
+                if path not in mapping:
+                    unmapped.setdefault(path, []).append(file_name)
+            expected = sorted({mapping[path] for path in paths if path in mapping})
+            if expected and mapping[feed_category] not in expected:
                 findings.append(_finding(
-                    check_id, product, side, f"feeds.{key}.category",
-                    "Kategorie ve feedu neodpovídá nejhlubší kategorii produktu"
-                    + (" (kategorie produkt vůbec nemá)" if normalize_text(value) not in paths else ""),
-                    value=value, expected=deepest[0] if len(deepest) == 1 else deepest,
-                    details={"product_categories": paths}))
+                    check_id, product, side, prop,
+                    f"Kategorie ve feedu '{feed_category}' se dle {file_name} mapuje jinam než kategorie produktu",
+                    value=mapping[feed_category], expected=expected[0] if len(expected) == 1 else expected,
+                    details={"feed_category": feed_category, "product_categories": paths}))
+        for path, files in unmapped.items():
+            findings.append(_finding(check_id, product, side, "categories",
+                                     "Kategorie produktu nemá mapování v " + ", ".join(files),
+                                     value=path, severity=SEVERITY_WARNING))
+    stats["mapping_files"] = ", ".join(sorted(used_files)) or "-"
     return findings, stats
 
 
@@ -259,7 +276,7 @@ def shop_checks(check_cls):
         check_cls("shop_metaDescription", "Jeden e-shop: SEO popis (metaDescription) = anotace",
                   run_meta_description, "shop"),
         check_cls("shop_slug", "Jeden e-shop: URL (slug) odpovídá názvu", run_slug, "shop"),
-        check_cls("shop_feed_category", "Jeden e-shop: kategorie ve feedech = nejhlubší kategorie produktu",
+        check_cls("shop_feed_category", "Jeden e-shop: kategorie ve feedech dle mapování kategorií projektu",
                   run_feed_categories, "shop"),
         check_cls("shop_feed_cpc", "Jeden e-shop: stejné CPC ve všech feedech", run_feed_cpc, "shop"),
         check_cls("shop_images", "Jeden e-shop: jedna hlavní fotka na 1. pozici, pozice 1..n, bez duplicit",

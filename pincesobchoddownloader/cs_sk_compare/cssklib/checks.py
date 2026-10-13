@@ -54,6 +54,7 @@ class Context:
     price_config: PriceConfig = field(default_factory=PriceConfig)
     active_only: bool = False
     shop_sides: tuple = ("cs", "sk")   # sides checked by single-shop checks
+    category_mappings: object = None   # CategoryMappings (project memory files)
     image_store: object = None
     vision: dict = field(default_factory=dict)
     _variant_cache: dict = field(default_factory=dict)

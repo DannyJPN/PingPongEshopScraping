@@ -1,5 +1,6 @@
 import pytest
 
+from cssklib.category_mapping import CategoryMappings, load_mapping
 from cssklib.checks import CHECKS, Context, run_check
 from cssklib.pairing import pair_products
 from cssklib.shop_checks import slugify
@@ -86,32 +87,94 @@ def test_meta_description_and_slug():
     assert run("shop_slug", [product]).findings[0].expected == "potah-butterfly-tenergy-05"
 
 
-def test_feed_category_rules():
-    product = make_product(categories=[
-        {"main": True, "path": {"44": "Potahy"}},
-        {"main": False, "path": {"44": "Potahy", "66": "Softy"}},
-    ])
+def _mapping_dir(tmp_path, cs_rows, sk_rows=None):
+    for platform in ("Glami", "Google", "Heureka", "Zbozi"):
+        for lang, rows in (("CS", cs_rows), ("SK", sk_rows)):
+            path = tmp_path / f"CategoryMapping{platform}_{lang}.csv"
+            text = '"KEY","VALUE"\n' + "".join(f'"{k}","{platform}: {v}"\n' for k, v in (rows or {}).items())
+            path.write_text("\ufeff" + text if rows is not None else "\ufeff", encoding="utf-8")
+    return CategoryMappings(str(tmp_path))
+
+
+def run_mapped(products, mappings, side="cs"):
+    cs, sk = (products, []) if side == "cs" else ([], products)
+    ctx = Context(cs_products=cs, sk_products=sk, pairing=pair_products(cs, sk), category_mappings=mappings)
+    return run_check(CHECKS["shop_feed_category"], ctx)
+
+
+ROWS = {"Potahy": "Potahy na pálky", "Potahy>Softy": "Potahy na pálky", "Čističe": "Doplňky",
+        "Příslušenství": "Doplňky", "Síťky": "Síťky", "Stoly": "Stoly"}
+
+
+def test_feed_category_follows_project_mapping(tmp_path):
+    mappings = _mapping_dir(tmp_path, ROWS)
+    product = make_product(categories=[{"main": True, "path": {"44": "Potahy"}},
+                                       {"main": False, "path": {"44": "Potahy", "66": "Softy"}}])
     for key in ("glami", "google", "heurekacs", "zbozi"):
-        product["feeds"][key]["category"] = "Potahy>Softy"
-    assert run("shop_feed_category", [product]).findings == []
-    product["feeds"]["glami"]["category"] = "Potahy"
+        product["feeds"][key]["category"] = "Potahy>Softy"   # other shop category, same platform category
+    result = run_mapped([product], mappings)
+    assert result.findings == [] and result.stats["checked"] == 4
+    assert result.stats["mapping_files"] == ", ".join(f"CategoryMapping{p}_CS.csv"
+                                                      for p in ("Glami", "Google", "Heureka", "Zbozi"))
+    # different shop category with the same platform category is fine (Čističe vs Příslušenství)
+    product = make_product(categories=[{"main": True, "path": {"37": "Čističe"}}])
+    for key in ("glami", "google", "heurekacs", "zbozi"):
+        product["feeds"][key]["category"] = "Příslušenství"
+    assert run_mapped([product], mappings).findings == []
+
+
+def test_feed_category_mapped_elsewhere(tmp_path):
+    mappings = _mapping_dir(tmp_path, ROWS)
+    product = make_product(categories=[{"main": True, "path": {"48": "Síťky"}}])
     product["feeds"]["zbozi"]["category"] = "Stoly"
-    findings = run("shop_feed_category", [product]).findings
-    assert [f.property for f in findings] == ["feeds.*.category", "feeds.glami.category", "feeds.zbozi.category"]
-    assert "nemá" in findings[2].message and "nemá" not in findings[1].message
-    assert findings[1].expected == "Potahy>Softy"
-    assert findings[1].details["product_categories"] == ["Potahy", "Potahy>Softy"]
+    for key in ("glami", "google", "heurekacs"):
+        product["feeds"][key]["category"] = "Síťky"
+    findings = run_mapped([product], mappings).findings
+    assert [(f.property, f.cs_value, f.expected) for f in findings] == [
+        ("feeds.zbozi.category", "Zbozi: Stoly", "Zbozi: Síťky")]
+    assert findings[0].details == {"feed_category": "Stoly", "product_categories": ["Síťky"]}
 
 
-def test_feed_category_ignores_empty_feed_category():
+def test_feed_category_missing_mappings(tmp_path):
+    mappings = _mapping_dir(tmp_path, ROWS)
+    product = make_product(categories=[{"main": True, "path": {"53": "Textil", "83": "Trička"}}])
+    for key in ("glami", "google", "heurekacs", "zbozi"):
+        product["feeds"][key]["category"] = "Textil>Trička"
+    findings = run_mapped([product], mappings).findings
+    assert {(f.property, f.severity) for f in findings} == {("feeds.glami.category", "error"),
+                                                           ("feeds.google.category", "error"),
+                                                           ("feeds.heurekacs.category", "error"),
+                                                           ("feeds.zbozi.category", "error")}
+    product["feeds"]["zbozi"]["category"] = "Potahy"
+    findings = run_mapped([product], mappings).findings
+    warnings = [f for f in findings if f.property == "categories"]
+    assert [(f.severity, f.cs_value) for f in warnings] == [("warning", "Textil>Trička")]
+    assert "CategoryMappingZbozi_CS.csv" in warnings[0].message
+
+
+def test_feed_category_sk_falls_back_to_cs_mapping(tmp_path):
+    mappings = _mapping_dir(tmp_path, ROWS, sk_rows=None)
+    product = sk_twin(make_product())
+    product["feeds"]["zbozi"]["category"] = "Stoly"
+    result = run_mapped([product], mappings, side="sk")
+    assert [f.property for f in result.findings] == ["feeds.zbozi.category"]
+    assert "záloha" in result.findings[0].message
+    sk_dir = tmp_path / "sk"
+    sk_dir.mkdir()
+    sk_mappings = _mapping_dir(sk_dir, ROWS, sk_rows={"Potahy": "SK potahy", "Stoly": "SK potahy"})
+    assert run_mapped([product], sk_mappings, side="sk").findings == []
+
+
+def test_feed_category_without_mapping_files(tmp_path):
+    result = run_mapped([make_product()], CategoryMappings(str(tmp_path)))
+    assert result.findings == [] and result.stats["no_mapping_file"] == 4
+
+
+def test_feed_category_uses_project_memory_by_default():
     product = make_product()
-    product["feeds"]["shopalikecs"] = {"hidden": 0, "category": "", "cpc": 1210}
-    assert run("shop_feed_category", [product]).findings == []
-
-
-def test_feed_category_without_feeds_or_categories():
-    assert run("shop_feed_category", [make_product(feeds={})]).stats["checked"] == 0
-    assert run("shop_feed_category", [make_product(categories=[])]).findings == []
+    ctx = Context(cs_products=[product], sk_products=[], pairing=pair_products([product], []))
+    result = run_check(CHECKS["shop_feed_category"], ctx)
+    assert result.findings == [] and result.stats["checked"] == 4
 
 
 def test_feed_cpc():
@@ -171,3 +234,20 @@ def test_shop_sides_restrict_checked_side():
     assert [f.side for f in findings] == ["sk"]
     ctx.shop_sides = ("cs", "sk")
     assert [f.side for f in run_check(CHECKS["shop_brand_in_name"], ctx).findings] == ["cs", "sk"]
+
+
+def test_feed_category_ignores_empty_values_and_products_without_categories(tmp_path):
+    mappings = _mapping_dir(tmp_path, ROWS)
+    product = make_product()
+    product["feeds"]["glami"]["category"] = ""
+    assert run_mapped([product], mappings).stats["checked"] == 3
+    assert run_mapped([make_product(feeds={})], mappings).stats["checked"] == 0
+    assert run_mapped([make_product(categories=[])], mappings).findings == []
+
+
+def test_load_mapping_edge_cases(tmp_path):
+    assert load_mapping(str(tmp_path), "Zbozi", "CS") == ({}, "CategoryMappingZbozi_CS.csv")
+    (tmp_path / "CategoryMappingZbozi_CS.csv").write_text("A;B\n1;2\n", encoding="utf-8")
+    assert load_mapping(str(tmp_path), "Zbozi", "CS")[0] == {}
+    (tmp_path / "CategoryMappingZbozi_CS.csv").write_text('"KEY","VALUE"\n" Potahy ","X"\n"",""\n', encoding="utf-8")
+    assert load_mapping(str(tmp_path), "Zbozi", "CS")[0] == {"Potahy": "X"}
