@@ -71,11 +71,13 @@ všechny produkty daného e-shopu (nejen spárované). Pravidla vycházejí ze z
 | `shop_name_zbozi_productname`, `shop_name_zbozi_product` | název produktu = titulek pro Zboží |
 | `shop_metaDescription` | SEO popis (`metaDescription`) = anotace (`annotation`) |
 | `shop_slug` | URL (`slug`) = název bez diakritiky, malými písmeny, oddělený pomlčkami |
-| `shop_feed_category` | kategorie e-shopu uvedená ve feedu (`feeds.glami/google/heurekacs/zbozi.category`) se podle mapování projektu (`desaka_unifier/Memory/CategoryMapping<Platforma>_<CS/SK>.csv`) musí mapovat na stejnou kategorii srovnávače jako některá z kategorií produktu; chybějící mapování kategorie ve feedu je chyba, chybějící mapování kategorie produktu warning. Prázdné SK mapování → použije se CS. Složka mapování: `--memory-dir` |
+| `shop_feed_category` | kategorie e-shopu uvedená ve feedu (`feeds.glami/google/heurekacs/zbozi.category`) se podle mapování projektu (`desaka_unifier/Memory/CategoryMapping<Platforma>_<CS/SK>.csv`) musí mapovat na stejnou kategorii srovnávače jako některá z kategorií produktu; nálezy jsou formulované jako rozpor „JSON ↔ mapovací soubor“ – chybu může mít kterýkoli z nich. Zatím se pro CZ i SK používá české mapování (SK soubory jsou prázdné → použije se CS). Složka mapování: `--memory-dir` |
 | `shop_feed_cpc` | CPC je ve všech feedech stejné (warning) |
 | `shop_images` | právě jedna hlavní fotka, je na 1. pozici, pozice 1..n, žádná fotka dvakrát |
 | `shop_variant_codes` | kód varianty = `<kód produktu>-NN`, kódy variant jsou v e-shopu unikátní |
 | `shop_brand_in_name` | název produktu obsahuje značku výrobce (warning) |
+| `shop_description_links` | popisy (`description`, `annotation`, `metaDescription`) neobsahují odkazy ani URL v textu; povolen je jen odkaz na **jiný produkt téhož e-shopu** (`/slug-produktu/` nebo `https://www.pincesobchod.cz/slug-produktu/`, u SK doména `.sk`), jehož slug existuje v JSONu. Hlásí odkazy mimo e-shop, na vyhledávání / novinky / kategorie, na neexistující (staré) produkty, na sebe sama, `mailto:` apod. |
+| `shop_category_mapping_files` | **soubor proti souboru**: kategorie e-shopu použité v JSONu (kategorie produktů i feedů) ↔ klíče každého `CategoryMapping<Platforma>_<LANG>.csv` (obousměrně) a mapovací soubory platforem navzájem (stejné klíče, vyplněné hodnoty). Žádný ze souborů se nepovažuje za správný – nález říká jen, že se soubory rozcházejí. |
 
 Kopie názvu se porovnávají přesně (rozdíl ve velikosti písmen je chyba), ignorují se jen mezery
 navíc. Prázdný titulek je warning. Pokud titulek ve feedu obsahuje starý SEO titulek, report to uvede.

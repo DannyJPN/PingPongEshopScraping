@@ -373,7 +373,7 @@ def classify_link(href, side, product_slugs):
     path = unquote(parts.path).strip("/")
     if "/" in path or path not in product_slugs:
         return "Odkaz na stránku e-shopu, která není produktem" if "/" in path or not path \
-            else "Odkaz na neexistující produkt e-shopu"
+            else "Odkaz na produkt, který v JSONu e-shopu neexistuje (neplatný nebo starý odkaz)"
     return None
 
 

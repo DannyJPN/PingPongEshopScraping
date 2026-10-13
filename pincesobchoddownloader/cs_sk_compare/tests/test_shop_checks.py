@@ -339,7 +339,7 @@ def test_link_to_other_product_of_same_shop_is_allowed(href):
     ('<a href="/vyhledavani/?string=etna">x</a>', "Odkaz na stránku e-shopu, která není produktem"),
     ('<a href="/nase-novinky/recenze/">x</a>', "Odkaz na stránku e-shopu, která není produktem"),
     ('<a href="/">x</a>', "Odkaz na stránku e-shopu, která není produktem"),
-    ('<a href="/neexistujici-produkt/">x</a>', "Odkaz na neexistující produkt e-shopu"),
+    ('<a href="/neexistujici-produkt/">x</a>', "Odkaz na produkt, který v JSONu e-shopu neexistuje (neplatný nebo starý odkaz)"),
     ('<a href="/potah-butterfly-tenergy-05/">x</a>', "Odkaz na sebe sama (ne na jiný produkt)"),
     ('<a href="mailto:info@example.com">x</a>', "Odkaz typu 'mailto:' není povolen"),
     ('<a href="relative-page">x</a>', "Odkaz není na produkt e-shopu"),
