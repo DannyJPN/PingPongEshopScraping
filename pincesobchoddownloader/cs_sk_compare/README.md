@@ -59,8 +59,8 @@ Seznam všech kontrol: `python check_all.py --list-checks`.
 ### Kontroly v rámci jednoho e-shopu (skupina `shop`)
 
 Každá kontrola běží zvlášť pro CZ i SK JSON (`--sides cs|sk|both`, výchozí oba) a kontroluje
-všechny produkty daného e-shopu (nejen spárované). Pravidla byla ověřena na skutečných exportech –
-platí pro 90–100 % produktů, zbytek jsou kandidáti na chybu.
+všechny produkty daného e-shopu (nejen spárované). Pravidla vycházejí ze zadání a z dat projektu
+(mapování kategorií v `desaka_unifier/Memory`), ne z JSONů samotných – ty mohou obsahovat chyby.
 
 | kontrola | pravidlo |
 |---|---|
@@ -71,7 +71,7 @@ platí pro 90–100 % produktů, zbytek jsou kandidáti na chybu.
 | `shop_name_zbozi_productname`, `shop_name_zbozi_product` | název produktu = titulek pro Zboží |
 | `shop_metaDescription` | SEO popis (`metaDescription`) = anotace (`annotation`) |
 | `shop_slug` | URL (`slug`) = název bez diakritiky, malými písmeny, oddělený pomlčkami |
-| `shop_feed_category` | kategorie je ve všech feedech stejná a rovná se nejhlubší kategorii produktu (`Potahy>Softy>Softy OFF`); prázdná kategorie feedu se ignoruje |
+| `shop_feed_category` | kategorie e-shopu uvedená ve feedu (`feeds.glami/google/heurekacs/zbozi.category`) se podle mapování projektu (`desaka_unifier/Memory/CategoryMapping<Platforma>_<CS/SK>.csv`) musí mapovat na stejnou kategorii srovnávače jako některá z kategorií produktu; chybějící mapování kategorie ve feedu je chyba, chybějící mapování kategorie produktu warning. Prázdné SK mapování → použije se CS. Složka mapování: `--memory-dir` |
 | `shop_feed_cpc` | CPC je ve všech feedech stejné (warning) |
 | `shop_images` | právě jedna hlavní fotka, je na 1. pozici, pozice 1..n, žádná fotka dvakrát |
 | `shop_variant_codes` | kód varianty = `<kód produktu>-NN`, kódy variant jsou v e-shopu unikátní |
