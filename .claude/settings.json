@@ -178,12 +178,9 @@
 
     ],
     "ask": [
-      "Write(./**)",
       "Edit(./**)",
-      "Delete(./**)",
-      "Update(./**)",
 
-      "Bash(python *.py:*)",
+      "Bash(python *.py*)",
       "Bash(pytest:*)",
       "Bash(coverage:*)",
 
@@ -203,11 +200,12 @@
       "Bash(vips:*)",
 
       "Bash(start:*)",
-      "Bash(.*/[^\\\\/]*(\\.exe|\\.bat|\\.cmd):*)"
+      "Bash(*.exe*)",
+      "Bash(*.bat*)",
+      "Bash(*.cmd*)"
     ],
     "deny": [
       "Read(C:/**)",
-      "Delete(/**)",
 
       "Bash(git merge:*)",
 
